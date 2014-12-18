@@ -140,12 +140,10 @@ def pad_plot(data):
     fig, ax = plt.subplots()
 
     ax.add_collection(c)
-    ax.autoscale_view()
+
+    plt.axis('equal')
 
     fig.show()
-
-
-
 
 if __name__ == "__main__":
     generate_pad_plane()
