@@ -63,7 +63,8 @@ class EventFile:
 
         return
 
-    def pack_sample(self, tb, val):
+    @staticmethod
+    def pack_sample(tb, val):
 
         # val is 12-bits and tb is 9 bits. Fit this in 24 bits.
         # Use one bit for parity
@@ -81,7 +82,8 @@ class EventFile:
         joined = (tb << 15) | narrowed | parity
         return joined
 
-    def unpack_sample(self, packed):
+    @staticmethod
+    def unpack_sample(packed):
         """Unpacks a packed time bucket / sample pair.
 
         :param packed: The packed value, as an integer
@@ -97,9 +99,8 @@ class EventFile:
 
         return tb, sample
 
-    def unpack_samples(self, packed):
-
-        result = numpy.zeros(512)
+    @staticmethod
+    def unpack_samples(packed):
 
         tbs = (packed & 0xFF8000) >> 15
         samples = (packed & 0xFFF)
@@ -108,71 +109,10 @@ class EventFile:
         # Change the parities from (0, 1, ...) to (1, -1, ...) and multiply
         samples *= (-2 * parities + 1)
 
-        for x, y in zip(tbs, samples):
-            result[x] = y
-
-        return result
+        result = numpy.hstack((tbs, samples))
+        return result[result[:, 0].argsort(), 1]
 
     def read_next(self):
-        """Reads the next event from the file.
-
-        This function attempts to read an event beginning at the current file position. The position is checked by
-        checking the event magic number ``0xEE``.
-
-        :return: The event as an :class:`Event`
-        """
-
-        assert self.is_open
-
-        try:
-            # Read the event header
-            # This has the following structure:
-            #     (magic, size, ID, ts, nTraces)
-            hdr = struct.unpack('<BIIQH', self.fp.read(19))
-
-            if hdr[0] != 0xEE:
-                # This is not the beginning of the event. Seek back and fail.
-                self.fp.seek(-19, 1)
-                raise FilePosError(self.fp.name, "Event magic number was wrong.")
-
-            event_size = hdr[1]
-            event_id = hdr[2]
-            event_ts = hdr[3]
-            num_traces = hdr[4]
-
-            print("Found event of size", event_size, ":")
-            print("    Event Number:", event_id)
-            print("    Contains", num_traces, "traces")
-
-            new_evt = Event(evt_id=event_id, timestamp=event_ts)
-
-            # Read the traces
-
-            for n in range(num_traces):
-                # Read the trace header. The structure of this is:
-                #    (size, cobo, asad, aget, ch, pad)
-                th = struct.unpack('<IBBBBH', self.fp.read(10))
-
-                cobo = th[1]
-                asad = th[2]
-                aget = th[3]
-                ch = th[4]
-                pad = th[5]
-
-                # Now read the traces themselves
-                num_samples = (th[0] - 10) // 3  # (total - header) / size of packed item
-
-                for s in range(num_samples):
-                    packed = struct.unpack('<I', self.fp.read(3) + b'\x00')[0]
-                    unpacked = self.unpack_sample(packed)
-                    new_evt.traces[cobo, asad, aget, ch, unpacked[0]] = unpacked[1]
-
-            return new_evt
-
-        except Error as er:
-            raise er
-
-    def read_next_new(self):
         """Reads the next event from the file.
 
         This function attempts to read an event beginning at the current file position. The position is checked by
@@ -221,9 +161,8 @@ class EventFile:
                 # Now read the trace itself
                 num_samples = (th[0] - 10) // 3  # (total - header) / size of packed item
 
-                raw_data_string = self.fp.read(3*num_samples)
-
-                packed = numpy.array([int.from_bytes(raw_data_string[n:n+3], 'little') for n in range(0, 3*num_samples, 3)])
+                packed = numpy.hstack((numpy.fromfile(self.fp, dtype='3u1', count=num_samples),
+                                       numpy.zeros((512, 1), dtype='u1'))).view('<u4')
 
                 unpacked = self.unpack_samples(packed)
                 new_evt.traces[cobo, asad, aget, ch] = unpacked
@@ -262,10 +201,9 @@ class Event:
 
         return
 
-
     def hits(self, padmap):
 
-        hits_by_addr = self.traces.sum((4))
+        hits_by_addr = self.traces.sum(4)
         flat_hits = numpy.zeros(10240)
 
         for addr, hitval in numpy.ndenumerate(hits_by_addr):
