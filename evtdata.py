@@ -1,5 +1,6 @@
 import struct
 import numpy
+import os.path
 
 
 class EventFile:
@@ -19,10 +20,18 @@ class EventFile:
         """
 
         self.magic = 0x6e7ef11e
+        self.lookup = []
+        self.current_event = 0
 
         if filename is not None:
             self.open(filename)
+            ltfilename = os.path.splitext(filename)[0] + '.lookup'
+            if os.path.exists(ltfilename):
+                self.load_lookup_table(ltfilename)
+            else:
+                self.make_lookup_table()
             self.is_open = True
+
         else:
             self.fp = None
             self.is_open = False
@@ -112,8 +121,8 @@ class EventFile:
         result = numpy.hstack((tbs, samples))
         return result[result[:, 0].argsort(), 1]
 
-    def read_next(self):
-        """Reads the next event from the file.
+    def _read(self):
+        """Reads an event at the current file position.
 
         This function attempts to read an event beginning at the current file position. The position is checked by
         checking the event magic number ``0xEE``.
@@ -171,6 +180,87 @@ class EventFile:
 
         except Error as er:
             raise er
+
+    def make_lookup_table(self):
+
+        assert self.is_open
+
+        self.fp.seek(4)
+
+        self.lookup = []
+
+        while True:
+            magic = self.fp.read(1)
+            if magic == b'\xEE':
+                pos = self.fp.tell() - 1
+                self.lookup.append(pos)
+                offset = struct.unpack('<I', self.fp.read(4))[0]
+                self.fp.seek(pos + offset)
+            elif magic == b'':
+                break
+            else:
+                print("Bad magic number")
+                return None
+
+        self.fp.seek(4)
+        self.current_event = 0
+
+        ltfilename = os.path.splitext(self.fp.name)[0] + '.lookup'
+
+        if not os.path.exists(ltfilename):
+            ltfile = open(ltfilename, 'w')
+            for entry in self.lookup:
+                ltfile.write(str(entry) + '\n')
+            ltfile.close()
+
+        return self.lookup
+
+    def load_lookup_table(self, filename):
+
+        self.lookup = []
+
+        try:
+            file = open(filename, 'r')
+            for line in file:
+                self.lookup.append(int(line.rstrip()))
+        except FileNotFoundError:
+            print("File name was not valid")
+            return
+
+    def read_next(self):
+
+        if self.current_event + 1 < len(self.lookup):
+            self.current_event += 1
+            self.fp.seek(self.lookup[self.current_event])
+            return self._read()
+        else:
+            print("At last event")
+            return None
+
+    def read_current(self):
+
+            self.fp.seek(self.lookup[self.current_event])
+            return self._read()
+
+    def read_previous(self):
+
+        if self.current_event - 1 >= 0:
+            self.current_event -= 1
+            self.fp.seek(self.lookup[self.current_event])
+            return self._read()
+        else:
+            print("At first event")
+            return None
+
+    def read_event_by_number(self, num):
+
+        if 0 <= num < len(self.lookup):
+            self.current_event = num
+            self.fp.seek(self.lookup[num])
+            return self._read()
+        else:
+            print("The provided number is outside the range of event numbers.")
+            return None
 
 
 class Event:
