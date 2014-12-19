@@ -1,6 +1,7 @@
 import struct
 import numpy
 import os.path
+from tpcplot import generate_pad_plane
 
 
 class EventFile:
@@ -303,6 +304,25 @@ class Event:
                 pass
 
         return flat_hits
+
+    def xyzs(self, padmap):
+
+        nz = self.traces.nonzero()
+        nza = numpy.array(nz).T
+        pcenters = generate_pad_plane().mean(1)
+
+        cvals = self.traces[nz]
+
+        result = numpy.zeros((cvals.shape[0], 4))
+
+        for idx, row in enumerate(nza):
+            padnum = padmap[tuple(row[0:4])]
+            x, y = pcenters[padnum]
+            z = row[4]
+            c = cvals[idx]
+            result[idx] = (x, y, z, c)
+
+        return result
 
 
 def load_pedestals(filename):

@@ -1,9 +1,10 @@
 import math
 import numpy
-import matplotlib.collections as coll
+import matplotlib as mpl
+import matplotlib.collections
 import matplotlib.pyplot as plt
-import matplotlib.colors as mplcolors
-import matplotlib.cm as mplcm
+import matplotlib.colors
+import matplotlib.cm
 
 
 def create_triangle(x_offset, y_offset, side, orient):
@@ -120,7 +121,7 @@ def show_pad_plane():
     """Displays the pad plane"""
 
     pts = generate_pad_plane()
-    c = coll.PolyCollection(pts)
+    c = mpl.collections.PolyCollection(pts)
 
     fig, ax = plt.subplots()
 
@@ -130,12 +131,20 @@ def show_pad_plane():
     fig.show()
 
 
+def _make_pad_colormap():
+
+    carr = mpl.cm.ScalarMappable(cmap='rainbow').to_rgba(range(256))[:, :-1]
+    carr[0] = numpy.array([230./256., 230./256., 230./256.])
+    return mpl.colors.LinearSegmentedColormap.from_list('mymap', carr, N=256)
+
+
 def pad_plot(data):
 
-    colors = mplcm.ScalarMappable().to_rgba(data)
+    mycm = _make_pad_colormap()
+    colors = mpl.cm.ScalarMappable(cmap=mycm).to_rgba(data)
 
     pts = generate_pad_plane()
-    c = coll.PolyCollection(pts, facecolors=colors, edgecolors='face')
+    c = mpl.collections.PolyCollection(pts, facecolors=colors, edgecolors='white', linewidths=0.05)
 
     fig, ax = plt.subplots()
 
@@ -145,5 +154,9 @@ def pad_plot(data):
 
     fig.show()
 
-if __name__ == "__main__":
-    generate_pad_plane()
+
+def chamber_plot(data):
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(data[:, 0], data[:, 1], data[:, 2], marker=',', linewidth=0, s=1, cmap='rainbow', c=data[:, 3])
