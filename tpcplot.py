@@ -5,6 +5,7 @@ import matplotlib.collections
 import matplotlib.pyplot as plt
 import matplotlib.colors
 import matplotlib.cm
+from mpl_toolkits.mplot3d import Axes3D
 
 
 def create_triangle(x_offset, y_offset, side, orient):
