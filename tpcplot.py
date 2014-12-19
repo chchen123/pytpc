@@ -1,3 +1,9 @@
+"""A module for viewing plots of AT-TPC merged data.
+
+This module can be used to generate both two- and three-dimensional plots of data from the AT-TPC. The data should be
+imported using the evtdata module. In principle, these functions could also be used to plot arbitrary data.
+"""
+
 import math
 import numpy
 import matplotlib as mpl
@@ -133,6 +139,10 @@ def show_pad_plane():
 
 
 def _make_pad_colormap():
+    """Generates the color map used for the pad plots.
+
+    This differs from the standard colormap in that zero is mapped to gray.
+    """
 
     carr = mpl.cm.ScalarMappable(cmap='rainbow').to_rgba(range(256))[:, :-1]
     carr[0] = numpy.array([230./256., 230./256., 230./256.])
@@ -140,6 +150,10 @@ def _make_pad_colormap():
 
 
 def pad_plot(data):
+    """ Plot the given data on the pads of the Micromegas.
+
+    :param data: The data, as an array indexed by pad number.
+    """
 
     mycm = _make_pad_colormap()
     colors = mpl.cm.ScalarMappable(cmap=mycm).to_rgba(data)
@@ -157,6 +171,13 @@ def pad_plot(data):
 
 
 def chamber_plot(data):
+    """ Plot the given data in 3D.
+
+    The data should be four-dimensional. The first three dimensions are the coordinates of the data points, and the
+    last dimension should contain the weight (or energy / activation) of the point. This is used for coloring.
+
+    :param data: The data, as an array of [x, y, z, weight]
+    """
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')

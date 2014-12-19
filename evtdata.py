@@ -17,7 +17,6 @@ class EventFile:
         If a filename is provided, that file will be opened.
 
         :param filename: The name of the file to open.
-        :return: None
         """
 
         self.magic = 0x6e7ef11e
@@ -46,7 +45,6 @@ class EventFile:
         correct type.
 
         :param filename: The name of the file to open
-        :return: None
         :except: IOError
         """
 
@@ -75,6 +73,14 @@ class EventFile:
 
     @staticmethod
     def pack_sample(tb, val):
+        """Pack a sample value into three bytes.
+
+        See the documentation of the Event File format for details.
+
+        :param tb: The time bucket
+        :param val: The sample
+        :return: The packed data
+        """
 
         # val is 12-bits and tb is 9 bits. Fit this in 24 bits.
         # Use one bit for parity
@@ -111,6 +117,15 @@ class EventFile:
 
     @staticmethod
     def unpack_samples(packed):
+        """ Unpacks an array of time bucket / sample pairs.
+
+        This is really just a modified version of unpack_sample that works with arrays.
+
+        :param packed: An array of packed values.
+        :return: An array of sample values, indexed by time bucket.
+        """
+
+        # TODO: Merge this into the unpack_sample method?
 
         tbs = (packed & 0xFF8000) >> 15
         samples = (packed & 0xFFF)
@@ -183,6 +198,14 @@ class EventFile:
             raise er
 
     def make_lookup_table(self):
+        """ Indexes the open file and generates a lookup table.
+
+        The lookup table is a list of the file offsets of each event, in bytes. This is used by the read_next() and
+        read_previous() functions to navigate around the file. The table is returned, but it is also assigned to
+        self.lookup.
+
+        :return: The lookup table.
+        """
 
         assert self.is_open
 
@@ -217,6 +240,12 @@ class EventFile:
         return self.lookup
 
     def load_lookup_table(self, filename):
+        """Read a lookup table from a file.
+
+        The file should contain the (integer) file offsets, with one on each line.
+
+        :param filename: The path to the file.
+        """
 
         self.lookup = []
 
@@ -229,6 +258,13 @@ class EventFile:
             return
 
     def read_next(self):
+        """Read the next event in the file.
+
+        This function reads the next event from the file and increments the self.current_event value. For example,
+        if the current_event is 4, then current_event will be set to 5, and event 5 will be read and returned.
+
+        :return: The next event, as an Event object.
+        """
 
         if self.current_event + 1 < len(self.lookup):
             self.current_event += 1
@@ -239,11 +275,25 @@ class EventFile:
             return None
 
     def read_current(self):
+        """Read the event currently pointed to by the current_event marker.
 
-            self.fp.seek(self.lookup[self.current_event])
-            return self._read()
+        This function reads the current event from the file. For example, if the current_event is 4, then event 4
+        will be read and returned.
+
+        :return: The current event, as an Event object.
+        """
+
+        self.fp.seek(self.lookup[self.current_event])
+        return self._read()
 
     def read_previous(self):
+        """Read the previous event from the file.
+
+        This function reads the previous event from the file and decrements the self.current_event value. For example,
+        if the current_event is 4, then current_event will be set to 3, and event 3 will be read and returned.
+
+        :return: The previous event, as an Event object.
+        """
 
         if self.current_event - 1 >= 0:
             self.current_event -= 1
@@ -254,6 +304,14 @@ class EventFile:
             return None
 
     def read_event_by_number(self, num):
+        """Reads a specific event from the file, based on its event number.
+
+        This function uses the lookup table to find the requested event in the file, and then reads and returns that
+        event. The current_event index is updated to the event number that was requested.
+
+        :param num: The event number to read.
+        :return: The requested event, as an Event object.
+        """
 
         if 0 <= num < len(self.lookup):
             self.current_event = num
@@ -273,11 +331,6 @@ class Event:
 
     def __init__(self, evt_id=0, timestamp=0):
         """ Initialize a new event.
-
-        Attributes:
-            evt_id -- The event ID
-            timestamp -- The event's timestamp
-            traces -- A numpy array containing the event's data
 
         :param evt_id: The event ID
         :param timestamp: The event timestamp
@@ -309,7 +362,7 @@ class Event:
 
         nz = self.traces.nonzero()
         nza = numpy.array(nz).T
-        pcenters = generate_pad_plane().mean(1)
+        pcenters = generate_pad_plane()
 
         cvals = self.traces[nz]
 
