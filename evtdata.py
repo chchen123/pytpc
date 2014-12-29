@@ -362,7 +362,7 @@ class Event:
 
         nz = self.traces.nonzero()
         nza = numpy.array(nz).T
-        pcenters = generate_pad_plane()
+        pcenters = generate_pad_plane().mean(1)
 
         cvals = self.traces[nz]
 

@@ -156,7 +156,9 @@ def pad_plot(data):
     """
 
     mycm = _make_pad_colormap()
-    colors = mpl.cm.ScalarMappable(cmap=mycm).to_rgba(data)
+    sm = mpl.cm.ScalarMappable(cmap=mycm)
+    sm.set_array(data)
+    colors = sm.to_rgba(data)
 
     pts = generate_pad_plane()
     c = mpl.collections.PolyCollection(pts, facecolors=colors, edgecolors='white', linewidths=0.05)
@@ -166,8 +168,13 @@ def pad_plot(data):
     ax.add_collection(c)
 
     plt.axis('equal')
+    plt.xlabel('X Position [mm]')
+    plt.ylabel('Y Position [mm]')
 
-    fig.show()
+    cbar = fig.colorbar(sm)
+    cbar.set_label('Activation')
+
+    return fig
 
 
 def chamber_plot(data):
@@ -182,3 +189,5 @@ def chamber_plot(data):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.scatter(data[:, 0], data[:, 1], data[:, 2], marker=',', linewidth=0, s=1, cmap='rainbow', c=data[:, 3])
+
+    return fig
