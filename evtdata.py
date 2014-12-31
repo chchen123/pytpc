@@ -135,6 +135,11 @@ class EventFile:
         samples *= (-2 * parities + 1)
 
         result = numpy.hstack((tbs, samples))
+        if result.shape[0] < 512:
+            temp = result
+            result = numpy.zeros((512, 2))
+            for i in temp:
+                result[i[0], 1] = i[1]
         return result[result[:, 0].argsort(), 1]
 
     def _read(self):
@@ -187,7 +192,7 @@ class EventFile:
                 num_samples = (th[0] - 10) // 3  # (total - header) / size of packed item
 
                 packed = numpy.hstack((numpy.fromfile(self.fp, dtype='3u1', count=num_samples),
-                                       numpy.zeros((512, 1), dtype='u1'))).view('<u4')
+                                       numpy.zeros((num_samples, 1), dtype='u1'))).view('<u4')
 
                 unpacked = self.unpack_samples(packed)
                 new_evt.traces[cobo, asad, aget, ch] = unpacked
