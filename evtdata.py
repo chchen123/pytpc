@@ -134,13 +134,13 @@ class EventFile:
         # Change the parities from (0, 1, ...) to (1, -1, ...) and multiply
         samples *= (-2 * parities + 1)
 
-        result = numpy.hstack((tbs, samples))
-        if result.shape[0] < 512:
-            temp = result
-            result = numpy.zeros((512, 2))
-            for i in temp:
-                result[i[0], 1] = i[1]
-        return result[result[:, 0].argsort(), 1]
+        unpacked = numpy.hstack((tbs, samples))
+        result = numpy.zeros(512)
+
+        for item in unpacked:
+            result[item[0]] = item[1]
+
+        return result
 
     def _read(self):
         """Reads an event at the current file position.
@@ -174,6 +174,7 @@ class EventFile:
             print("    Contains", num_traces, "traces")
 
             new_evt = Event(evt_id=event_id, timestamp=event_ts)
+            new_evt.traces = numpy.zeros((num_traces,), dtype=new_evt.dt)
 
             # Read the traces
 
@@ -182,11 +183,13 @@ class EventFile:
                 #    (size, cobo, asad, aget, ch, pad)
                 th = struct.unpack('<IBBBBH', self.fp.read(10))
 
-                cobo = th[1]
-                asad = th[2]
-                aget = th[3]
-                ch = th[4]
-                pad = th[5]
+                tr = new_evt.traces[n]
+
+                tr['cobo'] = th[1]
+                tr['asad'] = th[2]
+                tr['aget'] = th[3]
+                tr['channel'] = th[4]
+                tr['pad'] = th[5]
 
                 # Now read the trace itself
                 num_samples = (th[0] - 10) // 3  # (total - header) / size of packed item
@@ -195,7 +198,7 @@ class EventFile:
                                        numpy.zeros((num_samples, 1), dtype='u1'))).view('<u4')
 
                 unpacked = self.unpack_samples(packed)
-                new_evt.traces[cobo, asad, aget, ch] = unpacked
+                tr['data'][:] = unpacked
 
             return new_evt
 
@@ -344,42 +347,49 @@ class Event:
         assert (evt_id >= 0)
         assert (timestamp >= 0)
 
+        self.dt = numpy.dtype([('cobo', 'u1'), ('asad', 'u1'), ('aget', 'u1'), ('channel', 'u1'),
+                                    ('pad', 'u2'), ('data', '512i2')])
+
         self.evt_id = evt_id
         self.timestamp = timestamp
-        self.traces = numpy.zeros([10, 4, 4, 68, 512])
+        self.traces = numpy.zeros((0,), dtype=self.dt)
 
         return
 
-    def hits(self, padmap):
+    def hits(self):
+        """ Calculate the total activation of each pad.
 
-        hits_by_addr = self.traces.sum(4)
+        The result is a numpy array of (pad_number, activation)
+
+        :return: A numpy array of (pad_number, activation)
+        """
+
+        hits = self.traces['data'].sum(1)
+        pads = self.traces['pad']
+
         flat_hits = numpy.zeros(10240)
-
-        for addr, hitval in numpy.ndenumerate(hits_by_addr):
-            try:
-                flat_hits[padmap[addr]] = hitval
-            except KeyError:
-                pass
+        for (p, h) in zip(pads, hits):
+            flat_hits[p] = h
 
         return flat_hits
 
-    def xyzs(self, padmap):
+    def xyzs(self):
+        """ Find the scatter points of the event in space.
 
-        nz = self.traces.nonzero()
-        nza = numpy.array(nz).T
+        The result is a 4-D array. The points are given as (x, y, time bucket, activation). The x and y coordinates
+        are in millimeters.
+
+        :return: A numpy array of (x, y, tb, activation)
+        """
+
+        nz = self.traces['data'].nonzero()
         pcenters = generate_pad_plane().mean(1)
 
-        cvals = self.traces[nz]
+        xys = numpy.array([pcenters[self.traces[i]['pad']] for i in nz[0]])
+        zs = nz[1].reshape(nz[1].shape[0], 1)
+        cs = self.traces['data'][nz].reshape(nz[0].shape[0], 1)
 
-        result = numpy.zeros((cvals.shape[0], 4))
-
-        for idx, row in enumerate(nza):
-            padnum = padmap[tuple(row[0:4])]
-            x, y = pcenters[padnum]
-            z = row[4]
-            c = cvals[idx]
-            result[idx] = (x, y, z, c)
-
+        result = numpy.hstack((xys, zs, cs))
         return result
 
 
