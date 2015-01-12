@@ -90,12 +90,12 @@ class Particle:
         self.charge_num = charge_num
         self.charge = charge_num * e_chg
         self._energy = energy_per_particle * mass_num
-        self.position = position
+        self.position = numpy.array(position)
 
         beta = beta_factor(self._energy, self._mass)
-        self.velocity = (beta*c_lgt*cos(azimuth)*sin(polar),
+        self.velocity = numpy.array([beta*c_lgt*cos(azimuth)*sin(polar),
                          beta*c_lgt*sin(azimuth)*sin(polar),
-                         beta*c_lgt*cos(polar))
+                         beta*c_lgt*cos(polar)])
 
     def get_energy(self, unit='MeV', per_particle=False):
         """ Find the energy of the particle.
@@ -152,8 +152,7 @@ class Particle:
     def get_state_vector(self):
         """ Generate the particle's state vector, as (x, y, z, vx, vy, vz)
         """
-
-        return self.position + self.velocity
+        return numpy.hstack((self.position, self.velocity))
 
     def update_state(self, state_vector):
         """ Update the particle's parameters based on the provided state vector.
@@ -165,7 +164,10 @@ class Particle:
         new_energy = (gamma_factor(new_velocity) - 1)*self.get_mass()
 
         if new_energy <= 0:
-            raise self.ParticleStopped()
+            self.position = new_position
+            self.velocity = numpy.zeros(3)
+            self._energy = 0
+            #raise self.ParticleStopped()
 
         else:
             self.position = new_position
@@ -215,6 +217,8 @@ def gamma_factor(v):
     The argument v may be a number or an array-like object.
     """
     vmag = numpy.linalg.norm(v)
+    if vmag > c_lgt:
+        raise ValueError('Velocity was {}, which exceeds c.'.format(vmag))
     return 1/sqrt(1-vmag**2/c_lgt**2)
 
 
@@ -246,14 +250,16 @@ def find_next_state(particle, gas, ef, bf):
     pos = particle.position
 
     beta = particle.beta()
+    if beta == 0:
+        return particle.get_state_vector()
     tstep = pos_step / (beta * c_lgt)
     
-    force = lorentz(vel, ef, bf, charge)
+    force = numpy.array(lorentz(vel, ef, bf, charge))
     new_vel = vel + force/particle.get_mass('kg') * tstep  # this is questionable w.r.t. relativity...
     stopping = bethe(particle, gas)  # in MeV/m
     
     if stopping <= 0:
-        new_state = pos + (0, 0, 0)
+        new_state = numpy.hstack((pos, numpy.zeros(3)))
         return new_state
     else:
         de = float(threshold(stopping*pos_step, threshmin=1e-10))
@@ -291,9 +297,8 @@ def track(particle, gas, ef, bf):
     
     while True:
         state = find_next_state(particle, gas, ef, bf)
-        try:
-            particle.update_state(state)
-        except Particle.ParticleStopped:
+        particle.update_state(state)
+        if particle.get_energy() == 0:
             break
         
         pos.append(particle.position)
