@@ -1,9 +1,7 @@
 import numpy
 import scipy.constants
-from math import sin, cos, log, sqrt
+from math import sin, cos, log, sqrt, atan2
 from scipy.stats import threshold
-
-import matplotlib.pyplot as plt
 
 # Constants
 
@@ -91,11 +89,8 @@ class Particle:
         self.charge = charge_num * e_chg
         self._energy = energy_per_particle * mass_num
         self.position = numpy.array(position)
-
-        beta = beta_factor(self._energy, self._mass)
-        self.velocity = numpy.array([beta*c_lgt*cos(azimuth)*sin(polar),
-                         beta*c_lgt*sin(azimuth)*sin(polar),
-                         beta*c_lgt*cos(polar)])
+        self.azimuth = azimuth
+        self.polar = polar
 
     def get_energy(self, unit='MeV', per_particle=False):
         """ Find the energy of the particle.
@@ -137,45 +132,53 @@ class Particle:
         else:
             raise ValueError('Invalid units provided.')
 
+    def get_velocity(self):
+        """ Return the velocity of the particle, in m/s.
+        """
+        beta = self.beta()
+        vel = numpy.array([beta*c_lgt*cos(self.azimuth)*sin(self.polar),
+                           beta*c_lgt*sin(self.azimuth)*sin(self.polar),
+                           beta*c_lgt*cos(self.polar)])
+        return vel
+
     def beta(self):
         """ Returns beta, or v / c.
         """
-        en = self.get_energy()
+        en = self.get_energy(per_particle=False)
         m = self.get_mass()
         return beta_factor(en, m)
 
     def gamma(self):
         """ Returns gamma for the particle.
         """
-        return gamma_factor(self.velocity)
+        return 1 / sqrt(1 - self.beta()**2)
 
     def get_state_vector(self):
-        """ Generate the particle's state vector, as (x, y, z, vx, vy, vz)
+        """ Generate the particle's state vector, as (x, y, z, en/u, azi, pol)
         """
-        return numpy.hstack((self.position, self.velocity))
+        p = self.position  # for brevity
+        res = numpy.array([p[0], p[1], p[2], self.get_energy(per_particle=True), self.azimuth, self.polar])
+        return res
 
     def update_state(self, state_vector):
         """ Update the particle's parameters based on the provided state vector.
 
-        The state vector should be (x, y, z, vx, vy, vz)
+        The state vector should be (x, y, z, en/u, azi, pol)
         """
         new_position = state_vector[0:3]
-        new_velocity = state_vector[3:6]
-        new_energy = (gamma_factor(new_velocity) - 1)*self.get_mass()
+        new_energy = state_vector[3]
+        new_azimuth = state_vector[4]
+        new_polar = state_vector[5]
 
-        if new_energy <= 0:
-            self.position = new_position
-            self.velocity = numpy.zeros(3)
-            self._energy = 0
-            #raise self.ParticleStopped()
+        if new_energy < 0:
+            # raise ValueError('Negative energy: {}'.format(new_energy))
+            pass
 
         else:
             self.position = new_position
-            self.velocity = new_velocity
-            self._energy = new_energy
-
-    class ParticleStopped(Exception):
-        pass
+            self._energy = new_energy * self.mass_num
+            self.azimuth = new_azimuth
+            self.polar = new_polar
 
 
 def lorentz(vel, ef, bf, charge):
@@ -236,16 +239,13 @@ def beta_factor(en, mass):
 
 
 def find_next_state(particle, gas, ef, bf):
-    """ Find the next step from the given state vector.
-    
-    The state vector should have the format:
-        (x, y, z, vx, vy, vz)
-        
-    The units should be m and m/s.
+    """ Find the next step for the given particle and conditions.
+
+    Returns the new state vector in the form (x, y, z, en/u, azi, pol)
     """
 
     en = particle.get_energy()
-    vel = particle.velocity
+    vel = particle.get_velocity()
     charge = particle.charge
     pos = particle.position
 
@@ -257,19 +257,23 @@ def find_next_state(particle, gas, ef, bf):
     force = numpy.array(lorentz(vel, ef, bf, charge))
     new_vel = vel + force/particle.get_mass('kg') * tstep  # this is questionable w.r.t. relativity...
     stopping = bethe(particle, gas)  # in MeV/m
+    de = float(threshold(stopping*pos_step, threshmin=1e-3))
     
-    if stopping <= 0:
-        new_state = numpy.hstack((pos, numpy.zeros(3)))
+    if stopping <= 0 or de == 0:
+        new_state = particle.get_state_vector()
+        new_state[3] = 0  # Set the energy to 0
         return new_state
     else:
-        de = float(threshold(stopping*pos_step, threshmin=1e-10))
         en = float(threshold(en - de, threshmin=0))
         
         new_beta = beta_factor(en, particle.get_mass())
         new_vel *= new_beta / beta
         new_pos = pos + new_vel*tstep
+
+        new_azi = atan2(new_vel[1], new_vel[0])
+        new_pol = atan2(sqrt(new_vel[0]**2 + new_vel[1]**2), new_vel[2])
         
-        new_state = numpy.hstack((new_pos, new_vel))
+        new_state = numpy.array([new_pos[0], new_pos[1], new_pos[2], en / particle.mass_num, new_azi, new_pol])
         return new_state
 
 
@@ -284,14 +288,16 @@ def track(particle, gas, ef, bf):
 
     """
     pos = []
-    vel = []
+    azi = []
+    pol = []
     time = []
     en = []
     
     current_time = 0
 
     pos.append(particle.position)
-    vel.append(particle.velocity)
+    azi.append(particle.azimuth)
+    pol.append(particle.polar)
     time.append(current_time)
     en.append(particle.get_energy(per_particle=True))
     
@@ -299,24 +305,27 @@ def track(particle, gas, ef, bf):
         state = find_next_state(particle, gas, ef, bf)
         particle.update_state(state)
         if particle.get_energy() == 0:
+            print('Particle stopped')
             break
         
         pos.append(particle.position)
-        vel.append(particle.velocity)
+        azi.append(particle.azimuth)
+        pol.append(particle.polar)
         en.append(particle.get_energy(per_particle=True))
-        
-        current_time += pos_step / numpy.linalg.norm(vel)
+
+        current_time += pos_step / (particle.beta() * c_lgt)
         time.append(current_time)
 
         if particle.position[2] > 1 or sqrt(particle.position[0]**2 + particle.position[1]**2) > 0.275:
+            print('Particle left chamber')
             break
 
-    return pos, vel, time, en
+    return pos, azi, pol, time, en
 
 if __name__ == '__main__':
-    he_gas = Gas(4, 2, 41.8, 200.)
-    part = Particle(mass_num=4, charge_num=2, energy_per_particle=4, azimuth=pi/4, polar=pi/4)
-    e_field = [0, 0, 0]  # V/m
-    b_field = [0, 0, 1]  # T
-    res_pos, res_vel, res_time, res_en = track(part, he_gas, e_field, b_field)
+    he_gas = Gas(4, 2, 41.8, 150.)
+    part = Particle(mass_num=4, charge_num=2, energy_per_particle=2., azimuth=pi/5, polar=pi/4)
+    e_field = [0., 0., 15e3]  # V/m
+    b_field = [0., 0., 2.]  # T
+    res_pos, res_azi, res_pol, res_time, res_en = track(part, he_gas, e_field, b_field)
     print('Finished')
