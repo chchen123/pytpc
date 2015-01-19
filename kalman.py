@@ -1,7 +1,8 @@
 import numpy
 import scipy.constants
-from math import sin, cos, log, sqrt, atan2
+from math import sin, cos, tan, log, sqrt, atan2, floor
 from scipy.stats import threshold
+import copy
 
 # Constants
 
@@ -321,6 +322,270 @@ def track(particle, gas, ef, bf):
             break
 
     return pos, azi, pol, time, en
+
+
+def find_circle_params(xs, ys):
+    x1 = numpy.roll(xs, -1)
+    x2 = copy.copy(xs)
+    x3 = numpy.roll(xs, 1)
+    y1 = numpy.roll(ys, -1)
+    y2 = copy.copy(ys)
+    y3 = numpy.roll(ys, 1)
+
+    # Special cases: first and last. Use next two, or prev two
+    x1[0], y1[0] = x2[0], y2[0]
+    x2[0], y2[0] = x2[1], y2[1]
+    x3[0], y3[0] = x2[2], y2[2]
+    x1[-1], y1[-1] = x2[-1], y2[-1]
+    x2[-1], y2[-1] = x2[-2], y2[-2]
+    x3[-1], y3[-1] = x2[-3], y2[-3]
+
+    curv = ((2 * numpy.abs(x1*y2 + x2*y3 + x3*y1 - x1*y3 - x2*y1 - x3*y2)) /
+            numpy.sqrt(((x2-x1)**2+(y2-y1)**2) *
+                       ((x2-x3)**2+(y2-y3)**2) *
+                       ((x3-x1)**2+(y3-y1)**2)))
+
+    # Find circle centers
+
+    # first, mid, and last points
+    mp = floor(x1.size / 2)
+    mp2 = floor(mp/2)
+    x1c = x2[0]
+    y1c = y2[0]
+    x2c = x2[mp2]
+    y2c = y2[mp2]
+    x3c = x2[mp]
+    y3c = y2[mp]
+
+    # midpoints of lines connecting the three points
+    xm1 = (x1c + x2c) / 2
+    ym1 = (y1c + y2c) / 2
+    xm2 = (x2c + x3c) / 2
+    ym2 = (y2c + y3c) / 2
+
+    # slopes of the normal bisector lines, which intersect in the center
+    sl1 = (x1c - x2c) / (y2c - y1c)
+    sl2 = (x2c - x3c) / (y3c - y2c)
+
+    # center point
+    xc = -(-sl1*xm1 + sl2*xm2 + ym1 - ym2) / (sl1 - sl2)
+    yc = -(-sl1*sl2*xm1 + sl1*sl2*xm2 + sl2*ym1 - sl1*ym2) / (sl1 - sl2)
+
+    center = numpy.array((xc, yc))
+
+    return curv, center
+
+
+def find_phi(pts_in, center):
+    pts = copy.copy(pts_in)
+    pts -= center
+    phi = numpy.arctan2(pts[:, 1], pts[:, 0])
+    #phi -= phi[0]
+    return numpy.unwrap(phi)
+
+
+def find_pitch_angle(pos_in):
+    pos = copy.copy(pos_in)
+    pos_rot = numpy.roll(pos, 1, axis=0)
+    pos_rot[0] = pos_rot[1]  # to fix the wrap-around
+    diff = pos - pos_rot
+    lambs = numpy.arctan2(diff[:, 2], numpy.sqrt(diff[:, 0]**2 + diff[:, 1]**2))
+    return numpy.unwrap(lambs)
+
+
+def find_state_vector(pts):
+    """Returns the state vector from the position info of the track
+
+    The state vector is (x, y, z, 1/R, lambda, phi)
+    """
+
+    curvs, ctr = find_circle_params(pts[:, 0], pts[:, 1])
+    phis = find_phi(pts[:, 0:2], ctr)
+    lmbs = find_pitch_angle(pts)
+    found = numpy.vstack((curvs, lmbs, phis)).T
+    return numpy.hstack((pts, found)), ctr
+
+
+def recover_energy(curv, bfield, lambdas, mass_num, charge_num):
+    """Recover the energies from the state vector parameters
+
+    Arguments
+    ---------
+    curv : The curvatures (1/R) in inverse meters
+    bfield : The magnetic field vector, in Tesla
+    lambdas : The pitch angle of the helix at each point
+    mass : The particle mass number, A
+    charge : The particle's charge number, Z
+
+    Returns the energies in MeV
+    """
+    mass = mass_num * p_mc2
+    charge = charge_num * e_chg
+
+    ps = 1/curv * numpy.linalg.norm(bfield) * numpy.sqrt(1+numpy.tan(lambdas)**2) * charge / e_chg / 1e6  # in MeV/c
+    es = numpy.sqrt(ps**2 * c_lgt**2 + mass**2) - mass
+    return es
+
+
+def update_state_vector(state):
+    x0, y0, z0, k0, l0, phi0 = state
+    r0 = 1/k0
+
+    dphi = 0.005
+    phi1 = phi0 + dphi
+
+    dx = r0 * (cos(phi1) - cos(phi0))
+    dy = r0 * (sin(phi1) - sin(phi0))
+    dz = r0 * tan(l0) * dphi
+
+    ds = sqrt(dx**2 + dy**2 + dz**2)
+
+    en = recover_energy(k0, bfield, l0, 4, 2) / 4
+    if en > 1e-4:
+        part = Particle(4, 2, en)
+        beta = part.beta()
+        dedx = bethe(part, g)  # * e_chg * 1e6  # transform from MeV/m to J/m
+        try:
+            gamma = part.gamma()
+        except ZeroDivisionError:
+            gamma = 1e10
+        dk = k0 / (gamma * part.get_mass() * beta**2) * dedx * ds
+#         dk = (k0 * cos(l0)) / (beta * c_lgt * 2 * e_chg * numpy.linalg.norm(bfield)) * dedx * dphi
+#         dk = k0/(0.3 * numpy.linalg.norm(bfield) * beta) * dedx * dphi * 1e-3  # the 0.3 is in GeV/(m.T)
+#         print('en: {}, dedx: {}, dk: {}'.format(en, dedx, dk))
+        k1 = k0 + dk
+    else:
+        k1 = k0
+
+    r1 = 1 / k1
+
+    x1 = x0 + dx
+    y1 = y0 + dy
+    z1 = z0 + dz
+    l1 = l0
+
+    return numpy.array([x1, y1, z1, 1/r1, l1, phi1])
+
+
+def jacobian(func, particle, *args):
+    current_state = numpy.array(particle.get_state_vector())
+    f_current = numpy.array(func(particle, *args))
+
+    cols = []
+
+    for i, v in enumerate(current_state):
+        new_state = current_state[:]
+        delta = 0.01
+        new_state[i] = v + delta
+        new_particle = copy.copy(particle)
+        new_particle.update_state(new_state)
+
+        f_plus = numpy.array(func(new_particle, *args))
+
+        der = (f_plus - f_current) / delta
+        cols.append(der)
+
+    return numpy.vstack(cols).T
+
+
+def jacobian_from_vector(func, state, *args):
+    current_state = state
+    f_current = numpy.array(func(state, *args))
+
+    cols = []
+
+    for i, v in enumerate(current_state):
+        new_state = current_state[:]
+        prev_state = current_state[:]
+        # state vector (x, y, z, 1/R, lambda, phi)
+        delta = v / 10
+        new_state[i] = v + delta
+        prev_state[i] = v - delta
+
+        f_plus = numpy.array(func(new_state, *args))
+        f_minus = numpy.array(func(prev_state, *args))
+
+        der = (f_plus - f_minus) / (2*delta)
+        cols.append(der)
+
+    return numpy.vstack(cols).T
+
+
+def sym_jacobian(state):
+    x, y, z, k, l, phi = state
+    dphi = 0.005
+    phip = phi+dphi
+    res = numpy.array([[1, 0, 0, -dphi*tan(l)/k**2, dphi/(k*cos(l)**2), 0],
+                       [0, 1, 0, -(-cos(phi)+cos(phip))/k**2, 0, (sin(phi)-sin(phip))/k],
+                       [0, 0, 1, -(-sin(phi)+sin(phip))/k**2, 0, (-cos(phi)+cos(phip))/k],
+                       [0, 0, 0, 1, 0, 0],
+                       [0, 0, 0, 0, 1, 0],
+                       [0, 0, 0, 0, 0, 1]])
+    return res
+
+
+def generate_measurement(particle):
+    return particle.get_state_vector()[0:3]
+
+
+def apply_ekf(z):
+    q_mat = (1e-3)**2 * numpy.eye(num_sv_vars) # process noise
+#     r_mat = (1e-2)**2 * numpy.eye(num_meas_vars)
+    r_mat = numpy.array([[1e-2, 0, 0, 0, 0, 0],
+                         [0, 1e-2, 0, 0, 0, 0],
+                         [0, 0, 1e-2, 0, 0, 0],
+                         [0, 0, 0, 5e+0, 0, 0],
+                         [0, 0, 0, 0, 6e-1, 0],
+                         [0, 0, 0, 0, 0, 2e-1]])**2  # measurement noise
+    xhat = numpy.zeros(sv_shape)
+    p_mat = numpy.zeros(sv_sv_matsh)
+    xhatminus = numpy.zeros(sv_shape)
+    p_mat_minus = numpy.zeros(sv_sv_matsh)
+    k_mat = numpy.zeros(sv_meas_matsh)
+    s_mat = numpy.zeros(meas_meas_matsh)
+    i_mat = numpy.eye(num_sv_vars)
+
+    a_mat = numpy.zeros(sv_sv_matsh)
+
+    xhat[0] = z[0] #numpy.array([0, 0, 0, 10., 10, 1.])
+    p_mat[0] = numpy.array([[0.1, 0, 0, 0, 0, 0],
+                            [0, 0.1, 0, 0, 0, 0],
+                            [0, 0, 0.1, 0, 0, 0],
+                            [0, 0, 0, 10, 0, 0],
+                            [0, 0, 0, 0, 10, 0],
+                            [0, 0, 0, 0, 0, 1e0]])
+#     p_mat[0] = numpy.eye(6)
+
+    for k in range(1, z.shape[0]):
+        # time update step
+        try:
+            xhatminus[k] =  update_state_vector(xhat[k-1]) # + numpy.random.normal(0, 1e-2, 6)
+#             a_mat[k] = sym_jacobian(xhat[k-1])
+#             xhatminus[k] = numpy.dot(a_mat[k], xhat[k-1].reshape((6,1))).reshape(6)
+            a_mat[k] = sym_jacobian(xhatminus[k])
+
+            a_mat_t = a_mat[k].T
+            w_mat = numpy.eye(6)
+            w_mat_t = w_mat.T
+
+            p_mat_minus[k] = numpy.dot(a_mat[k], numpy.dot(p_mat[k-1], a_mat_t)) + q_mat # numpy.dot(w_mat, numpy.dot(q_mat, w_mat_t))
+
+            # measurement update step
+#             h_mat = numpy.hstack((numpy.eye(3), numpy.zeros((3,3))))
+            h_mat = numpy.eye(num_meas_vars)
+            h_mat_t = h_mat.T
+            v_mat = h_mat
+            v_mat_t = v_mat.T
+
+            s_mat[k] = numpy.dot(h_mat, numpy.dot(p_mat_minus[k], h_mat_t)) + r_mat #numpy.dot(v_mat, numpy.dot(r_mat, v_mat_t))
+            k_mat[k] = numpy.dot(p_mat_minus[k], numpy.dot(h_mat_t, numpy.linalg.inv(s_mat[k])))
+            xhat[k] = xhatminus[k] + numpy.dot(k_mat[k], (z[k] - xhatminus[k]))
+            p_mat[k] = numpy.dot(i_mat - numpy.dot(k_mat[k], h_mat), p_mat_minus[k])
+        except numpy.linalg.LinAlgError as err:
+            print(err, k, s_mat[k])
+
+    return xhat, p_mat, a_mat
+
 
 if __name__ == '__main__':
     he_gas = Gas(4, 2, 41.8, 150.)
