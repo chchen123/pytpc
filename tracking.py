@@ -1,6 +1,7 @@
 import numpy
 from math import sin, cos, tan, log, sqrt, atan2, floor
 from scipy.stats import threshold
+from sklearn.cluster import DBSCAN
 import copy
 
 from constants import *
@@ -173,6 +174,30 @@ class Particle:
             self._energy = new_energy * self.mass_num
             self.azimuth = new_azimuth
             self.polar = new_polar
+
+
+def find_tracks(data, eps=20, min_samples=20):
+    """ Applies the DBSCAN algorithm from scikit-learn to find tracks in the data.
+
+    Arguments
+    ---------
+
+    data : An array of (x, y, z, hits) data points
+    eps : The minimum distance between adjacent points in a cluster
+    min_samples : The min number of points in a cluster
+
+    Returns a list of numpy arrays containing the data points in each identified track.
+
+    """
+    xyz = data[:, 0:3]
+    dbs = DBSCAN(eps=eps, min_samples=min_samples)
+    dbs.fit(data)
+
+    tracks = []
+    for track in (numpy.where(dbs.labels_ == n)[0] for n in numpy.unique(dbs.labels_) if n != -1):
+        tracks.append(data[track])
+
+    return tracks
 
 
 class Tracker:
