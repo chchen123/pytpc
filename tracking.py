@@ -4,23 +4,7 @@ from math import sin, cos, tan, log, sqrt, atan2, floor
 from scipy.stats import threshold
 import copy
 
-# Constants
-
-e_mc2 = scipy.constants.physical_constants['electron mass energy equivalent in MeV'][0]
-p_mc2 = scipy.constants.physical_constants['proton mass energy equivalent in MeV'][0]
-p_kg = scipy.constants.physical_constants['proton mass'][0]
-e_chg = scipy.constants.physical_constants['elementary charge'][0]
-N_avo = scipy.constants.physical_constants['Avogadro constant'][0]
-c_lgt = scipy.constants.physical_constants['speed of light in vacuum'][0]
-pi = scipy.constants.pi
-eps_0 = scipy.constants.physical_constants['electric constant'][0]
-
-pos_step = 1e-3  # in m
-num_iters = 100
-
-MeVtokg = 1e6 * e_chg / c_lgt**2
-amuTokg = 1.66054e-27
-amuToMeV = 931.494
+from constants import *
 
 
 class Gas:
@@ -526,66 +510,6 @@ def sym_jacobian(state):
 
 def generate_measurement(particle):
     return particle.get_state_vector()[0:3]
-
-
-def apply_ekf(z):
-    q_mat = (1e-3)**2 * numpy.eye(num_sv_vars) # process noise
-#     r_mat = (1e-2)**2 * numpy.eye(num_meas_vars)
-    r_mat = numpy.array([[1e-2, 0, 0, 0, 0, 0],
-                         [0, 1e-2, 0, 0, 0, 0],
-                         [0, 0, 1e-2, 0, 0, 0],
-                         [0, 0, 0, 5e+0, 0, 0],
-                         [0, 0, 0, 0, 6e-1, 0],
-                         [0, 0, 0, 0, 0, 2e-1]])**2  # measurement noise
-    xhat = numpy.zeros(sv_shape)
-    p_mat = numpy.zeros(sv_sv_matsh)
-    xhatminus = numpy.zeros(sv_shape)
-    p_mat_minus = numpy.zeros(sv_sv_matsh)
-    k_mat = numpy.zeros(sv_meas_matsh)
-    s_mat = numpy.zeros(meas_meas_matsh)
-    i_mat = numpy.eye(num_sv_vars)
-
-    a_mat = numpy.zeros(sv_sv_matsh)
-
-    xhat[0] = z[0] #numpy.array([0, 0, 0, 10., 10, 1.])
-    p_mat[0] = numpy.array([[0.1, 0, 0, 0, 0, 0],
-                            [0, 0.1, 0, 0, 0, 0],
-                            [0, 0, 0.1, 0, 0, 0],
-                            [0, 0, 0, 10, 0, 0],
-                            [0, 0, 0, 0, 10, 0],
-                            [0, 0, 0, 0, 0, 1e0]])
-#     p_mat[0] = numpy.eye(6)
-
-    for k in range(1, z.shape[0]):
-        # time update step
-        try:
-            xhatminus[k] =  update_state_vector(xhat[k-1]) # + numpy.random.normal(0, 1e-2, 6)
-#             a_mat[k] = sym_jacobian(xhat[k-1])
-#             xhatminus[k] = numpy.dot(a_mat[k], xhat[k-1].reshape((6,1))).reshape(6)
-            a_mat[k] = sym_jacobian(xhatminus[k])
-
-            a_mat_t = a_mat[k].T
-            w_mat = numpy.eye(6)
-            w_mat_t = w_mat.T
-
-            p_mat_minus[k] = numpy.dot(a_mat[k], numpy.dot(p_mat[k-1], a_mat_t)) + q_mat # numpy.dot(w_mat, numpy.dot(q_mat, w_mat_t))
-
-            # measurement update step
-#             h_mat = numpy.hstack((numpy.eye(3), numpy.zeros((3,3))))
-            h_mat = numpy.eye(num_meas_vars)
-            h_mat_t = h_mat.T
-            v_mat = h_mat
-            v_mat_t = v_mat.T
-
-            s_mat[k] = numpy.dot(h_mat, numpy.dot(p_mat_minus[k], h_mat_t)) + r_mat #numpy.dot(v_mat, numpy.dot(r_mat, v_mat_t))
-            k_mat[k] = numpy.dot(p_mat_minus[k], numpy.dot(h_mat_t, numpy.linalg.inv(s_mat[k])))
-            xhat[k] = xhatminus[k] + numpy.dot(k_mat[k], (z[k] - xhatminus[k]))
-            p_mat[k] = numpy.dot(i_mat - numpy.dot(k_mat[k], h_mat), p_mat_minus[k])
-        except numpy.linalg.LinAlgError as err:
-            print(err, k, s_mat[k])
-
-    return xhat, p_mat, a_mat
-
 
 if __name__ == '__main__':
     he_gas = Gas(4, 2, 41.8, 150.)
