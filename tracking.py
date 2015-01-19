@@ -1,10 +1,10 @@
 import numpy
-import scipy.constants
 from math import sin, cos, tan, log, sqrt, atan2, floor
 from scipy.stats import threshold
 import copy
 
 from constants import *
+import kalman
 
 
 class Gas:
@@ -55,7 +55,7 @@ class Particle:
     """ Describes a beam particle for tracking.
     """
 
-    def __init__(self, mass_num, charge_num, energy_per_particle, position=(0, 0, 0), azimuth=0, polar=0):
+    def __init__(self, mass_num, charge_num, energy_per_particle=0, position=(0, 0, 0), azimuth=0, polar=0):
         """ Initialize the class.
 
         Arguments
@@ -98,6 +98,15 @@ class Particle:
             res /= self.mass_num
 
         return res
+
+    def set_energy(self, new_en, per_particle=False):
+        """ Set the energy of the particle to new_en, in MeV.
+        """
+
+        if per_particle:
+            self._energy = new_en * self.mass_num
+        else:
+            self._energy = new_en
 
     def get_mass(self, unit='MeV'):
         """ Find the mass of the particle.
@@ -164,6 +173,78 @@ class Particle:
             self._energy = new_energy * self.mass_num
             self.azimuth = new_azimuth
             self.polar = new_polar
+
+
+class Tracker:
+
+    meas_dim = 6
+    sv_dim = 6
+
+    def __init__(self, particle, gas, efield, bfield):
+        self.particle = particle
+        self.gas = gas
+        self.efield = efield
+        self.bfield = bfield
+        self.kfilter = kalman.KalmanFilter(Tracker.sv_dim, Tracker.meas_dim,
+                                          self.update_state_vector,
+                                          self.jacobian)
+
+    def update_state_vector(self, state):
+        x0, y0, z0, k0, l0, phi0 = state
+        r0 = 1/k0
+
+        dphi = 0.005
+        phi1 = phi0 + dphi
+
+        dx = r0 * (cos(phi1) - cos(phi0))
+        dy = r0 * (sin(phi1) - sin(phi0))
+        dz = r0 * tan(l0) * dphi
+
+        ds = sqrt(dx**2 + dy**2 + dz**2)
+
+        en = recover_energy(k0, self.bfield, l0, self.particle.mass_num, self.particle.charge_num) / 4
+        if en > 1e-4:
+            self.particle.set_energy(en, per_particle=True)
+            beta = self.particle.beta()
+            dedx = bethe(self.particle, self.gas)  # * e_chg * 1e6  # transform from MeV/m to J/m
+            try:
+                gamma = self.particle.gamma()
+            except ZeroDivisionError:
+                gamma = 1e10
+            dk = k0 / (gamma * self.particle.get_mass() * beta**2) * dedx * ds
+    #         dk = (k0 * cos(l0)) / (beta * c_lgt * 2 * e_chg * numpy.linalg.norm(bfield)) * dedx * dphi
+    #         dk = k0/(0.3 * numpy.linalg.norm(bfield) * beta) * dedx * dphi * 1e-3  # the 0.3 is in GeV/(m.T)
+    #         print('en: {}, dedx: {}, dk: {}'.format(en, dedx, dk))
+            k1 = k0 + dk
+        else:
+            k1 = k0
+
+        r1 = 1 / k1
+
+        x1 = x0 + dx
+        y1 = y0 + dy
+        z1 = z0 + dz
+        l1 = l0
+
+        return numpy.array([x1, y1, z1, 1/r1, l1, phi1])
+
+    @staticmethod
+    def jacobian(state):
+        x, y, z, k, l, phi = state
+        dphi = 0.005
+        phip = phi+dphi
+        res = numpy.array([[1, 0, 0, -dphi*tan(l)/k**2, dphi/(k*cos(l)**2), 0],
+                           [0, 1, 0, -(-cos(phi)+cos(phip))/k**2, 0, (sin(phi)-sin(phip))/k],
+                           [0, 0, 1, -(-sin(phi)+sin(phip))/k**2, 0, (-cos(phi)+cos(phip))/k],
+                           [0, 0, 0, 1, 0, 0],
+                           [0, 0, 0, 0, 1, 0],
+                           [0, 0, 0, 0, 0, 1]])
+        return res
+
+    def track(self, meas):
+        meas_sv, ctr = find_state_vector(meas)
+        self.kfilter.apply(meas_sv)
+        return self.kfilter
 
 
 def lorentz(vel, ef, bf, charge):
@@ -411,44 +492,7 @@ def recover_energy(curv, bfield, lambdas, mass_num, charge_num):
     return es
 
 
-def update_state_vector(state):
-    x0, y0, z0, k0, l0, phi0 = state
-    r0 = 1/k0
 
-    dphi = 0.005
-    phi1 = phi0 + dphi
-
-    dx = r0 * (cos(phi1) - cos(phi0))
-    dy = r0 * (sin(phi1) - sin(phi0))
-    dz = r0 * tan(l0) * dphi
-
-    ds = sqrt(dx**2 + dy**2 + dz**2)
-
-    en = recover_energy(k0, bfield, l0, 4, 2) / 4
-    if en > 1e-4:
-        part = Particle(4, 2, en)
-        beta = part.beta()
-        dedx = bethe(part, g)  # * e_chg * 1e6  # transform from MeV/m to J/m
-        try:
-            gamma = part.gamma()
-        except ZeroDivisionError:
-            gamma = 1e10
-        dk = k0 / (gamma * part.get_mass() * beta**2) * dedx * ds
-#         dk = (k0 * cos(l0)) / (beta * c_lgt * 2 * e_chg * numpy.linalg.norm(bfield)) * dedx * dphi
-#         dk = k0/(0.3 * numpy.linalg.norm(bfield) * beta) * dedx * dphi * 1e-3  # the 0.3 is in GeV/(m.T)
-#         print('en: {}, dedx: {}, dk: {}'.format(en, dedx, dk))
-        k1 = k0 + dk
-    else:
-        k1 = k0
-
-    r1 = 1 / k1
-
-    x1 = x0 + dx
-    y1 = y0 + dy
-    z1 = z0 + dz
-    l1 = l0
-
-    return numpy.array([x1, y1, z1, 1/r1, l1, phi1])
 
 
 def jacobian(func, particle, *args):
@@ -495,17 +539,6 @@ def jacobian_from_vector(func, state, *args):
     return numpy.vstack(cols).T
 
 
-def sym_jacobian(state):
-    x, y, z, k, l, phi = state
-    dphi = 0.005
-    phip = phi+dphi
-    res = numpy.array([[1, 0, 0, -dphi*tan(l)/k**2, dphi/(k*cos(l)**2), 0],
-                       [0, 1, 0, -(-cos(phi)+cos(phip))/k**2, 0, (sin(phi)-sin(phip))/k],
-                       [0, 0, 1, -(-sin(phi)+sin(phip))/k**2, 0, (-cos(phi)+cos(phip))/k],
-                       [0, 0, 0, 1, 0, 0],
-                       [0, 0, 0, 0, 1, 0],
-                       [0, 0, 0, 0, 0, 1]])
-    return res
 
 
 def generate_measurement(particle):
@@ -517,4 +550,6 @@ if __name__ == '__main__':
     e_field = [0., 0., 15e3]  # V/m
     b_field = [0., 0., 2.]  # T
     res_pos, res_azi, res_pol, res_time, res_en = track(part, he_gas, e_field, b_field)
+    tr = Tracker(part, he_gas, e_field, b_field)
+    kf = tr.track(res_pos)
     print('Finished')

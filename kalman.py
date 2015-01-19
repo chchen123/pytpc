@@ -76,13 +76,8 @@ class KalmanFilter:
         """
         self._init_matrices(z.shape[0])
 
-        self.xhat[0] = z[0]
-        self.p_mat[0] = numpy.array([[0.1, 0, 0, 0, 0, 0],
-                                     [0, 0.1, 0, 0, 0, 0],
-                                     [0, 0, 0.1, 0, 0, 0],
-                                     [0, 0, 0, 10, 0, 0],
-                                     [0, 0, 0, 0, 10, 0],
-                                     [0, 0, 0, 0, 0, 1e0]])
+        self.xhat[0] = numpy.ones(self.sv_dim)
+        self.p_mat[0] = numpy.eye(self.sv_dim) * 0.1
 
         for k in range(1, z.shape[0]):
             try:
