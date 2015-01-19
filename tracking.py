@@ -539,11 +539,6 @@ def jacobian_from_vector(func, state, *args):
     return numpy.vstack(cols).T
 
 
-
-
-def generate_measurement(particle):
-    return particle.get_state_vector()[0:3]
-
 if __name__ == '__main__':
     he_gas = Gas(4, 2, 41.8, 150.)
     part = Particle(mass_num=4, charge_num=2, energy_per_particle=2., azimuth=pi/5, polar=pi/4)
