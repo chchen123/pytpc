@@ -9,7 +9,7 @@ import kalman
 
 
 class Gas:
-    """ Describes a gas in the detector
+    """ Describes a gas in the detector.
     """
 
     def __init__(self, molar_mass, num_electrons, mean_exc_pot, pressure):
@@ -34,10 +34,12 @@ class Gas:
 
     @property
     def electron_density(self):
+        """Electron density per cm^3"""
         return N_avo * self.num_electrons * self.density / self.molar_mass
 
     @property
     def electron_density_per_m3(self):
+        """Electron density per m^3"""
         return self.electron_density * 1e6
 
 
@@ -69,6 +71,7 @@ class Particle:
 
     @property
     def energy(self):
+        """The total energy in MeV"""
         return self._energy
 
     @energy.setter
@@ -77,6 +80,7 @@ class Particle:
 
     @property
     def energy_per_particle(self):
+        """The energy per particle in MeV/u"""
         return self._energy / self.mass_num
 
     @energy_per_particle.setter
@@ -84,20 +88,14 @@ class Particle:
         self._energy = new * self.mass_num
 
     @property
-    def energy_kg(self):
-        return self._energy * MeVtokg
-
-    @property
     def mass(self):
+        """The particle mass in MeV/c^2"""
         return self._mass
 
     @property
     def mass_kg(self):
+        """The particle mass in kg"""
         return self._mass * MeVtokg
-
-    @property
-    def mass_g(self):
-        return self._mass * MeVtokg * 1000
 
     @property
     def velocity(self):
@@ -109,30 +107,27 @@ class Particle:
 
     @property
     def beta(self):
-        """ Returns beta, or v / c.
-        """
         en = self.energy
         m = self.mass
         return beta_factor(en, m)
 
     @property
     def gamma(self):
-        """ Returns gamma for the particle.
-        """
         return 1 / sqrt(1 - self.beta**2)
 
     @property
     def state_vector(self):
+        """The state vector of the particle, as (x, y, z, en/u, azi, pol).
+
+        Setting to this will update every other property automatically.
+
+        """
         p = self.position  # for brevity
         res = numpy.array([p[0], p[1], p[2], self.energy_per_particle, self.azimuth, self.polar])
         return res
 
     @state_vector.setter
     def state_vector(self, new):
-        """ Update the particle's parameters based on the provided state vector.
-
-        The state vector should be (x, y, z, en/u, azi, pol)
-        """
         new_position = new[0:3]
         new_energy = new[3]
         new_azimuth = new[4]
