@@ -27,29 +27,18 @@ class Gas:
         self.mean_exc_pot = mean_exc_pot
         self.pressure = pressure
 
-    def get_density(self, unit='g/cm^3'):
-        """ Return the density. Available units are g/cm^3, kg/m^3, and g/m^3
-        """
-        pressure = self.pressure / 760. * self.molar_mass / 24040.  # in g/cm^3. 24040 is R*T at room temp.
-        if unit == 'g/cm^3':
-            return pressure
-        elif unit == 'kg/m^3':
-            return pressure * 1000
-        elif unit == 'g/m^3':
-            return pressure * 1e6
-        else:
-            raise ValueError('Invalid units provided.')
+    @property
+    def density(self):
+        """Density in g/cm^3"""
+        return self.pressure / 760. * self.molar_mass / 24040.
 
-    def get_electron_density(self, unit='cm^-3'):
-        """ Get the electron density. Units are cm^-3 or m^-3
-        """
-        ne = N_avo * self.num_electrons * self.get_density(unit='g/cm^3') / self.molar_mass
-        if unit == 'cm^-3':
-            return ne
-        elif unit == 'm^-3':
-            return ne * 1e6
-        else:
-            raise ValueError('Invalid units provided.')
+    @property
+    def electron_density(self):
+        return N_avo * self.num_electrons * self.density / self.molar_mass
+
+    @property
+    def electron_density_per_m3(self):
+        return self.electron_density * 1e6
 
 
 class Particle:
@@ -78,92 +67,76 @@ class Particle:
         self.azimuth = azimuth
         self.polar = polar
 
-    def get_energy(self, unit='MeV', per_particle=False):
-        """ Find the energy of the particle.
+    @property
+    def energy(self):
+        return self._energy
 
-        The unit argument specifies the units to use. Options are:
-            - MeV : The total energy in MeV
-            - J : The total energy in joules
+    @energy.setter
+    def energy(self, new):
+        self._energy = new
 
-        The per_particle argument specifies if the total energy should be divided by the mass number.
-        """
+    @property
+    def energy_per_particle(self):
+        return self._energy / self.mass_num
 
-        if unit == 'MeV':
-            res = self._energy
-        elif unit == 'J':
-            res = self._energy / 1e6 * e_chg
-        else:
-            raise ValueError('Invalid units provided.')
+    @energy_per_particle.setter
+    def energy_per_particle(self, new):
+        self._energy = new * self.mass_num
 
-        if per_particle:
-            res /= self.mass_num
+    @property
+    def energy_kg(self):
+        return self._energy * MeVtokg
 
-        return res
+    @property
+    def mass(self):
+        return self._mass
 
-    def set_energy(self, new_en, per_particle=False):
-        """ Set the energy of the particle to new_en, in MeV.
-        """
+    @property
+    def mass_kg(self):
+        return self._mass * MeVtokg
 
-        if per_particle:
-            self._energy = new_en * self.mass_num
-        else:
-            self._energy = new_en
+    @property
+    def mass_g(self):
+        return self._mass * MeVtokg * 1000
 
-    def get_mass(self, unit='MeV'):
-        """ Find the mass of the particle.
-
-        The unit argument specifies the units to use. Options are:
-            - MeV : The total mass in MeV/c^2
-            - kg : The total mass in kilograms
-            - g : The total mass in grams
-        """
-
-        if unit == 'MeV':
-            return self._mass
-        elif unit == 'kg':
-            return self._mass * MeVtokg
-        elif unit == 'g':
-            return self._mass * MeVtokg * 1000
-        else:
-            raise ValueError('Invalid units provided.')
-
-    def get_velocity(self):
-        """ Return the velocity of the particle, in m/s.
-        """
-        beta = self.beta()
+    @property
+    def velocity(self):
+        beta = self.beta
         vel = numpy.array([beta*c_lgt*cos(self.azimuth)*sin(self.polar),
                            beta*c_lgt*sin(self.azimuth)*sin(self.polar),
                            beta*c_lgt*cos(self.polar)])
         return vel
 
+    @property
     def beta(self):
         """ Returns beta, or v / c.
         """
-        en = self.get_energy(per_particle=False)
-        m = self.get_mass()
+        en = self.energy
+        m = self.mass
         return beta_factor(en, m)
 
+    @property
     def gamma(self):
         """ Returns gamma for the particle.
         """
-        return 1 / sqrt(1 - self.beta()**2)
+        return 1 / sqrt(1 - self.beta**2)
 
-    def get_state_vector(self):
-        """ Generate the particle's state vector, as (x, y, z, en/u, azi, pol)
-        """
+    @property
+    def state_vector(self):
         p = self.position  # for brevity
-        res = numpy.array([p[0], p[1], p[2], self.get_energy(per_particle=True), self.azimuth, self.polar])
+        res = numpy.array([p[0], p[1], p[2], self.energy_per_particle, self.azimuth, self.polar])
         return res
 
-    def update_state(self, state_vector):
+    @state_vector.setter
+    def state_vector(self, new):
         """ Update the particle's parameters based on the provided state vector.
 
         The state vector should be (x, y, z, en/u, azi, pol)
         """
-        new_position = state_vector[0:3]
-        new_energy = state_vector[3]
-        new_azimuth = state_vector[4]
-        new_polar = state_vector[5]
+        new_position = new[0:3]
+        new_energy = new[3]
+        new_azimuth = new[4]
+        new_polar = new[5]
 
         if new_energy < 0:
             # raise ValueError('Negative energy: {}'.format(new_energy))
@@ -229,14 +202,14 @@ class Tracker:
 
         en = recover_energy(k0, self.bfield, l0, self.particle.mass_num, self.particle.charge_num) / 4
         if en > 1e-4:
-            self.particle.set_energy(en, per_particle=True)
-            beta = self.particle.beta()
+            self.particle.energy_per_particle = en
+            beta = self.particle.beta
             dedx = bethe(self.particle, self.gas)  # * e_chg * 1e6  # transform from MeV/m to J/m
             try:
-                gamma = self.particle.gamma()
+                gamma = self.particle.gamma
             except ZeroDivisionError:
                 gamma = 1e10
-            dk = k0 / (gamma * self.particle.get_mass() * beta**2) * dedx * ds
+            dk = k0 / (gamma * self.particle.mass * beta**2) * dedx * ds
     #         dk = (k0 * cos(l0)) / (beta * c_lgt * 2 * e_chg * numpy.linalg.norm(bfield)) * dedx * dphi
     #         dk = k0/(0.3 * numpy.linalg.norm(bfield) * beta) * dedx * dphi * 1e-3  # the 0.3 is in GeV/(m.T)
     #         print('en: {}, dedx: {}, dk: {}'.format(en, dedx, dk))
@@ -287,11 +260,11 @@ def bethe(particle, gas):
     Returns: The stopping power in MeV/m
     
     """
-    ne = gas.get_electron_density(unit='m^-3')
+    ne = gas.electron_density_per_m3
     z = particle.charge_num
     I = gas.mean_exc_pot * 1e-6  # convert to MeV
 
-    beta_sq = particle.beta()**2
+    beta_sq = particle.beta**2
 
     try:
         frnt = ne * z**2 * e_chg**4 / (e_mc2 * MeVtokg * c_lgt**2 * beta_sq * 4 * pi * eps_0**2)
@@ -335,29 +308,29 @@ def find_next_state(particle, gas, ef, bf):
     Returns the new state vector in the form (x, y, z, en/u, azi, pol)
     """
 
-    en = particle.get_energy()
-    vel = particle.get_velocity()
+    en = particle.energy
+    vel = particle.velocity
     charge = particle.charge
     pos = particle.position
 
-    beta = particle.beta()
+    beta = particle.beta
     if beta == 0:
-        return particle.get_state_vector()
+        return particle.state_vector
     tstep = pos_step / (beta * c_lgt)
     
     force = numpy.array(lorentz(vel, ef, bf, charge))
-    new_vel = vel + force/particle.get_mass('kg') * tstep  # this is questionable w.r.t. relativity...
+    new_vel = vel + force/particle.mass_kg * tstep  # this is questionable w.r.t. relativity...
     stopping = bethe(particle, gas)  # in MeV/m
     de = float(threshold(stopping*pos_step, threshmin=1e-3))
     
     if stopping <= 0 or de == 0:
-        new_state = particle.get_state_vector()
+        new_state = particle.state_vector
         new_state[3] = 0  # Set the energy to 0
         return new_state
     else:
         en = float(threshold(en - de, threshmin=0))
         
-        new_beta = beta_factor(en, particle.get_mass())
+        new_beta = beta_factor(en, particle.mass)
         new_vel *= new_beta / beta
         new_pos = pos + new_vel*tstep
 
@@ -390,21 +363,21 @@ def track(particle, gas, ef, bf):
     azi.append(particle.azimuth)
     pol.append(particle.polar)
     time.append(current_time)
-    en.append(particle.get_energy(per_particle=True))
+    en.append(particle.energy_per_particle)
     
     while True:
         state = find_next_state(particle, gas, ef, bf)
-        particle.update_state(state)
-        if particle.get_energy() == 0:
+        particle.state_vector = state
+        if particle.energy == 0:
             print('Particle stopped')
             break
         
         pos.append(particle.position)
         azi.append(particle.azimuth)
         pol.append(particle.polar)
-        en.append(particle.get_energy(per_particle=True))
+        en.append(particle.energy_per_particle)
 
-        current_time += pos_step / (particle.beta() * c_lgt)
+        current_time += pos_step / (particle.beta * c_lgt)
         time.append(current_time)
 
         if particle.position[2] > 1 or sqrt(particle.position[0]**2 + particle.position[1]**2) > 0.275:
@@ -515,53 +488,6 @@ def recover_energy(curv, bfield, lambdas, mass_num, charge_num):
     ps = 1/curv * numpy.linalg.norm(bfield) * numpy.sqrt(1+numpy.tan(lambdas)**2) * charge / e_chg / 1e6  # in MeV/c
     es = numpy.sqrt(ps**2 * c_lgt**2 + mass**2) - mass
     return es
-
-
-
-
-
-def jacobian(func, particle, *args):
-    current_state = numpy.array(particle.get_state_vector())
-    f_current = numpy.array(func(particle, *args))
-
-    cols = []
-
-    for i, v in enumerate(current_state):
-        new_state = current_state[:]
-        delta = 0.01
-        new_state[i] = v + delta
-        new_particle = copy.copy(particle)
-        new_particle.update_state(new_state)
-
-        f_plus = numpy.array(func(new_particle, *args))
-
-        der = (f_plus - f_current) / delta
-        cols.append(der)
-
-    return numpy.vstack(cols).T
-
-
-def jacobian_from_vector(func, state, *args):
-    current_state = state
-    f_current = numpy.array(func(state, *args))
-
-    cols = []
-
-    for i, v in enumerate(current_state):
-        new_state = current_state[:]
-        prev_state = current_state[:]
-        # state vector (x, y, z, 1/R, lambda, phi)
-        delta = v / 10
-        new_state[i] = v + delta
-        prev_state[i] = v - delta
-
-        f_plus = numpy.array(func(new_state, *args))
-        f_minus = numpy.array(func(prev_state, *args))
-
-        der = (f_plus - f_minus) / (2*delta)
-        cols.append(der)
-
-    return numpy.vstack(cols).T
 
 
 if __name__ == '__main__':
