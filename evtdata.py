@@ -169,10 +169,6 @@ class EventFile:
             event_ts = hdr[3]
             num_traces = hdr[4]
 
-            print("Found event of size", event_size, ":")
-            print("    Event Number:", event_id)
-            print("    Contains", num_traces, "traces")
-
             new_evt = Event(evt_id=event_id, timestamp=event_ts)
             new_evt.traces = numpy.zeros((num_traces,), dtype=new_evt.dt)
 
@@ -329,6 +325,47 @@ class EventFile:
             print("The provided number is outside the range of event numbers.")
             return None
 
+    def __iter__(self):
+        """ Prepare the file object for iteration.
+
+        This sets the current event to 0 and rewinds the file pointer back to the beginning.
+        """
+        self.fp.seek(self.lookup[0])
+        self.current_event = 0
+        return self
+
+    def __next__(self):
+        """ Get the next event when iterating.
+        """
+
+        if self.current_event < len(self.lookup):
+            evt = self.read_current()
+            self.current_event += 1
+            return evt
+        else:
+            raise StopIteration
+
+    def __getitem__(self, item):
+        """ Implements subscripting of the event file, with slices.
+        """
+
+        if isinstance(item, slice):
+            start, stop, step = item.indices(len(self.lookup))
+            evts = []
+            for i in range(start, stop, step):
+                e = self.read_event_by_number(i)
+                evts.append(e)
+            return evts
+
+        elif isinstance(item, int):
+            if item < 0 or item > len(self.lookup):
+                raise IndexError("The index is out of bounds")
+            else:
+                return self.read_event_by_number(item)
+
+        else:
+            raise IndexError("index must be int or slice")
+
 
 class Event:
     """ Represents an event from an :class:`EventFile`.
@@ -355,6 +392,10 @@ class Event:
         self.traces = numpy.zeros((0,), dtype=self.dt)
 
         return
+
+    def __str__(self):
+        str = 'Event {id}, timestamp {ts}.\nContains {tr} traces.'
+        return str.format(id=self.evt_id, ts=self.timestamp, tr=len(self.traces))
 
     def hits(self):
         """ Calculate the total activation of each pad.
