@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/pyevt.iml" filepath="$PROJECT_DIR$/.idea/pyevt.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/pytpc.iml" filepath="$PROJECT_DIR$/.idea/pytpc.iml" />
     </modules>
   </component>
 </project>
