@@ -69,7 +69,7 @@ class KalmanFilter:
         self.i_mat = numpy.eye(self.sv_dim)
         self.a_mat = numpy.zeros(self.sv_sv_matsh)
 
-    def apply(self, z):
+    def apply(self, z, ):
         """ Apply the Kalman filter to the provided data set.
 
         Returns the state estimates for each point.
@@ -90,12 +90,13 @@ class KalmanFilter:
                 self.p_mat_minus[k] = numpy.dot(self.a_mat[k], numpy.dot(self.p_mat[k-1], a_mat_t)) + self.q_mat
 
                 # measurement update step
-                h_mat = numpy.eye(self.sv_dim, self.meas_dim)
+                h_mat = numpy.eye(self.meas_dim, self.sv_dim)
                 h_mat_t = h_mat.T
+                print(h_mat, h_mat_t)
 
                 self.s_mat[k] = numpy.dot(h_mat, numpy.dot(self.p_mat_minus[k], h_mat_t)) + self.r_mat
                 self.k_mat[k] = numpy.dot(self.p_mat_minus[k], numpy.dot(h_mat_t, numpy.linalg.inv(self.s_mat[k])))
-                self.xhat[k] = self.xhatminus[k] + numpy.dot(self.k_mat[k], (z[k] - self.xhatminus[k]))
+                self.xhat[k] = self.xhatminus[k] + numpy.dot(self.k_mat[k], (z[k] - self.xhatminus[k, 0:self.meas_dim]))
                 self.p_mat[k] = numpy.dot(self.i_mat - numpy.dot(self.k_mat[k], h_mat), self.p_mat_minus[k])
             except numpy.linalg.LinAlgError as err:
                 print(err, k, self.s_mat[k])

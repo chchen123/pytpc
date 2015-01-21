@@ -105,6 +105,25 @@ class Particle:
                            beta*c_lgt*cos(self.polar)])
         return vel
 
+    @velocity.setter
+    def velocity(self, new):
+        vx, vy, vz = new
+        self.energy = (gamma_factor(new) - 1) * self.mass
+        self.azimuth = atan2(vy, vx)
+        self.polar = atan2(sqrt(vx**2 + vy**2), vz)
+
+    @property
+    def momentum(self):
+        """The momentum in kg.m/s"""
+        return self.gamma * self.mass_kg * self.velocity
+
+    @momentum.setter
+    def momentum(self, new):
+        px, py, pz = new
+        self.energy = numpy.sqrt(numpy.linalg.norm(new)**2 * c_lgt**2 + self.mass**2) - self.mass
+        self.azimuth = atan2(py, px)
+        self.polar = atan2(sqrt(px**2 + py**2), pz)
+
     @property
     def beta(self):
         en = self.energy
@@ -170,7 +189,7 @@ def find_tracks(data, eps=20, min_samples=20):
 
 class Tracker:
 
-    meas_dim = 6
+    meas_dim = 3
     sv_dim = 6
 
     def __init__(self, particle, gas, efield, bfield):
@@ -179,64 +198,55 @@ class Tracker:
         self.efield = efield
         self.bfield = bfield
         self.kfilter = kalman.KalmanFilter(Tracker.sv_dim, Tracker.meas_dim,
-                                          self.update_state_vector,
-                                          self.jacobian)
+                                           self.update_state_vector,
+                                           self.jacobian)
 
     def update_state_vector(self, state):
-        x0, y0, z0, k0, l0, phi0 = state
-        r0 = 1/k0
+        """Find the next state vector.
 
-        dphi = 0.005
-        phi1 = phi0 + dphi
+        State vector is of the form (x, y, z, px, py, pz)
 
-        dx = r0 * (cos(phi1) - cos(phi0))
-        dy = r0 * (sin(phi1) - sin(phi0))
-        dz = r0 * tan(l0) * dphi
+        """
+        pos0 = state[0:3]
+        mom0 = state[3:6]
 
-        ds = sqrt(dx**2 + dy**2 + dz**2)
+        self.particle.position = pos0
+        self.particle.momentum = mom0
 
-        en = recover_energy(k0, self.bfield, l0, self.particle.mass_num, self.particle.charge_num) / 4
-        if en > 1e-4:
-            self.particle.energy_per_particle = en
-            beta = self.particle.beta
-            dedx = bethe(self.particle, self.gas)  # * e_chg * 1e6  # transform from MeV/m to J/m
-            try:
-                gamma = self.particle.gamma
-            except ZeroDivisionError:
-                gamma = 1e10
-            dk = k0 / (gamma * self.particle.mass * beta**2) * dedx * ds
-    #         dk = (k0 * cos(l0)) / (beta * c_lgt * 2 * e_chg * numpy.linalg.norm(bfield)) * dedx * dphi
-    #         dk = k0/(0.3 * numpy.linalg.norm(bfield) * beta) * dedx * dphi * 1e-3  # the 0.3 is in GeV/(m.T)
-    #         print('en: {}, dedx: {}, dk: {}'.format(en, dedx, dk))
-            k1 = k0 + dk
-        else:
-            k1 = k0
+        de = bethe(self.particle, self.gas) * pos_step  # energy lost in MeV
+        new_en = float(threshold(self.particle.energy - de, threshmin=0.))
+        self.particle.energy = new_en
 
-        r1 = 1 / k1
+        force = lorentz(self.particle.velocity, self.efield, self.bfield, self.particle.charge)
+        dt = pos_step / numpy.linalg.norm(self.particle.velocity)
 
-        x1 = x0 + dx
-        y1 = y0 + dy
-        z1 = z0 + dz
-        l1 = l0
+        self.particle.velocity += force * dt
 
-        return numpy.array([x1, y1, z1, 1/r1, l1, phi1])
+        self.particle.position += self.particle.velocity * dt
 
-    @staticmethod
-    def jacobian(state):
-        x, y, z, k, l, phi = state
-        dphi = 0.005
-        phip = phi+dphi
-        res = numpy.array([[1, 0, 0, -dphi*tan(l)/k**2, dphi/(k*cos(l)**2), 0],
-                           [0, 1, 0, -(-cos(phi)+cos(phip))/k**2, 0, (sin(phi)-sin(phip))/k],
-                           [0, 0, 1, -(-sin(phi)+sin(phip))/k**2, 0, (-cos(phi)+cos(phip))/k],
-                           [0, 0, 0, 1, 0, 0],
-                           [0, 0, 0, 0, 1, 0],
-                           [0, 0, 0, 0, 0, 1]])
+        return numpy.hstack((self.particle.position, self.particle.velocity))
+
+    def jacobian(self, state):
+        # pos = state[0:3]
+        # mom = state[3:6]
+        # self.particle.position = pos
+        # self.particle.momentum = mom
+        #
+        # x, y, z, px, py, pz = state
+        m = self.particle.mass_kg
+        q = self.particle.charge
+        bx, by, bz = self.bfield
+
+        res = numpy.array([[1, 0, 0, 1/m, 0, 0],
+                           [0, 1, 0, 0, 1/m, 0],
+                           [0, 0, 1, 0, 0, 1/m],
+                           [0, 0, 0, 1, q/m*bz, -q/m*by],
+                           [0, 0, 0, -q/m*bz, 1, q/m*bx],
+                           [0, 0, 0, q/m*by, -q/m*bx, 1]])
         return res
 
     def track(self, meas):
-        meas_sv, ctr = find_state_vector(meas)
-        self.kfilter.apply(meas_sv)
+        self.kfilter.apply(meas)
         return self.kfilter
 
 
@@ -347,16 +357,14 @@ def track(particle, gas, ef, bf):
 
     """
     pos = []
-    azi = []
-    pol = []
+    mom = []
     time = []
     en = []
     
     current_time = 0
 
     pos.append(particle.position)
-    azi.append(particle.azimuth)
-    pol.append(particle.polar)
+    mom.append(particle.momentum)
     time.append(current_time)
     en.append(particle.energy_per_particle)
     
@@ -368,8 +376,7 @@ def track(particle, gas, ef, bf):
             break
         
         pos.append(particle.position)
-        azi.append(particle.azimuth)
-        pol.append(particle.polar)
+        mom.append(particle.momentum)
         en.append(particle.energy_per_particle)
 
         current_time += pos_step / (particle.beta * c_lgt)
@@ -379,7 +386,7 @@ def track(particle, gas, ef, bf):
             print('Particle left chamber')
             break
 
-    return pos, azi, pol, time, en
+    return pos, mom, time, en
 
 
 def find_circle_params(xs, ys):
