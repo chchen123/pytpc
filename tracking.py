@@ -79,6 +79,14 @@ class Particle:
         self._energy = new
 
     @property
+    def energy_j(self):
+        return self._energy * 1e6 * e_chg
+
+    @energy_j.setter
+    def energy_j(self, value):
+        self._energy = value / 1e6 / e_chg
+
+    @property
     def energy_per_particle(self):
         """The energy per particle in MeV/u"""
         return self._energy / self.mass_num
@@ -120,7 +128,8 @@ class Particle:
     @momentum.setter
     def momentum(self, new):
         px, py, pz = new
-        self.energy = numpy.sqrt(numpy.linalg.norm(new)**2 * c_lgt**2 + self.mass**2) - self.mass
+        self.energy_j = (numpy.sqrt(numpy.linalg.norm(new)**2 * c_lgt**2 + self.mass_kg**2 * c_lgt**4)
+                         - self.mass_kg * c_lgt**2)
         self.azimuth = atan2(py, px)
         self.polar = atan2(sqrt(px**2 + py**2), pz)
 
@@ -132,7 +141,12 @@ class Particle:
 
     @property
     def gamma(self):
-        return 1 / sqrt(1 - self.beta**2)
+        try:
+            g = 1 / sqrt(1 - self.beta**2)
+        except ZeroDivisionError:
+            g = 1e100
+
+        return g
 
     @property
     def state_vector(self):
@@ -189,17 +203,16 @@ def find_tracks(data, eps=20, min_samples=20):
 
 class Tracker:
 
-    meas_dim = 3
+    meas_dim = 6
     sv_dim = 6
 
-    def __init__(self, particle, gas, efield, bfield):
+    def __init__(self, particle, gas, efield, bfield, seed):
         self.particle = particle
         self.gas = gas
         self.efield = efield
         self.bfield = bfield
-        self.kfilter = kalman.KalmanFilter(Tracker.sv_dim, Tracker.meas_dim,
-                                           self.update_state_vector,
-                                           self.jacobian)
+        self.kfilter = kalman.KalmanFilter(self.sv_dim, self.meas_dim, self.update_state_vector, self.jacobian,
+                                           self.generate_measurement, self.measure_jacobian, seed)
 
     def update_state_vector(self, state):
         """Find the next state vector.
@@ -212,19 +225,26 @@ class Tracker:
 
         self.particle.position = pos0
         self.particle.momentum = mom0
-
-        de = bethe(self.particle, self.gas) * pos_step  # energy lost in MeV
-        new_en = float(threshold(self.particle.energy - de, threshmin=0.))
-        self.particle.energy = new_en
-
-        force = lorentz(self.particle.velocity, self.efield, self.bfield, self.particle.charge)
-        dt = pos_step / numpy.linalg.norm(self.particle.velocity)
-
-        self.particle.velocity += force * dt
-
-        self.particle.position += self.particle.velocity * dt
-
-        return numpy.hstack((self.particle.position, self.particle.velocity))
+        #
+        # de = bethe(self.particle, self.gas) * pos_step  # energy lost in MeV
+        # new_en = float(threshold(self.particle.energy - de, threshmin=0.))
+        # self.particle.energy = new_en
+        #
+        # force = lorentz(self.particle.velocity, self.efield, self.bfield, self.particle.charge)
+        # dt = pos_step / numpy.linalg.norm(self.particle.velocity)
+        # dp = force * dt
+        # dp_mag = numpy.linalg.norm(dp)
+        #
+        # newvel = (oldvel + dv) / (1 + oldvel_mag * dv_mag / c_lgt**2)
+        #
+        # self.particle.velocity = newvel
+        #
+        # self.particle.position += self.particle.velocity * dt
+        #
+        # return numpy.hstack((self.particle.position, self.particle.velocity))
+        new_state = find_next_state(self.particle, self.gas, self.efield, self.bfield)
+        self.particle.state_vector = new_state
+        return numpy.hstack([self.particle.position, self.particle.momentum])
 
     def jacobian(self, state):
         # pos = state[0:3]
@@ -244,6 +264,35 @@ class Tracker:
                            [0, 0, 0, -q/m*bz, 1, q/m*bx],
                            [0, 0, 0, q/m*by, -q/m*bx, 1]])
         return res
+
+
+    def generate_measurement(self, state):
+        pos = state[0:3]
+        mom = state[3:6]
+        self.particle.position = pos
+        self.particle.momentum = mom
+        vel = self.particle.velocity
+        dt = pos_step / (self.particle.beta * c_lgt)
+        return numpy.hstack((pos, vel*dt))
+
+    @staticmethod
+    def measure_jacobian(state):
+        x, y, z, px, py, pz = state
+
+        print(state)
+
+        return numpy.array([[1, 0, 0, 0, 0, 0],
+                            [0, 1, 0, 0, 0, 0],
+                            [0, 0, 1, 0, 0, 0],
+                            [0, 0, 0, -((pos_step*px**2)/(px**2 + py**2 + pz**2)**(3/2))
+                             + pos_step/sqrt(px**2 + py**2 + pz**2), -((pos_step*px*py)/(px**2 + py**2 + pz**2)**(3/2)),
+                             -((pos_step*px*pz)/(px**2 + py**2 + pz**2)**(3/2))],
+                            [0, 0, 0, -((pos_step*px*py)/(px**2 + py**2 + pz**2)**(3/2)),
+                             -((pos_step*py**2)/(px**2 + py**2 + pz**2)**(3/2)) + pos_step/sqrt(px**2 + py**2 + pz**2),
+                             -((pos_step*py*pz)/(px**2 + py**2 + pz**2)**(3/2))],
+                            [0, 0, 0, -((pos_step*px*pz)/(px**2 + py**2 + pz**2)**(3/2)),
+                             -((pos_step*py*pz)/(px**2 + py**2 + pz**2)**(3/2)), -((pos_step*pz**2)
+                             /(px**2 + py**2 + pz**2)**(3/2)) + pos_step/sqrt(px**2 + py**2 + pz**2)]])
 
     def track(self, meas):
         self.kfilter.apply(meas)
@@ -271,14 +320,16 @@ def bethe(particle, gas):
 
     beta_sq = particle.beta**2
 
-    try:
+    if beta_sq == 0.0:
+        # The particle has stopped, so the dedx should be 0
+        dedx = float('inf')
+    elif beta_sq == 1.0:
+        # This is odd, but then I guess dedx -> 0
+        dedx = 0
+    else:
         frnt = ne * z**2 * e_chg**4 / (e_mc2 * MeVtokg * c_lgt**2 * beta_sq * 4 * pi * eps_0**2)
         lnt = log(2 * e_mc2 * beta_sq / (I * (1 - beta_sq)))
         dedx = frnt*(lnt - beta_sq)  # this should be in SI units, J/m
-
-    except ZeroDivisionError:
-        # This should only happen if beta == 0, so it should indicate that the particle has stopped.
-        dedx = 0
 
     return dedx / e_chg * 1e-6  # converted to MeV/m
 
@@ -304,7 +355,10 @@ def beta_factor(en, mass):
     en : the relativistic kinetic energy
     mass : the rest mass
     """
-    return (sqrt(en)*sqrt(en + 2*mass)) / (en + mass)
+    b = (sqrt(en)*sqrt(en + 2*mass)) / (en + mass)
+    if b > 1.0:
+        b = 1.0
+    return b
 
 
 def find_next_state(particle, gas, ef, bf):

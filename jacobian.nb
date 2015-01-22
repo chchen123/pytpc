@@ -10,10 +10,10 @@
 NotebookFileLineBreakTest
 NotebookFileLineBreakTest
 NotebookDataPosition[       158,          7]
-NotebookDataLength[     30181,        732]
-NotebookOptionsPosition[     29232,        695]
-NotebookOutlinePosition[     29590,        711]
-CellTagsIndexPosition[     29547,        708]
+NotebookDataLength[     39094,        988]
+NotebookOptionsPosition[     37533,        930]
+NotebookOutlinePosition[     37891,        946]
+CellTagsIndexPosition[     37848,        943]
 WindowFrame->Normal*)
 
 (* Beginning of Notebook Content *)
@@ -691,6 +691,241 @@ Cell[BoxData[
   Function[BoxForm`e$, 
    MatrixForm[BoxForm`e$]]]], "Output",
  CellChangeTimes->{{3.63085355498153*^9, 3.630853628195363*^9}}]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{"vel", "[", 
+   RowBox[{"px_", ",", "py_", ",", "pz_"}], "]"}], "=", 
+  RowBox[{
+   RowBox[{"Solve", "[", 
+    RowBox[{
+     RowBox[{
+      RowBox[{"{", 
+       RowBox[{"px", ",", "py", ",", "pz"}], "}"}], "\[Equal]", 
+      RowBox[{
+       FractionBox["1", 
+        RowBox[{"Sqrt", "[", 
+         RowBox[{"1", "-", 
+          RowBox[{
+           RowBox[{
+            RowBox[{"Norm", "[", 
+             RowBox[{"{", 
+              RowBox[{"vx", ",", "vy", ",", "vz"}], "}"}], "]"}], "^", "2"}], 
+           "/", 
+           RowBox[{"c", "^", "2"}]}]}], "]"}]], "m", " ", 
+       RowBox[{"{", 
+        RowBox[{"vx", ",", "vy", ",", "vz"}], "}"}]}]}], ",", 
+     RowBox[{"{", 
+      RowBox[{"vx", ",", "vy", ",", "vz"}], "}"}]}], "]"}], "[", 
+   RowBox[{"[", "2", "]"}], "]"}]}]], "Input",
+ CellChangeTimes->{{3.630927689379093*^9, 3.630927790960067*^9}}],
+
+Cell[BoxData[
+ RowBox[{"{", 
+  RowBox[{
+   RowBox[{"vx", "\[Rule]", 
+    FractionBox[
+     RowBox[{"c", " ", "px"}], 
+     SqrtBox[
+      RowBox[{
+       RowBox[{
+        SuperscriptBox["c", "2"], " ", 
+        SuperscriptBox["m", "2"]}], "+", 
+       SuperscriptBox["px", "2"], "+", 
+       SuperscriptBox["py", "2"], "+", 
+       SuperscriptBox["pz", "2"]}]]]}], ",", 
+   RowBox[{"vy", "\[Rule]", 
+    FractionBox[
+     RowBox[{"c", " ", "py"}], 
+     SqrtBox[
+      RowBox[{
+       RowBox[{
+        SuperscriptBox["c", "2"], " ", 
+        SuperscriptBox["m", "2"]}], "+", 
+       SuperscriptBox["px", "2"], "+", 
+       SuperscriptBox["py", "2"], "+", 
+       SuperscriptBox["pz", "2"]}]]]}], ",", 
+   RowBox[{"vz", "\[Rule]", 
+    FractionBox[
+     RowBox[{"c", " ", "pz"}], 
+     SqrtBox[
+      RowBox[{
+       RowBox[{
+        SuperscriptBox["c", "2"], " ", 
+        SuperscriptBox["m", "2"]}], "+", 
+       SuperscriptBox["px", "2"], "+", 
+       SuperscriptBox["py", "2"], "+", 
+       SuperscriptBox["pz", "2"]}]]]}]}], "}"}]], "Output",
+ CellChangeTimes->{{3.630927774614381*^9, 3.6309277915438232`*^9}}]
+}, Open  ]],
+
+Cell[BoxData[
+ RowBox[{"Clear", "[", "measure", "]"}]], "Input",
+ CellChangeTimes->{{3.6309279333094273`*^9, 3.6309279356515293`*^9}}],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{"measure", "[", 
+   RowBox[{"x_", ",", "y_", ",", "z_", ",", "px_", ",", "py_", ",", "pz_"}], 
+   "]"}], "=", 
+  RowBox[{"FullSimplify", "[", 
+   RowBox[{
+    RowBox[{"Flatten", "[", 
+     RowBox[{"{", 
+      RowBox[{"x", ",", "y", ",", "z", ",", 
+       RowBox[{
+        RowBox[{"(", 
+         RowBox[{
+          RowBox[{"{", 
+           RowBox[{"vx", ",", "vy", ",", "vz"}], "}"}], "*", 
+          RowBox[{"pstep", "/", 
+           RowBox[{"Norm", "[", 
+            RowBox[{"{", 
+             RowBox[{"vx", ",", "vy", ",", "vz"}], "}"}], "]"}]}]}], ")"}], "/.", 
+        RowBox[{"vel", "[", 
+         RowBox[{"px", ",", "py", ",", "pz"}], "]"}]}]}], "}"}], "]"}], ",", 
+    RowBox[{"Assumptions", "\[Rule]", 
+     RowBox[{"{", 
+      RowBox[{
+       RowBox[{"Element", "[", 
+        RowBox[{
+         RowBox[{"{", 
+          RowBox[{"px", ",", "py", ",", "pz", ",", "x", ",", "y", ",", "z"}], 
+          "}"}], ",", "Reals"}], "]"}], ",", 
+       RowBox[{"c", ">", "0"}], ",", 
+       RowBox[{"m", ">", "0"}], ",", 
+       RowBox[{
+        RowBox[{
+         RowBox[{
+          SuperscriptBox["c", "2"], " ", 
+          SuperscriptBox["m", "2"]}], "+", 
+         SuperscriptBox["px", "2"], "+", 
+         SuperscriptBox["py", "2"], "+", 
+         SuperscriptBox["pz", "2"]}], ">", "0"}]}], "}"}]}]}], 
+   "]"}]}]], "Input",
+ CellChangeTimes->{{3.630927633198312*^9, 3.630927646935461*^9}, {
+  3.630927798071373*^9, 3.630927932226363*^9}, {3.630928241679913*^9, 
+  3.630928256673882*^9}}],
+
+Cell[BoxData[
+ RowBox[{"{", 
+  RowBox[{"x", ",", "y", ",", "z", ",", 
+   FractionBox[
+    RowBox[{"pstep", " ", "px"}], 
+    SqrtBox[
+     RowBox[{
+      SuperscriptBox["px", "2"], "+", 
+      SuperscriptBox["py", "2"], "+", 
+      SuperscriptBox["pz", "2"]}]]], ",", 
+   FractionBox[
+    RowBox[{"pstep", " ", "py"}], 
+    SqrtBox[
+     RowBox[{
+      SuperscriptBox["px", "2"], "+", 
+      SuperscriptBox["py", "2"], "+", 
+      SuperscriptBox["pz", "2"]}]]], ",", 
+   FractionBox[
+    RowBox[{"pstep", " ", "pz"}], 
+    SqrtBox[
+     RowBox[{
+      SuperscriptBox["px", "2"], "+", 
+      SuperscriptBox["py", "2"], "+", 
+      SuperscriptBox["pz", "2"]}]]]}], "}"}]], "Output",
+ CellChangeTimes->{3.63092793684652*^9, 3.6309282577525177`*^9}]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ RowBox[{"measjac", "=", 
+  RowBox[{
+   RowBox[{
+    RowBox[{"D", "[", 
+     RowBox[{
+      RowBox[{"measure", "[", 
+       RowBox[{"x", ",", "y", ",", "z", ",", "px", ",", "py", ",", "pz"}], 
+       "]"}], ",", 
+      RowBox[{"{", 
+       RowBox[{"{", 
+        RowBox[{"x", ",", "y", ",", "z", ",", "px", ",", "py", ",", "pz"}], 
+        "}"}], "}"}]}], "]"}], "//", "InputForm"}], "//", 
+   "ToString"}]}]], "Input",
+ CellChangeTimes->{{3.630927953239945*^9, 3.630927954162793*^9}, {
+  3.630928373980959*^9, 3.630928453462926*^9}}],
+
+Cell[BoxData["\<\"{{1, 0, 0, 0, 0, 0}, {0, 1, 0, 0, 0, 0}, {0, 0, 1, 0, 0, \
+0}, {0, 0, 0, -((pstep*px^2)/(px^2 + py^2 + pz^2)^(3/2)) + pstep/Sqrt[px^2 + \
+py^2 + pz^2], -((pstep*px*py)/(px^2 + py^2 + pz^2)^(3/2)), \
+-((pstep*px*pz)/(px^2 + py^2 + pz^2)^(3/2))}, {0, 0, 0, -((pstep*px*py)/(px^2 \
++ py^2 + pz^2)^(3/2)), -((pstep*py^2)/(px^2 + py^2 + pz^2)^(3/2)) + \
+pstep/Sqrt[px^2 + py^2 + pz^2], -((pstep*py*pz)/(px^2 + py^2 + pz^2)^(3/2))}, \
+{0, 0, 0, -((pstep*px*pz)/(px^2 + py^2 + pz^2)^(3/2)), -((pstep*py*pz)/(px^2 \
++ py^2 + pz^2)^(3/2)), -((pstep*pz^2)/(px^2 + py^2 + pz^2)^(3/2)) + \
+pstep/Sqrt[px^2 + py^2 + pz^2]}}\"\>"], "Output",
+ CellChangeTimes->{
+  3.63092795657679*^9, 3.630928263019264*^9, {3.630928376584165*^9, 
+   3.630928453772244*^9}}]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ RowBox[{"pytrans", "=", 
+  RowBox[{"{", 
+   RowBox[{
+    RowBox[{"\"\<[\>\"", "\[Rule]", "\"\<(\>\""}], ",", 
+    RowBox[{"\"\<]\>\"", "\[Rule]", "\"\<)\>\""}], ",", 
+    RowBox[{"\"\<{\>\"", "\[Rule]", "\"\<[\>\""}], ",", 
+    RowBox[{"\"\<}\>\"", "\[Rule]", "\"\<]\>\""}], ",", 
+    RowBox[{"\"\<Sqrt\>\"", "\[Rule]", "\"\<sqrt\>\""}], ",", 
+    RowBox[{"\"\<pstep\>\"", "\[Rule]", "\"\<pos_step\>\""}], ",", 
+    RowBox[{"\"\<^\>\"", "\[Rule]", "\"\<**\>\""}]}], "}"}]}]], "Input",
+ CellChangeTimes->{{3.630928508108788*^9, 3.630928577274047*^9}, {
+  3.630928632424594*^9, 3.630928635516241*^9}, {3.630928674274919*^9, 
+  3.6309286972287397`*^9}}],
+
+Cell[BoxData[
+ RowBox[{"{", 
+  RowBox[{
+   RowBox[{"\<\"[\"\>", "\[Rule]", "\<\"(\"\>"}], ",", 
+   RowBox[{"\<\"]\"\>", "\[Rule]", "\<\")\"\>"}], ",", 
+   RowBox[{"\<\"{\"\>", "\[Rule]", "\<\"[\"\>"}], ",", 
+   RowBox[{"\<\"}\"\>", "\[Rule]", "\<\"]\"\>"}], ",", 
+   RowBox[{"\<\"Sqrt\"\>", "\[Rule]", "\<\"sqrt\"\>"}], ",", 
+   RowBox[{"\<\"pstep\"\>", "\[Rule]", "\<\"pos_step\"\>"}], ",", 
+   RowBox[{"\<\"^\"\>", "\[Rule]", "\<\"**\"\>"}]}], "}"}]], "Output",
+ CellChangeTimes->{{3.630928563466806*^9, 3.630928577912437*^9}, {
+  3.6309286798479548`*^9, 3.630928697994478*^9}}]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ RowBox[{"StringReplace", "[", 
+  RowBox[{"measjac", ",", "pytrans"}], "]"}]], "Input",
+ CellChangeTimes->{{3.630928405485571*^9, 3.630928423500759*^9}, {
+  3.6309284566540318`*^9, 3.6309285022897167`*^9}, {3.630928567504726*^9, 
+  3.630928569825379*^9}}],
+
+Cell[BoxData["\<\"[[1, 0, 0, 0, 0, 0], [0, 1, 0, 0, 0, 0], [0, 0, 1, 0, 0, \
+0], [0, 0, 0, -((pos_step*px**2)/(px**2 + py**2 + pz**2)**(3/2)) + \
+pos_step/sqrt(px**2 + py**2 + pz**2), -((pos_step*px*py)/(px**2 + py**2 + \
+pz**2)**(3/2)), -((pos_step*px*pz)/(px**2 + py**2 + pz**2)**(3/2))], [0, 0, \
+0, -((pos_step*px*py)/(px**2 + py**2 + pz**2)**(3/2)), \
+-((pos_step*py**2)/(px**2 + py**2 + pz**2)**(3/2)) + pos_step/sqrt(px**2 + \
+py**2 + pz**2), -((pos_step*py*pz)/(px**2 + py**2 + pz**2)**(3/2))], [0, 0, \
+0, -((pos_step*px*pz)/(px**2 + py**2 + pz**2)**(3/2)), \
+-((pos_step*py*pz)/(px**2 + py**2 + pz**2)**(3/2)), -((pos_step*pz**2)/(px**2 \
++ py**2 + pz**2)**(3/2)) + pos_step/sqrt(px**2 + py**2 + pz**2)]]\"\>"], \
+"Output",
+ CellChangeTimes->{
+  3.630928491170148*^9, {3.63092857024684*^9, 3.63092857934262*^9}, {
+   3.6309286819316053`*^9, 3.630928704083235*^9}}]
 }, Open  ]]
 },
 WindowSize->{808, 866},
@@ -732,7 +967,28 @@ Cell[26466, 606, 977, 28, 84, "Output"]
 }, Open  ]],
 Cell[CellGroupData[{
 Cell[27480, 639, 424, 11, 28, "Input"],
-Cell[27907, 652, 1309, 40, 176, "Output"]
+Cell[27907, 652, 1309, 40, 165, "Output"]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[29253, 697, 887, 26, 70, "Input"],
+Cell[30143, 725, 1114, 36, 56, "Output"]
+}, Open  ]],
+Cell[31272, 764, 134, 2, 28, "Input"],
+Cell[CellGroupData[{
+Cell[31431, 770, 1522, 42, 90, "Input"],
+Cell[32956, 814, 745, 24, 58, "Output"]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[33738, 843, 547, 15, 28, "Input"],
+Cell[34288, 860, 761, 11, 148, "Output"]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[35086, 876, 665, 13, 46, "Input"],
+Cell[35754, 891, 580, 11, 28, "Output"]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[36371, 907, 269, 5, 28, "Input"],
+Cell[36643, 914, 874, 13, 182, "Output"]
 }, Open  ]]
 }
 ]

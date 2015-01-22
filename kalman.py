@@ -24,7 +24,7 @@ class KalmanFilter:
 
     """
 
-    def __init__(self, sv_dim, meas_dim, update, jacobian):
+    def __init__(self, sv_dim, meas_dim, update, update_jacobian, measure, measure_jacobian, seed):
         """ Initializes the class.
 
         Arguments
@@ -40,8 +40,16 @@ class KalmanFilter:
 
         self._init_matrices(1)
 
+        self.q_mat = numpy.eye(self.sv_dim)
+        self.r_mat = numpy.eye(self.meas_dim)
+
         self.update = update
-        self.jacobian = jacobian
+        self.update_jacobian = update_jacobian
+
+        self.measure = measure
+        self.measure_jacobian = measure_jacobian
+
+        self.seed = seed
 
     def _init_matrices(self, num_meas):
         """ Initializes the object's matrices.
@@ -57,9 +65,6 @@ class KalmanFilter:
         self.sv_shape = (num_meas, self.sv_dim)
         self.meas_shape = (num_meas, self.meas_dim)
 
-        self.q_mat = numpy.eye(self.sv_dim)
-        self.r_mat = numpy.eye(self.meas_dim)
-
         self.xhat = numpy.zeros(self.sv_shape)
         self.xhatminus = numpy.zeros(self.sv_shape)
         self.p_mat = numpy.zeros(self.sv_sv_matsh)
@@ -69,34 +74,33 @@ class KalmanFilter:
         self.i_mat = numpy.eye(self.sv_dim)
         self.a_mat = numpy.zeros(self.sv_sv_matsh)
 
-    def apply(self, z, ):
+    def apply(self, z):
         """ Apply the Kalman filter to the provided data set.
 
         Returns the state estimates for each point.
         """
         self._init_matrices(z.shape[0])
 
-        self.xhat[0] = numpy.ones(self.sv_dim)
-        self.p_mat[0] = numpy.eye(self.sv_dim) * 0.1
+        self.xhat[0] = self.seed
+        self.p_mat[0] = numpy.eye(self.sv_dim) * 1e-30
 
         for k in range(1, z.shape[0]):
             try:
                 # time update step
                 self.xhatminus[k] = self.update(self.xhat[k-1])  # + numpy.random.normal(0, 1e-2, 6)
-                self.a_mat[k] = self.jacobian(self.xhatminus[k])
+                self.a_mat[k] = self.update_jacobian(self.xhatminus[k])
 
                 a_mat_t = self.a_mat[k].T
 
                 self.p_mat_minus[k] = numpy.dot(self.a_mat[k], numpy.dot(self.p_mat[k-1], a_mat_t)) + self.q_mat
 
                 # measurement update step
-                h_mat = numpy.eye(self.meas_dim, self.sv_dim)
+                h_mat = self.measure_jacobian(self.xhatminus[k])
                 h_mat_t = h_mat.T
-                print(h_mat, h_mat_t)
 
                 self.s_mat[k] = numpy.dot(h_mat, numpy.dot(self.p_mat_minus[k], h_mat_t)) + self.r_mat
                 self.k_mat[k] = numpy.dot(self.p_mat_minus[k], numpy.dot(h_mat_t, numpy.linalg.inv(self.s_mat[k])))
-                self.xhat[k] = self.xhatminus[k] + numpy.dot(self.k_mat[k], (z[k] - self.xhatminus[k, 0:self.meas_dim]))
+                self.xhat[k] = self.xhatminus[k] + numpy.dot(self.k_mat[k], (z[k] - self.measure(self.xhatminus[k])))
                 self.p_mat[k] = numpy.dot(self.i_mat - numpy.dot(self.k_mat[k], h_mat), self.p_mat_minus[k])
             except numpy.linalg.LinAlgError as err:
                 print(err, k, self.s_mat[k])
