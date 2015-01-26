@@ -7,6 +7,9 @@ import copy
 from constants import *
 import kalman
 
+import sys
+from filterpy.kalman import UnscentedKalmanFilter as UKF
+
 
 class Gas:
     """ Describes a gas in the detector.
@@ -203,7 +206,7 @@ def find_tracks(data, eps=20, min_samples=20):
 
 class Tracker:
 
-    meas_dim = 6
+    meas_dim = 3
     sv_dim = 6
 
     def __init__(self, particle, gas, efield, bfield, seed):
@@ -211,10 +214,15 @@ class Tracker:
         self.gas = gas
         self.efield = efield
         self.bfield = bfield
-        self.kfilter = kalman.KalmanFilter(self.sv_dim, self.meas_dim, self.update_state_vector, self.jacobian,
-                                           self.generate_measurement, self.measure_jacobian, seed)
+        self.kfilter = UKF(dim_x=self.sv_dim, dim_z=self.meas_dim, dt=1e-8, fx=self.update_state_vector,
+                           hx=self.generate_measurement)
 
-    def update_state_vector(self, state):
+        self.kfilter.Q *= 1e-6
+        self.kfilter.R *= 1e-2
+        self.kfilter.x = seed
+        self.kfilter.P *= 100
+
+    def update_state_vector(self, state, dt):
         """Find the next state vector.
 
         State vector is of the form (x, y, z, px, py, pz)
@@ -268,12 +276,8 @@ class Tracker:
 
     def generate_measurement(self, state):
         pos = state[0:3]
-        mom = state[3:6]
         self.particle.position = pos
-        self.particle.momentum = mom
-        vel = self.particle.velocity
-        dt = pos_step / (self.particle.beta * c_lgt)
-        return numpy.hstack((pos, vel*dt))
+        return pos
 
     @staticmethod
     def measure_jacobian(state):
@@ -295,8 +299,8 @@ class Tracker:
                              /(px**2 + py**2 + pz**2)**(3/2)) + pos_step/sqrt(px**2 + py**2 + pz**2)]])
 
     def track(self, meas):
-        self.kfilter.apply(meas)
-        return self.kfilter
+        res, covar = self.kfilter.batch_filter(meas)
+        return res, covar
 
 
 def lorentz(vel, ef, bf, charge):
