@@ -4,10 +4,9 @@ from scipy.stats import threshold
 from sklearn.cluster import DBSCAN
 import copy
 
+import relativity as rel
 from constants import *
-import kalman
 
-import sys
 from filterpy.kalman import UnscentedKalmanFilter as UKF
 
 
@@ -119,7 +118,7 @@ class Particle:
     @velocity.setter
     def velocity(self, new):
         vx, vy, vz = new
-        self.energy = (gamma_factor(new) - 1) * self.mass
+        self.energy = (rel.gamma(new) - 1) * self.mass
         self.azimuth = atan2(vy, vx)
         self.polar = atan2(sqrt(vx**2 + vy**2), vz)
 
@@ -140,7 +139,7 @@ class Particle:
     def beta(self):
         en = self.energy
         m = self.mass
-        return beta_factor(en, m)
+        return rel.beta(en, m)
 
     @property
     def gamma(self):
@@ -338,33 +337,6 @@ def bethe(particle, gas):
     return dedx / e_chg * 1e-6  # converted to MeV/m
 
 
-def gamma_factor(v):
-    """Returns the Lorentz gamma factor.
-
-    The argument v may be a number or an array-like object.
-    """
-    vmag = numpy.linalg.norm(v)
-    if vmag > c_lgt:
-        raise ValueError('Velocity was {}, which exceeds c.'.format(vmag))
-    return 1/sqrt(1-vmag**2/c_lgt**2)
-
-
-def beta_factor(en, mass):
-    """ Returns beta, or v / c.
-
-    The arguments should be in compatible units.
-
-    Arguments
-    ---------
-    en : the relativistic kinetic energy
-    mass : the rest mass
-    """
-    b = (sqrt(en)*sqrt(en + 2*mass)) / (en + mass)
-    if b > 1.0:
-        b = 1.0
-    return b
-
-
 def find_next_state(particle, gas, ef, bf):
     """ Find the next step for the given particle and conditions.
 
@@ -393,7 +365,7 @@ def find_next_state(particle, gas, ef, bf):
     else:
         en = float(threshold(en - de, threshmin=0))
         
-        new_beta = beta_factor(en, particle.mass)
+        new_beta = rel.beta(en, particle.mass)
         new_vel *= new_beta / beta
         new_pos = pos + new_vel*tstep
 
