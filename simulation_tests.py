@@ -1,5 +1,5 @@
 import unittest
-import tracking
+import simulation as sim
 from math import sqrt, sin, cos, atan2
 import numpy
 from constants import *
@@ -7,7 +7,7 @@ from constants import *
 
 class TestGas(unittest.TestCase):
     def setUp(self):
-        self.gas = tracking.Gas(molar_mass=10., num_electrons=4.,
+        self.gas = sim.Gas(molar_mass=10., num_electrons=4.,
                                 mean_exc_pot=8., pressure=200.)
 
     def test_density(self):
@@ -34,7 +34,7 @@ class TestParticle(unittest.TestCase):
         self.pos_i = (1., 1., 1.)
         self.azi_i = pi/2
         self.pol_i = pi/3
-        self.p = tracking.Particle(self.A_i, self.Z_i, self.en_i, self.pos_i, self.azi_i,
+        self.p = sim.Particle(self.A_i, self.Z_i, self.en_i, self.pos_i, self.azi_i,
                                    self.pol_i)
 
     def test_mass(self):
