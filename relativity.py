@@ -1,8 +1,8 @@
-'''relativity.py
+"""relativity.py
 
 This module contains functions to calculate quantities of interest in special relativity.
 
-'''
+"""
 
 import numpy
 from constants import *

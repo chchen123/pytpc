@@ -26,6 +26,7 @@ class TestGamma(unittest.TestCase):
         exp = 1 / sqrt(1 + v**2 / c_lgt**2)
         self.assertAlmostEqual(rel.gamma(v), exp, places=4)
 
+
 class TestBeta(unittest.TestCase):
     """Tests for relativity.beta function"""
 
