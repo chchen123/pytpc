@@ -119,5 +119,32 @@ class TestLorentz(unittest.TestCase):
         self.assertRaises(ValueError, self.do_test_values, vel=1, bf=1)
 
 
+class TestBethe(unittest.TestCase):
+    """Tests for sim.bethe function"""
+
+    def setUp(self):
+        self.p = sim.Particle(4, 2, 3)
+        self.g = sim.Gas(10., 2, 10.2, 200.)
+
+    def test_zero_energy(self):
+        self.p.energy = 0
+        self.assertEqual(sim.bethe(self.p, self.g), float('inf'))
+
+    def test_large_energy(self):
+        self.p.velocity = [0, 0, 0.999999999*c_lgt]
+        self.assertAlmostEqual(sim.bethe(self.p, self.g), 0.0, delta=0.1)
+
+    def test_high_pressure(self):
+        self.g.pressure = 1e100
+        self.assertGreater(sim.bethe(self.p, self.g), 1e10)
+
+    def test_zero_pressure(self):
+        self.g.pressure = 0
+        self.assertEqual(sim.bethe(self.p, self.g), 0.0)
+
+    def test_low_pressure(self):
+        self.g.pressure = 1e-3
+        self.assertLess(sim.bethe(self.p, self.g), 1e-3)
+
 if __name__ == '__main__':
     unittest.main()

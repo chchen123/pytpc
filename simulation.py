@@ -235,7 +235,7 @@ def bethe(particle, gas):
     beta_sq = particle.beta**2
 
     if beta_sq == 0.0:
-        # The particle has stopped, so the dedx should be 0
+        # The particle has stopped, so the dedx should be infinite
         dedx = float('inf')
     elif beta_sq == 1.0:
         # This is odd, but then I guess dedx -> 0
