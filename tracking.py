@@ -1,11 +1,10 @@
 import numpy
-from math import sin, cos, tan, log, sqrt, atan2, floor
-from scipy.stats import threshold
+from math import sqrt, floor
 from sklearn.cluster import DBSCAN
 import copy
 
-import relativity as rel
 from constants import *
+import simulation as sim
 
 from filterpy.kalman import UnscentedKalmanFilter as UKF
 
@@ -80,7 +79,7 @@ class Tracker:
         # self.particle.position += self.particle.velocity * dt
         #
         # return numpy.hstack((self.particle.position, self.particle.velocity))
-        new_state = find_next_state(self.particle, self.gas, self.efield, self.bfield)
+        new_state = sim.find_next_state(self.particle, self.gas, self.efield, self.bfield)
         self.particle.state_vector = new_state
         return numpy.hstack([self.particle.position, self.particle.momentum])
 
@@ -236,11 +235,11 @@ def recover_energy(curv, bfield, lambdas, mass_num, charge_num):
 
 
 if __name__ == '__main__':
-    he_gas = Gas(4, 2, 41.8, 150.)
-    part = Particle(mass_num=4, charge_num=2, energy_per_particle=2., azimuth=pi/5, polar=pi/4)
+    he_gas = sim.Gas(4, 2, 41.8, 150.)
+    part = sim.Particle(mass_num=4, charge_num=2, energy_per_particle=2., azimuth=pi/5, polar=pi/4)
     e_field = [0., 0., 15e3]  # V/m
     b_field = [0., 0., 2.]  # T
-    res_pos, res_azi, res_pol, res_time, res_en = track(part, he_gas, e_field, b_field)
+    res_pos, res_azi, res_pol, res_time, res_en = sim.track(part, he_gas, e_field, b_field)
     tr = Tracker(part, he_gas, e_field, b_field)
     kf = tr.track(res_pos)
     print('Finished')
