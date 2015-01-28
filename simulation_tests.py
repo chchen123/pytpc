@@ -2,6 +2,7 @@ import unittest
 import simulation as sim
 from math import sqrt, sin, cos, atan2
 import numpy
+import numpy.testing as nptest
 from constants import *
 
 
@@ -73,13 +74,13 @@ class TestParticle(unittest.TestCase):
         exp_vel = numpy.array([beta*c_lgt*cos(self.azi_i)*sin(self.pol_i),
                                beta*c_lgt*sin(self.azi_i)*sin(self.pol_i),
                                beta*c_lgt*cos(self.pol_i)])
-        self.assertEqual(self.p.velocity.all(), exp_vel.all())
+        nptest.assert_array_equal(self.p.velocity, exp_vel)
 
     def test_velocity_setter(self):
         new_vel = 2 * self.p.velocity
         vx, vy, vz = new_vel
         self.p.velocity *= 2
-        self.assertEqual(self.p.velocity.all(), new_vel.all())
+        nptest.assert_allclose(self.p.velocity, new_vel)
 
         exp_azi = atan2(vy, vx)
         exp_pol = atan2(sqrt(vx**2 + vy**2), vz)
@@ -98,7 +99,7 @@ class TestLorentz(unittest.TestCase):
         """A helper function to run tests when the goal is comparing the return value."""
         res = sim.lorentz(vel, ef, bf, charge)
         exp = charge*(ef + numpy.cross(vel, bf))
-        self.assertEqual(res.all(), exp.all())
+        nptest.assert_allclose(res, exp)
 
     def test_zero_charge(self):
         self.do_test_values(charge=0)
