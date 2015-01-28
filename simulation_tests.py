@@ -90,5 +90,34 @@ class TestParticle(unittest.TestCase):
         self.assertEqual(self.p.energy, exp_en)
 
 
+class TestLorentz(unittest.TestCase):
+    """Tests for sim.lorentz function"""
+
+    def do_test_values(self, vel=numpy.array((3e6, 4e4, 1e2)), bf=numpy.array((0, 0, -2)),
+                       ef=numpy.array((0, 0, 1e6)), charge=4*e_chg):
+        """A helper function to run tests when the goal is comparing the return value."""
+        res = sim.lorentz(vel, ef, bf, charge)
+        exp = charge*(ef + numpy.cross(vel, bf))
+        self.assertEqual(res.all(), exp.all())
+
+    def test_zero_charge(self):
+        self.do_test_values(charge=0)
+
+    def test_zero_efield(self):
+        self.do_test_values(ef=numpy.zeros(3))
+
+    def test_zero_bfield(self):
+        self.do_test_values(bf=numpy.zeros(3))
+
+    def test_zero_ef_bf(self):
+        self.do_test_values(ef=numpy.zeros(3), bf=numpy.zeros(3))
+
+    def test_zero_vel(self):
+        self.do_test_values(vel=numpy.zeros(3))
+
+    def test_scalar_vel(self):
+        self.assertRaises(ValueError, self.do_test_values, vel=1, bf=1)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -210,7 +210,11 @@ def lorentz(vel, ef, bf, charge):
 
     Returns: The force, in whatever units the inputs generate.
     """
-    return charge*(ef + numpy.cross(vel, bf))
+
+    try:
+        return charge*(ef + numpy.cross(vel, bf))
+    except ValueError:
+        raise ValueError('vel, ef, bf must have length >= 2')
 
 
 def bethe(particle, gas):
