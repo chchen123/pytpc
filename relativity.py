@@ -17,7 +17,7 @@ def gamma(v):
     The argument v may be a number or an array-like object.
     """
     vmag = numpy.linalg.norm(v)
-    if vmag > c_lgt:
+    if vmag >= c_lgt:
         raise ValueError('Velocity was {}, which exceeds c.'.format(vmag))
     return 1/sqrt(1-vmag**2/c_lgt**2)
 
@@ -32,7 +32,14 @@ def beta(en, mass):
     en : the relativistic kinetic energy
     mass : the rest mass
     """
-    b = (sqrt(en)*sqrt(en + 2*mass)) / (en + mass)
+    if en < 0.0 or mass < 0.0:
+        raise ValueError('mass and energy must be positive')
+
+    try:
+        b = (sqrt(en)*sqrt(en + 2*mass)) / (en + mass)
+    except ZeroDivisionError:
+        raise ValueError('mass and energy cannot both be zero')
+
     if b > 1.0:
         b = 1.0
     return b
