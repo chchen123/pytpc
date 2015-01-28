@@ -146,5 +146,27 @@ class TestBethe(unittest.TestCase):
         self.g.pressure = 1e-3
         self.assertLess(sim.bethe(self.p, self.g), 1e-3)
 
+
+class TestFindNextState(unittest.TestCase):
+    """Tests for sim.find_next_state function"""
+
+    def setUp(self):
+        self.p = sim.Particle(4, 2, 3)
+        self.g = sim.Gas(4, 2, 41.8, 150.)
+        self.ef = numpy.array([0, 0, 15e3])
+        self.bf = numpy.array([0, 0, -1])
+
+    @property
+    def args(self):
+        return self.p, self.g, self.ef, self.bf
+
+    def test_zero_energy(self):
+        """If the energy is 0, the particle should stay still"""
+        self.p.energy = 0
+        old_sv = self.p.state_vector
+        new_sv = sim.find_next_state(*self.args)
+        self.assertTrue(numpy.array_equal(old_sv, new_sv),
+                        msg='state vector changed')
+
 if __name__ == '__main__':
     unittest.main()
