@@ -1,3 +1,4 @@
 .ipynb_checkpoints
 workspace.xml
 doc/_build
+__pycache__
