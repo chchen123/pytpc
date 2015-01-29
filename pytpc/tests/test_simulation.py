@@ -106,6 +106,19 @@ class TestParticle(unittest.TestCase):
         self.p.energy = 0
         nptest.assert_equal(self.p.momentum_mev, 0)
 
+    def test_state_vector(self):
+        sv = self.p.state_vector
+        nptest.assert_equal(sv[0:3], self.p.position)
+        nptest.assert_equal(sv[3:6], self.p.momentum_mev)
+
+    def test_state_vector_setter(self):
+        new_pos = numpy.array((4, 2, 1))
+        new_mom = self.p.momentum_mev / 2
+        self.p.state_vector = numpy.hstack((new_pos, new_mom))
+
+        nptest.assert_allclose(self.p.position, new_pos)
+        nptest.assert_allclose(self.p.momentum_mev, new_mom)
+
 
 class TestLorentz(unittest.TestCase):
     """Tests for sim.lorentz function"""
@@ -133,7 +146,7 @@ class TestLorentz(unittest.TestCase):
         self.do_test_values(vel=numpy.zeros(3))
 
     def test_scalar_vel(self):
-        self.assertRaises(ValueError, self.do_test_values, vel=1, bf=1)
+        self.assertRaisesRegex(TypeError, 'iterable', self.do_test_values, vel=1, bf=1)
 
 
 class TestBethe(unittest.TestCase):
@@ -184,6 +197,19 @@ class TestFindNextState(unittest.TestCase):
         new_sv = sim.find_next_state(*self.args)
         self.assertTrue(numpy.array_equal(old_sv, new_sv),
                         msg='state vector changed')
+
+
+class TestThreshold(unittest.TestCase):
+    """Tests for sim.threshold function"""
+
+    def test_above(self):
+        self.assertEqual(sim.threshold(40., 20.), 40.)
+
+    def test_below(self):
+        self.assertEqual(sim.threshold(10., 20.), 20.)
+
+    def test_equal(self):
+        self.assertEqual(sim.threshold(10., 10.), 10.)
 
 if __name__ == '__main__':
     unittest.main()

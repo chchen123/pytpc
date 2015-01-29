@@ -6,7 +6,8 @@ Contains code for simulating the tracking of particles in a TPC.
 
 import numpy
 from math import atan2, log, sin, cos, sqrt
-from scipy.stats import threshold
+
+import copy
 
 from .constants import *
 import pytpc.relativity as rel
@@ -176,31 +177,17 @@ class Particle:
 
     @property
     def state_vector(self):
-        """The state vector of the particle, as (x, y, z, en/u, azi, pol).
+        """The state vector of the particle, as (x, y, z, px, py, pz).
 
         Setting to this will update every other property automatically.
 
         """
-        p = self.position  # for brevity
-        res = numpy.array([p[0], p[1], p[2], self.energy_per_particle, self.azimuth, self.polar])
-        return res
+        return numpy.hstack([self.position, self.momentum_mev])
 
     @state_vector.setter
     def state_vector(self, new):
-        new_position = new[0:3]
-        new_energy = new[3]
-        new_azimuth = new[4]
-        new_polar = new[5]
-
-        if new_energy < 0:
-            # raise ValueError('Negative energy: {}'.format(new_energy))
-            pass
-
-        else:
-            self.position = new_position
-            self._energy = new_energy * self.mass_num
-            self.azimuth = new_azimuth
-            self.polar = new_polar
+        self.position = new[0:3]
+        self.momentum_mev = new[3:6]
 
 
 def lorentz(vel, ef, bf, charge):
@@ -222,10 +209,15 @@ def lorentz(vel, ef, bf, charge):
     Returns: The force, in whatever units the inputs generate.
     """
 
-    try:
-        return charge*(ef + numpy.cross(vel, bf))
-    except ValueError:
-        raise ValueError('vel, ef, bf must have length >= 2')
+    vx, vy, vz = vel
+    ex, ey, ez = ef
+    bx, by, bz = bf
+
+    fx = charge * (ex + vy*bz - vz*by)
+    fy = charge * (ey + vz*bx - vx*bz)
+    fz = charge * (ez + vx*by - vy*bx)
+
+    return numpy.array([fx, fy, fz])
 
 
 def bethe(particle, gas):
@@ -259,10 +251,29 @@ def bethe(particle, gas):
     return dedx / e_chg * 1e-6  # converted to MeV/m
 
 
+def threshold(value, threshmin=0):
+    """Applies a threshold to the given value.
+
+    Any value less than threshmin will be replaced by threshmin.
+
+    **Arguments**
+
+    value : float or int
+        The value to be thresholded
+    threshmin : float or int
+        The minimum threshold value
+
+    """
+    if value < threshmin:
+        return threshmin
+    else:
+        return value
+
+
 def find_next_state(particle, gas, ef, bf):
     """ Find the next step for the given particle and conditions.
 
-    Returns the new state vector in the form (x, y, z, en/u, azi, pol)
+    Returns the new state vector in the form (x, y, z, px, py, pz)
     """
 
     en = particle.energy
@@ -275,14 +286,14 @@ def find_next_state(particle, gas, ef, bf):
         return particle.state_vector
     tstep = pos_step / (beta * c_lgt)
 
-    force = numpy.array(lorentz(vel, ef, bf, charge))
+    force = lorentz(vel, ef, bf, charge)
     new_vel = vel + force/particle.mass_kg * tstep  # this is questionable w.r.t. relativity...
     stopping = bethe(particle, gas)  # in MeV/m
     de = float(threshold(stopping*pos_step, threshmin=1e-3))
 
     if stopping <= 0 or de == 0:
         new_state = particle.state_vector
-        new_state[3] = 0  # Set the energy to 0
+        new_state[3:6] = [0, 0, 0]  # Set the momentum to 0
         return new_state
     else:
         en = float(threshold(en - de, threshmin=0))
@@ -291,11 +302,11 @@ def find_next_state(particle, gas, ef, bf):
         new_vel *= new_beta / beta
         new_pos = pos + new_vel*tstep
 
-        new_azi = atan2(new_vel[1], new_vel[0])
-        new_pol = atan2(sqrt(new_vel[0]**2 + new_vel[1]**2), new_vel[2])
+        new_particle = copy.copy(particle)
+        new_particle.position = new_pos
+        new_particle.velocity = new_vel
 
-        new_state = numpy.array([new_pos[0], new_pos[1], new_pos[2], en / particle.mass_num, new_azi, new_pol])
-        return new_state
+        return new_particle.state_vector
 
 
 def track(particle, gas, ef, bf):
