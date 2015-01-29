@@ -10,11 +10,14 @@ from math import sqrt
 
 
 def gamma(v):
-    """Returns gamma.
+    r"""Returns gamma.
 
-    Gamma is defined as $$\gamma = \frac{1}{\sqrt{1-\beta^2}}$$ where $\beta = \frac{v}{c}$.
+    Gamma is defined as :math:`\gamma = \frac{1}{\sqrt{1-\beta^2}}` where :math:`\beta = \frac{v}{c}`.
 
-    The argument v may be a number or an array-like object.
+    **Arguments**
+
+    v : array-like or number
+        the velocity
     """
     vmag = numpy.linalg.norm(v)
     if vmag >= c_lgt:
@@ -23,14 +26,18 @@ def gamma(v):
 
 
 def beta(en, mass):
-    """ Returns beta, or v / c.
+    """ Returns beta, or :math:`v / c`.
 
     The arguments should be in compatible units.
 
-    Arguments
-    ---------
-    en : the relativistic kinetic energy
-    mass : the rest mass
+    **Arguments**
+
+    en : int or float
+        the relativistic kinetic energy
+    mass : int or float
+        the rest mass
+
+    :param int en: the energy
     """
     if en < 0.0 or mass < 0.0:
         raise ValueError('mass and energy must be positive')

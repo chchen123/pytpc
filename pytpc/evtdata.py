@@ -1,9 +1,32 @@
-"""Event File Interface
+"""
+evtdata
+=======
 
 This module provides functionality for interacting with GET event files. These files contain merged events.
 
 ..  Note::
     This module does *not* allow interaction with un-merged GRAW files.
+
+Examples
+--------
+
+..  code-block:: python
+
+    from pytpc.evtdata import EventFile, Event
+
+    # Open a file
+    ef = EventFile('/path/to/data.evt')
+
+    # Read the fourth event
+    evt = ef[4]
+
+    # Iterate over all events
+    for evt in ef:
+        do_something(evt)
+
+    # Slices are also supported
+    for evt in ef[4:20]:
+        do_something(evt)
 
 """
 
@@ -18,6 +41,12 @@ class EventFile:
 
     This class provides an interface to merged event files from the GET electronics. It is capable of opening
     merged data files and reading events from them.
+
+    When an event file is first opened, its contents are automatically indexed. The generated lookup table is saved
+    in the same directory as the event file, but with the extension ".lookup".
+
+    The events can be accessed with the methods beginning with "read". Additionally, this class supports both
+    iteration and subscripting.
     """
 
     def __init__(self, filename=None):
@@ -25,12 +54,18 @@ class EventFile:
 
         If a filename is provided, that file will be opened.
 
-        :param filename: The name of the file to open.
+        **Arguments**
+
+        filename : string
+            The name of the file to open.
         """
 
-        self.magic = 0x6e7ef11e
+        self.magic = 0x6e7ef11e  # The file's magic number
+
         self.lookup = []
-        self.current_event = 0
+        """A lookup table for the events in the file. This is simply an array of file offsets."""
+
+        self.current_event = 0  #: The current event
 
         if filename is not None:
             self.open(filename)
@@ -53,8 +88,10 @@ class EventFile:
         The file's first 4 bytes are compared to the magic value ``0x6e7ef11e`` to check that the file is of the
         correct type.
 
-        :param filename: The name of the file to open
-        :except: IOError
+        **Arguments**
+
+        filename : string
+            The name of the file to open
         """
 
         try:
@@ -86,9 +123,17 @@ class EventFile:
 
         See the documentation of the Event File format for details.
 
-        :param tb: The time bucket
-        :param val: The sample
-        :return: The packed data
+        **Arguments**
+
+        tb : int
+            The time bucket
+        val : int
+            The sample
+
+        **Returns**
+
+        joined : int
+            The packed sample
         """
 
         # val is 12-bits and tb is 9 bits. Fit this in 24 bits.
@@ -111,8 +156,17 @@ class EventFile:
     def unpack_sample(packed):
         """Unpacks a packed time bucket / sample pair.
 
-        :param packed: The packed value, as an integer
-        :return: A tuple containing (time bucket, sample)
+        **Arguments**
+
+        packed : int
+            The packed value
+
+        **Returns**
+
+        tb : int
+            The time bucket
+        sample : int
+            The sample value
         """
 
         tb = (packed & 0xFF8000) >> 15
@@ -130,8 +184,15 @@ class EventFile:
 
         This is really just a modified version of unpack_sample that works with arrays.
 
-        :param packed: An array of packed values.
-        :return: An array of sample values, indexed by time bucket.
+        **Arguments**
+
+        packed : array-like
+            The packed values
+
+        **Returns**
+
+        samples : numpy.ndarray
+            The sample values, indexed by time bucket
         """
 
         # TODO: Merge this into the unpack_sample method?
@@ -154,10 +215,12 @@ class EventFile:
     def _read(self):
         """Reads an event at the current file position.
 
-        This function attempts to read an event beginning at the current file position. The position is checked by
-        checking the event magic number ``0xEE``.
+        The position is checked by checking the event magic number ``0xEE``.
 
-        :return: The event as an :class:`Event`
+        **Returns**
+
+        event : instance of :class:`Event`
+            The read event
         """
 
         assert self.is_open
@@ -217,7 +280,9 @@ class EventFile:
         read_previous() functions to navigate around the file. The table is returned, but it is also assigned to
         self.lookup.
 
-        :return: The lookup table.
+        **Returns**
+        lookup : list
+            The lookup table
         """
 
         assert self.is_open
@@ -257,7 +322,10 @@ class EventFile:
 
         The file should contain the (integer) file offsets, with one on each line.
 
-        :param filename: The path to the file.
+        **Arguments**
+
+        filename : string
+            The path to the file.
         """
 
         self.lookup = []
@@ -276,7 +344,10 @@ class EventFile:
         This function reads the next event from the file and increments the self.current_event value. For example,
         if the current_event is 4, then current_event will be set to 5, and event 5 will be read and returned.
 
-        :return: The next event, as an Event object.
+        **Returns**
+
+        evt : instance of :class:`Event`
+            The next event in the file
         """
 
         if self.current_event + 1 < len(self.lookup):
@@ -293,7 +364,10 @@ class EventFile:
         This function reads the current event from the file. For example, if the current_event is 4, then event 4
         will be read and returned.
 
-        :return: The current event, as an Event object.
+        **Returns**
+
+        evt : instance of :class:`Event`
+            The current event
         """
 
         self.fp.seek(self.lookup[self.current_event])
@@ -305,7 +379,10 @@ class EventFile:
         This function reads the previous event from the file and decrements the self.current_event value. For example,
         if the current_event is 4, then current_event will be set to 3, and event 3 will be read and returned.
 
-        :return: The previous event, as an Event object.
+        **Returns**
+
+        evt : instance of :class:`Event`
+            The previous event from the file
         """
 
         if self.current_event - 1 >= 0:
@@ -322,8 +399,15 @@ class EventFile:
         This function uses the lookup table to find the requested event in the file, and then reads and returns that
         event. The current_event index is updated to the event number that was requested.
 
-        :param num: The event number to read.
-        :return: The requested event, as an Event object.
+        **Arguments**
+
+        num : int
+            The event number to read. This should be an index in the bounds of :attr:`lookup`
+
+        **Returns**
+
+        evt : instance of :class:`Event`
+            The requested event from the file
         """
 
         if 0 <= num < len(self.lookup):
@@ -379,26 +463,34 @@ class EventFile:
 class Event:
     """ Represents an event from an :class:`EventFile`.
 
-    The event is represented as a numpy array. The indices are:
-        (CoBo, AsAd, AGET, channel, time bucket)
+    The event is represented as a numpy array with a complex dtype.
     """
 
     def __init__(self, evt_id=0, timestamp=0):
         """ Initialize a new event.
 
-        :param evt_id: The event ID
-        :param timestamp: The event timestamp
-        :return: None
+        **Arguments**
+
+        evt_id : int
+            The event ID
+        timestamp : int
+            The event timestamp
         """
         assert (evt_id >= 0)
         assert (timestamp >= 0)
 
         self.dt = numpy.dtype([('cobo', 'u1'), ('asad', 'u1'), ('aget', 'u1'), ('channel', 'u1'),
-                                    ('pad', 'u2'), ('data', '512i2')])
+                               ('pad', 'u2'), ('data', '512i2')])
+        """The data type of the numpy array"""
 
         self.evt_id = evt_id
+        """The event ID"""
+
         self.timestamp = timestamp
+        """The event timestamp"""
+
         self.traces = numpy.zeros((0,), dtype=self.dt)
+        """The event data. The dtype is :attr:`dt`."""
 
         return
 
@@ -409,9 +501,12 @@ class Event:
     def hits(self):
         """ Calculate the total activation of each pad.
 
-        The result is a numpy array of (pad_number, activation)
+        The activation is calculated by summing the activation for all time buckets in each channel.
 
-        :return: A numpy array of (pad_number, activation)
+        **Returns**
+
+        hits : numpy.ndarray
+            An array of hits, indexed by pad number
         """
 
         hits = self.traces['data'].sum(1)
@@ -426,10 +521,10 @@ class Event:
     def xyzs(self):
         """ Find the scatter points of the event in space.
 
-        The result is a 4-D array. The points are given as (x, y, time bucket, activation). The x and y coordinates
-        are in millimeters.
+        **Returns**
 
-        :return: A numpy array of (x, y, tb, activation)
+        xyzs : numpy.ndarray
+            A 4D array of points including (x, y, tb, activation)
         """
 
         nz = self.traces['data'].nonzero()
@@ -446,8 +541,17 @@ class Event:
 def load_pedestals(filename):
     """ Loads pedestals from the provided file.
 
-    :param filename: The name of the file containing the pedestals.
-    :return: The pedestals as a numpy array
+    The pedestals file should be in CSV format, and the columns should be cobo, asad, aget, and channel.
+
+    **Arguments**
+
+    filename : string
+        The name of the file containing the pedestals.
+
+    **Returns**
+
+    peds : numpy.ndarray
+        The pedestals, in a 4D array with the same indices as above.
     """
 
     f = open(filename, 'r')
@@ -462,10 +566,17 @@ def load_pedestals(filename):
 
 
 def load_padmap(filename):
-    """ Loads pad mapping from the provided file.
+    """Loads pad mapping from the provided file.
 
-    :param filename: The name of the file containing the pad mapping.
-    :return: The pad mapping as a dictionary {(cobo, asad, aget, ch): pad}
+    **Arguments**
+
+    filename : string
+        The name of the file containing the pad mapping
+
+    **Returns**
+
+    pm : dictionary
+        The pad mapping as {(cobo, asad, aget, ch): pad}
     """
 
     f = open(filename, 'r')
@@ -487,14 +598,9 @@ class Error(Exception):
 class FilePosError(Error):
     """Raised when data is read from a file whose read pointer does not seem
     to be in the correct position.
-
-    Attributes:
-        filename -- the name of the file being read
-        details -- an explanation of the particular error
-        message -- an error message for printing
     """
 
     def __init__(self, filename, details=""):
-        self.filename = filename
-        self.details = details
-        self.message = "FilePosError in " + filename + ": " + details
+        self.filename = filename  #: The name of the file where the error occurred
+        self.details = details    #: Details of the error
+        self.message = "FilePosError in " + filename + ": " + details  # An error message for printing
