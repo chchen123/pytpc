@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import pytpc.tracking as tracking
 import pytpc.simulation as sim
 import numpy
-from .constants import *
+from pytpc.constants import *
 
 def state_vector_plots(sv, sv2=None, data=None):
     fig, ax = plt.subplots(nrows=3, ncols=2)

@@ -68,23 +68,7 @@ class Tracker:
 
         self.particle.position = pos0
         self.particle.momentum = mom0
-        #
-        # de = bethe(self.particle, self.gas) * pos_step  # energy lost in MeV
-        # new_en = float(threshold(self.particle.energy - de, threshmin=0.))
-        # self.particle.energy = new_en
-        #
-        # force = lorentz(self.particle.velocity, self.efield, self.bfield, self.particle.charge)
-        # dt = pos_step / numpy.linalg.norm(self.particle.velocity)
-        # dp = force * dt
-        # dp_mag = numpy.linalg.norm(dp)
-        #
-        # newvel = (oldvel + dv) / (1 + oldvel_mag * dv_mag / c_lgt**2)
-        #
-        # self.particle.velocity = newvel
-        #
-        # self.particle.position += self.particle.velocity * dt
-        #
-        # return numpy.hstack((self.particle.position, self.particle.velocity))
+
         new_state = sim.find_next_state(self.particle, self.gas, self.efield, self.bfield)
         self.particle.state_vector = new_state
         return numpy.hstack([self.particle.position, self.particle.momentum])
