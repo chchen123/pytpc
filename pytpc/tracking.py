@@ -1,10 +1,16 @@
+"""Particle Tracking
+
+This module contains code to track a particle in data.
+
+"""
+
 import numpy
 from math import sqrt, floor
 from sklearn.cluster import DBSCAN
 import copy
 
-from constants import *
-import simulation as sim
+from .constants import *
+import pytpc.simulation as sim
 
 from filterpy.kalman import UnscentedKalmanFilter as UKF
 

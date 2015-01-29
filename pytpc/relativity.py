@@ -1,11 +1,11 @@
-"""relativity.py
+"""Special Relativity Functions
 
 This module contains functions to calculate quantities of interest in special relativity.
 
 """
 
 import numpy
-from constants import *
+from .constants import *
 from math import sqrt
 
 

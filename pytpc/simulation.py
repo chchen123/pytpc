@@ -8,8 +8,8 @@ import numpy
 from math import atan2, log, sin, cos, sqrt
 from scipy.stats import threshold
 
-from constants import *
-import relativity as rel
+from .constants import *
+import pytpc.relativity as rel
 
 
 class Gas:

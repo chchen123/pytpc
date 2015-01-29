@@ -2,9 +2,10 @@ import matplotlib as mpl
 mpl.use('PDF')
 import matplotlib.pyplot as plt
 
-import tracking
+import pytpc.tracking as tracking
+import pytpc.simulation as sim
 import numpy
-from constants import *
+from .constants import *
 
 def state_vector_plots(sv, sv2=None, data=None):
     fig, ax = plt.subplots(nrows=3, ncols=2)
@@ -54,12 +55,12 @@ def state_vector_plots(sv, sv2=None, data=None):
     plt.savefig('/Users/josh/Desktop/test.pdf')
 
 def main():
-    pt = tracking.Particle(mass_num=4, charge_num=2, energy_per_particle=2, azimuth=pi/3, polar=pi/9)
+    pt = sim.Particle(mass_num=4, charge_num=2, energy_per_particle=2, azimuth=pi/3, polar=pi/9)
     efield = [0, 0, 15e3]
     bfield = [0, 0, 0]
-    g = tracking.Gas(4, 2, 41.8, 150.)
+    g = sim.Gas(4, 2, 41.8, 150.)
 
-    pos, mom, time, en = map(numpy.array, tracking.track(pt, g, efield, bfield))
+    pos, mom, time, en = map(numpy.array, sim.track(pt, g, efield, bfield))
 
     sv = numpy.hstack((pos, mom))
     meas_pos = pos + numpy.random.normal(0, 1e-2, pos.shape)

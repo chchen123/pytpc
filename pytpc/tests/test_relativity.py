@@ -1,7 +1,9 @@
+"""Unit tests for relativity.py"""
+
 import unittest
-import relativity as rel
+import pytpc.relativity as rel
 from math import sqrt
-from constants import *
+from pytpc.constants import *
 import numpy
 
 

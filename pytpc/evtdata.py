@@ -1,7 +1,16 @@
+"""Event File Interface
+
+This module provides functionality for interacting with GET event files. These files contain merged events.
+
+..  Note::
+    This module does *not* allow interaction with un-merged GRAW files.
+
+"""
+
 import struct
 import numpy
 import os.path
-from tpcplot import generate_pad_plane
+from .tpcplot import generate_pad_plane
 
 
 class EventFile:

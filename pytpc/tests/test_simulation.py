@@ -1,9 +1,11 @@
+"""Unit tests for simulation.py"""
+
 import unittest
-import simulation as sim
+import pytpc.simulation as sim
 from math import sqrt, sin, cos, atan2
 import numpy
 import numpy.testing as nptest
-from constants import *
+from pytpc.constants import *
 
 
 class TestGas(unittest.TestCase):

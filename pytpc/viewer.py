@@ -10,9 +10,6 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 import tkinter as tk
 import tkinter.ttk as ttk
 
-import tpcplot
-import evtdata
-
 root = tk.Tk()
 root.wm_title("PyEvt Viewer Menu")
 
