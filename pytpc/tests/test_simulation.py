@@ -92,6 +92,20 @@ class TestParticle(unittest.TestCase):
         exp_en = (1/sqrt(1 - numpy.linalg.norm(new_vel)**2 / c_lgt**2) - 1)*self.p.mass
         self.assertEqual(self.p.energy, exp_en)
 
+    def test_momentum_mev(self):
+        mom = self.p.momentum_mev
+        self.assertEqual(len(mom), 3, msg='momentum is scalar')
+
+        exp_mom = self.p.momentum * c_lgt / e_chg * 1e-6
+        nptest.assert_allclose(mom, exp_mom)
+
+        exp_mag = sqrt((self.p.energy + self.p.mass)**2 - self.p.mass**2)
+        self.assertAlmostEqual(numpy.linalg.norm(mom), exp_mag, places=6)
+
+    def test_momentum_mev_zero(self):
+        self.p.energy = 0
+        nptest.assert_equal(self.p.momentum_mev, 0)
+
 
 class TestLorentz(unittest.TestCase):
     """Tests for sim.lorentz function"""

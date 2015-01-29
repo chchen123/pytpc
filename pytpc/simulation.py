@@ -149,6 +149,17 @@ class Particle:
         self.polar = atan2(sqrt(px**2 + py**2), pz)
 
     @property
+    def momentum_mev(self):
+        return self.gamma * self.mass * self.velocity / c_lgt
+
+    @momentum_mev.setter
+    def momentum_mev(self, new):
+        px, py, pz = new
+        self.energy = numpy.sqrt(numpy.linalg.norm(new)**2 + self.mass**2) - self.mass
+        self.azimuth = atan2(py, px)
+        self.polar = atan2(sqrt(px**2 + py**2), pz)
+
+    @property
     def beta(self):
         en = self.energy
         m = self.mass
@@ -301,13 +312,17 @@ def track(particle, gas, ef, bf):
     mom = []
     time = []
     en = []
+    azi = []
+    pol = []
 
     current_time = 0
 
     pos.append(particle.position)
-    mom.append(particle.momentum)
+    mom.append(particle.momentum_mev)
     time.append(current_time)
     en.append(particle.energy_per_particle)
+    azi.append(particle.azimuth)
+    pol.append(particle.polar)
 
     while True:
         state = find_next_state(particle, gas, ef, bf)
@@ -317,8 +332,10 @@ def track(particle, gas, ef, bf):
             break
 
         pos.append(particle.position)
-        mom.append(particle.momentum)
+        mom.append(particle.momentum_mev)
         en.append(particle.energy_per_particle)
+        azi.append(particle.azimuth)
+        pol.append(particle.polar)
 
         current_time += pos_step / (particle.beta * c_lgt)
         time.append(current_time)
@@ -327,4 +344,4 @@ def track(particle, gas, ef, bf):
             print('Particle left chamber')
             break
 
-    return pos, mom, time, en
+    return pos, mom, time, en, azi, pol
