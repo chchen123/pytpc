@@ -80,36 +80,52 @@ class Particle:
         self._mass = mass_num * p_mc2
         self.charge_num = charge_num
         self.charge = charge_num * e_chg
-        self._energy = energy_per_particle * mass_num
         self.position = numpy.array(position)
-        self.azimuth = azimuth
-        self.polar = polar
+        energy = energy_per_particle * self.mass_num
+        mom_mag = sqrt((energy + self.mass)**2 - self.mass**2)
+        self.momentum = mom_mag * numpy.array([cos(azimuth) * sin(polar),
+                                               sin(azimuth) * sin(polar),
+                                               cos(polar)])
+
+    @property
+    def azimuth(self):
+        px, py, pz = self.momentum
+        return atan2(py, px)
+
+    @property
+    def polar(self):
+        px, py, pz = self.momentum
+        return atan2(sqrt(px**2 + py**2), pz)
 
     @property
     def energy(self):
         """The total energy in MeV"""
-        return self._energy
+        pmag = numpy.linalg.norm(self.momentum)
+        return sqrt(pmag**2 + self.mass**2) - self.mass
 
     @energy.setter
     def energy(self, new):
-        self._energy = new
+        mom_mag = sqrt((new + self.mass)**2 - self.mass**2)
+        self.momentum = mom_mag * numpy.array([cos(self.azimuth) * sin(self.polar),
+                                               sin(self.azimuth) * sin(self.polar),
+                                               cos(self.polar)])
 
     @property
     def energy_j(self):
-        return self._energy * 1e6 * e_chg
+        return self.energy * 1e6 * e_chg
 
     @energy_j.setter
     def energy_j(self, value):
-        self._energy = value / 1e6 / e_chg
+        self.energy = value / 1e6 / e_chg
 
     @property
     def energy_per_particle(self):
         """The energy per particle in MeV/u"""
-        return self._energy / self.mass_num
+        return self.energy / self.mass_num
 
     @energy_per_particle.setter
     def energy_per_particle(self, new):
-        self._energy = new * self.mass_num
+        self.energy = new * self.mass_num
 
     @property
     def mass(self):
@@ -123,42 +139,14 @@ class Particle:
 
     @property
     def velocity(self):
-        beta = self.beta
-        vel = numpy.array([beta*c_lgt*cos(self.azimuth)*sin(self.polar),
-                           beta*c_lgt*sin(self.azimuth)*sin(self.polar),
-                           beta*c_lgt*cos(self.polar)])
-        return vel
+        p_si = self.momentum * 1e6 / c_lgt * e_chg
+        return p_si / (self.gamma * self.mass_kg)
 
     @velocity.setter
     def velocity(self, new):
-        vx, vy, vz = new
-        self.energy = (rel.gamma(new) - 1) * self.mass
-        self.azimuth = atan2(vy, vx)
-        self.polar = atan2(sqrt(vx**2 + vy**2), vz)
-
-    @property
-    def momentum(self):
-        """The momentum in kg.m/s"""
-        return self.gamma * self.mass_kg * self.velocity
-
-    @momentum.setter
-    def momentum(self, new):
-        px, py, pz = new
-        self.energy_j = (numpy.sqrt(numpy.linalg.norm(new)**2 * c_lgt**2 + self.mass_kg**2 * c_lgt**4)
-                         - self.mass_kg * c_lgt**2)
-        self.azimuth = atan2(py, px)
-        self.polar = atan2(sqrt(px**2 + py**2), pz)
-
-    @property
-    def momentum_mev(self):
-        return self.gamma * self.mass * self.velocity / c_lgt
-
-    @momentum_mev.setter
-    def momentum_mev(self, new):
-        px, py, pz = new
-        self.energy = numpy.sqrt(numpy.linalg.norm(new)**2 + self.mass**2) - self.mass
-        self.azimuth = atan2(py, px)
-        self.polar = atan2(sqrt(px**2 + py**2), pz)
+        gam = rel.gamma(new)
+        p_si = gam * self.mass_kg * new
+        self.momentum = p_si / e_chg * c_lgt * 1e-6
 
     @property
     def beta(self):
@@ -182,12 +170,12 @@ class Particle:
         Setting to this will update every other property automatically.
 
         """
-        return numpy.hstack([self.position, self.momentum_mev])
+        return numpy.hstack([self.position, self.momentum])
 
     @state_vector.setter
     def state_vector(self, new):
         self.position = new[0:3]
-        self.momentum_mev = new[3:6]
+        self.momentum = new[3:6]
 
 
 def lorentz(vel, ef, bf, charge):
@@ -329,7 +317,7 @@ def track(particle, gas, ef, bf):
     current_time = 0
 
     pos.append(particle.position)
-    mom.append(particle.momentum_mev)
+    mom.append(particle.momentum)
     time.append(current_time)
     en.append(particle.energy_per_particle)
     azi.append(particle.azimuth)
@@ -343,7 +331,7 @@ def track(particle, gas, ef, bf):
             break
 
         pos.append(particle.position)
-        mom.append(particle.momentum_mev)
+        mom.append(particle.momentum)
         en.append(particle.energy_per_particle)
         azi.append(particle.azimuth)
         pol.append(particle.polar)

@@ -47,7 +47,6 @@ class TestParticle(unittest.TestCase):
 
     def test_energy(self):
         exp_energy = self.en_i * self.A_i
-        self.assertEqual(self.p._energy, exp_energy)
         self.assertEqual(self.p.energy, exp_energy)
         self.assertEqual(self.p.energy_per_particle, exp_energy / self.A_i)
         self.assertEqual(self.p.energy_j, exp_energy * 1e6 * e_chg)
@@ -55,12 +54,12 @@ class TestParticle(unittest.TestCase):
     def test_energy_setter(self):
         new_en = (self.en_i + 1) * self.A_i
         self.p.energy = new_en
-        self.assertEqual(self.p._energy, new_en)
+        self.assertEqual(self.p.energy, new_en)
 
     def test_energy_per_particle_setter(self):
         new_en_per_u = (self.en_i / self.A_i) + 1
         self.p.energy_per_particle = new_en_per_u
-        self.assertEqual(self.p._energy / self.p.mass_num, new_en_per_u)
+        self.assertEqual(self.p.energy / self.p.mass_num, new_en_per_u)
 
     def test_gamma(self):
         exp_gamma = self.p.energy / self.p.mass + 1
@@ -76,7 +75,7 @@ class TestParticle(unittest.TestCase):
         exp_vel = numpy.array([beta*c_lgt*cos(self.azi_i)*sin(self.pol_i),
                                beta*c_lgt*sin(self.azi_i)*sin(self.pol_i),
                                beta*c_lgt*cos(self.pol_i)])
-        nptest.assert_array_equal(self.p.velocity, exp_vel)
+        nptest.assert_allclose(self.p.velocity, exp_vel)
 
     def test_velocity_setter(self):
         new_vel = 2 * self.p.velocity
@@ -86,38 +85,35 @@ class TestParticle(unittest.TestCase):
 
         exp_azi = atan2(vy, vx)
         exp_pol = atan2(sqrt(vx**2 + vy**2), vz)
-        self.assertEqual(self.p.azimuth, exp_azi)
-        self.assertEqual(self.p.polar, exp_pol)
+        self.assertAlmostEqual(self.p.azimuth, exp_azi, places=6)
+        self.assertAlmostEqual(self.p.polar, exp_pol, places=6)
 
         exp_en = (1/sqrt(1 - numpy.linalg.norm(new_vel)**2 / c_lgt**2) - 1)*self.p.mass
-        self.assertEqual(self.p.energy, exp_en)
+        self.assertAlmostEqual(self.p.energy, exp_en, places=6)
 
-    def test_momentum_mev(self):
-        mom = self.p.momentum_mev
+    def test_momentum(self):
+        mom = self.p.momentum
         self.assertEqual(len(mom), 3, msg='momentum is scalar')
-
-        exp_mom = self.p.momentum * c_lgt / e_chg * 1e-6
-        nptest.assert_allclose(mom, exp_mom)
 
         exp_mag = sqrt((self.p.energy + self.p.mass)**2 - self.p.mass**2)
         self.assertAlmostEqual(numpy.linalg.norm(mom), exp_mag, places=6)
 
-    def test_momentum_mev_zero(self):
+    def test_momentum_zero(self):
         self.p.energy = 0
-        nptest.assert_equal(self.p.momentum_mev, 0)
+        nptest.assert_equal(self.p.momentum, 0)
 
     def test_state_vector(self):
         sv = self.p.state_vector
         nptest.assert_equal(sv[0:3], self.p.position)
-        nptest.assert_equal(sv[3:6], self.p.momentum_mev)
+        nptest.assert_equal(sv[3:6], self.p.momentum)
 
     def test_state_vector_setter(self):
         new_pos = numpy.array((4, 2, 1))
-        new_mom = self.p.momentum_mev / 2
+        new_mom = self.p.momentum / 2
         self.p.state_vector = numpy.hstack((new_pos, new_mom))
 
         nptest.assert_allclose(self.p.position, new_pos)
-        nptest.assert_allclose(self.p.momentum_mev, new_mom)
+        nptest.assert_allclose(self.p.momentum, new_mom)
 
 
 class TestLorentz(unittest.TestCase):
@@ -161,7 +157,7 @@ class TestBethe(unittest.TestCase):
         self.assertEqual(sim.bethe(self.p, self.g), float('inf'))
 
     def test_large_energy(self):
-        self.p.velocity = [0, 0, 0.999999999*c_lgt]
+        self.p.velocity = numpy.array([0, 0, 0.999999999*c_lgt])
         self.assertAlmostEqual(sim.bethe(self.p, self.g), 0.0, delta=0.1)
 
     def test_high_pressure(self):
