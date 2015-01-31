@@ -181,10 +181,11 @@ class TestFindNextState(unittest.TestCase):
         self.g = sim.Gas(4, 2, 41.8, 150.)
         self.ef = numpy.array([0, 0, 15e3])
         self.bf = numpy.array([0, 0, -1])
+        self.tstep = 5e-11
 
     @property
     def args(self):
-        return self.p, self.g, self.ef, self.bf
+        return self.p, self.g, self.ef, self.bf, self.tstep
 
     def test_zero_energy(self):
         """If the energy is 0, the particle should stay still"""

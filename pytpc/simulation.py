@@ -258,7 +258,7 @@ def threshold(value, threshmin=0):
         return value
 
 
-def find_next_state(particle, gas, ef, bf):
+def find_next_state(particle, gas, ef, bf, tstep):
     """ Find the next step for the given particle and conditions.
 
     Returns the new state vector in the form (x, y, z, px, py, pz)
@@ -272,7 +272,6 @@ def find_next_state(particle, gas, ef, bf):
     beta = particle.beta
     if beta == 0:
         return particle.state_vector
-    tstep = pos_step / (beta * c_lgt)
 
     force = lorentz(vel, ef, bf, charge)
     new_vel = vel + force/particle.mass_kg * tstep  # this is questionable w.r.t. relativity...
@@ -324,7 +323,8 @@ def track(particle, gas, ef, bf):
     pol.append(particle.polar)
 
     while True:
-        state = find_next_state(particle, gas, ef, bf)
+        tstep = pos_step / (particle.beta * c_lgt)
+        state = find_next_state(particle, gas, ef, bf, tstep)
         particle.state_vector = state
         if particle.energy == 0:
             print('Particle stopped')
@@ -336,7 +336,7 @@ def track(particle, gas, ef, bf):
         azi.append(particle.azimuth)
         pol.append(particle.polar)
 
-        current_time += pos_step / (particle.beta * c_lgt)
+        current_time += tstep
         time.append(current_time)
 
         if particle.position[2] > 1 or sqrt(particle.position[0]**2 + particle.position[1]**2) > 0.275:

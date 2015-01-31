@@ -67,7 +67,9 @@ class Tracker:
         self.particle.position = pos0
         self.particle.momentum = mom0
 
-        new_state = sim.find_next_state(self.particle, self.gas, self.efield, self.bfield)
+        tstep = pos_step / (self.particle.beta * c_lgt)
+
+        new_state = sim.find_next_state(self.particle, self.gas, self.efield, self.bfield, tstep)
         self.particle.state_vector = new_state
         return numpy.hstack([self.particle.position, self.particle.momentum])
 
