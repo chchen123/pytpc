@@ -11,8 +11,8 @@ def chisq(meas, exp, var):
 
 def main():
 
-    resf = open('kf_sim_results.csv', 'w')
-    excf = open('kf_sim_exceptions.csv', 'w')
+    resf = open('kf_sim_results.csv', 'w', buffering=0)
+    excf = open('kf_sim_exceptions.csv', 'w', buffering=0)
 
     efield = [0, 0, 15e3]
     bfield = [0, 0, 0]
