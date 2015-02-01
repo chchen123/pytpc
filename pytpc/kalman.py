@@ -1,7 +1,8 @@
+from __future__ import division, print_function
 import numpy
 
 
-class KalmanFilter:
+class KalmanFilter(object):
     """ A class that defines a general extended Kalman filter.
 
     Attributes

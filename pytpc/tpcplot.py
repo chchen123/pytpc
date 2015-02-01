@@ -4,6 +4,7 @@ This module can be used to generate both two- and three-dimensional plots of dat
 imported using the evtdata module. In principle, these functions could also be used to plot arbitrary data.
 """
 
+from __future__ import division, print_function
 import math
 import numpy
 import matplotlib as mpl

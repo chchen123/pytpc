@@ -1,5 +1,6 @@
 """Unit tests for relativity.py"""
 
+from __future__ import division, print_function
 import unittest
 import pytpc.relativity as rel
 from math import sqrt

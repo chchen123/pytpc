@@ -30,6 +30,7 @@ Examples
 
 """
 
+from __future__ import division, print_function
 import struct
 import numpy
 import os.path
@@ -495,8 +496,8 @@ class Event:
         return
 
     def __str__(self):
-        str = 'Event {id}, timestamp {ts}.\nContains {tr} traces.'
-        return str.format(id=self.evt_id, ts=self.timestamp, tr=len(self.traces))
+        s = 'Event {id}, timestamp {ts}.\nContains {tr} traces.'
+        return s.format(id=self.evt_id, ts=self.timestamp, tr=len(self.traces))
 
     def hits(self):
         """ Calculate the total activation of each pad.

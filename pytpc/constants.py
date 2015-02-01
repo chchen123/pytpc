@@ -5,6 +5,7 @@ simulations and elsewhere.
 
 """
 
+from __future__ import division, print_function
 import scipy.constants
 
 e_mc2 = scipy.constants.physical_constants['electron mass energy equivalent in MeV'][0]

@@ -4,6 +4,7 @@ This module contains code to track a particle in data.
 
 """
 
+from __future__ import division, print_function
 import numpy
 from sklearn.cluster import DBSCAN
 

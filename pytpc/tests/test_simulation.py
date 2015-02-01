@@ -1,5 +1,6 @@
 """Unit tests for simulation.py"""
 
+from __future__ import division, print_function
 import unittest
 import pytpc.simulation as sim
 from math import sqrt, sin, cos, atan2
@@ -142,7 +143,7 @@ class TestLorentz(unittest.TestCase):
         self.do_test_values(vel=numpy.zeros(3))
 
     def test_scalar_vel(self):
-        self.assertRaisesRegex(TypeError, 'iterable', self.do_test_values, vel=1, bf=1)
+        self.assertRaises(TypeError, self.do_test_values, vel=1, bf=1)
 
 
 class TestBethe(unittest.TestCase):

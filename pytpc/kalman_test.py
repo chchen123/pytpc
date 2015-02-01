@@ -1,3 +1,4 @@
+from __future__ import division, print_function
 import pytpc.tracking as tracking
 import pytpc.simulation as sim
 import numpy
@@ -22,7 +23,7 @@ def main():
             try:
                 pt = sim.Particle(mass_num=4, charge_num=2, energy_per_particle=2, azimuth=azi, polar=pol)
 
-                pos, mom, *junk = map(numpy.array, sim.track(pt, g, efield, bfield))
+                pos, mom, time_, en_, azi_, pol_ = map(numpy.array, sim.track(pt, g, efield, bfield))
 
                 sv = numpy.hstack((pos, mom))
                 meas_pos = pos + numpy.random.normal(0, 1e-2, pos.shape)
@@ -43,4 +44,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

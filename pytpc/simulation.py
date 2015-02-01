@@ -4,6 +4,7 @@ Contains code for simulating the tracking of particles in a TPC.
 
 """
 
+from __future__ import division, print_function
 import numpy
 from math import atan2, log, sin, cos, sqrt
 
@@ -13,7 +14,7 @@ from .constants import *
 import pytpc.relativity as rel
 
 
-class Gas:
+class Gas(object):
     """ Describes a gas in the detector.
 
     Attributes
@@ -59,7 +60,7 @@ class Gas:
         return self.electron_density * 1e6
 
 
-class Particle:
+class Particle(object):
     """ Describes a beam particle for tracking.
     """
 
