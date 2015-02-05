@@ -82,11 +82,21 @@ class Particle(object):
         self.charge_num = charge_num
         self.charge = charge_num * e_chg
         self.position = numpy.array(position)
-        energy = energy_per_particle * self.mass_num
-        mom_mag = sqrt((energy + self.mass)**2 - self.mass**2)
-        self.momentum = mom_mag * numpy.array([cos(azimuth) * sin(polar),
-                                               sin(azimuth) * sin(polar),
-                                               cos(polar)])
+        self._energy = energy_per_particle * self.mass_num
+        self._mom_mag = sqrt((self._energy + self.mass)**2 - self.mass**2)
+        self._momentum = self._mom_mag * numpy.array([cos(azimuth) * sin(polar),
+                                                      sin(azimuth) * sin(polar),
+                                                      cos(polar)])
+
+    @property
+    def momentum(self):
+        return self._momentum
+
+    @momentum.setter
+    def momentum(self, new):
+        self._momentum = new
+        self._mom_mag = numpy.linalg.norm(new)
+        self._energy = sqrt(self._mom_mag**2 + self.mass**2) - self.mass
 
     @property
     def azimuth(self):
@@ -101,15 +111,15 @@ class Particle(object):
     @property
     def energy(self):
         """The total energy in MeV"""
-        pmag = numpy.linalg.norm(self.momentum)
-        return sqrt(pmag**2 + self.mass**2) - self.mass
+        return self._energy
 
     @energy.setter
     def energy(self, new):
-        mom_mag = sqrt((new + self.mass)**2 - self.mass**2)
-        self.momentum = mom_mag * numpy.array([cos(self.azimuth) * sin(self.polar),
-                                               sin(self.azimuth) * sin(self.polar),
-                                               cos(self.polar)])
+        self._mom_mag = sqrt((new + self.mass)**2 - self.mass**2)
+        self._momentum = self._mom_mag * numpy.array([cos(self.azimuth) * sin(self.polar),
+                                                      sin(self.azimuth) * sin(self.polar),
+                                                      cos(self.polar)])
+        self._energy = sqrt(self._mom_mag**2 + self.mass**2) - self.mass
 
     @property
     def energy_j(self):
