@@ -46,8 +46,8 @@ class Tracker:
     def __init__(self, particle, gas, efield, bfield, seed):
         self.particle = particle
         self.gas = gas
-        self.efield = efield
-        self.bfield = bfield
+        self.efield = numpy.asarray(efield)
+        self.bfield = numpy.asarray(bfield)
         self.kfilter = UKF(dim_x=self.sv_dim, dim_z=self.meas_dim, dt=1e-8, fx=self.update_state_vector,
                            hx=self.generate_measurement)
 
@@ -71,6 +71,19 @@ class Tracker:
         tstep = pos_step / (self.particle.beta * c_lgt)
 
         new_state = sim.find_next_state(self.particle, self.gas, self.efield, self.bfield, tstep)
+        self.particle.state_vector = new_state
+        return numpy.hstack([self.particle.position, self.particle.momentum])
+
+    def prev_state_vector(self, state, dt):
+        pos0 = state[0:3]
+        mom0 = state[3:6]
+
+        self.particle.position = pos0
+        self.particle.momentum = mom0
+
+        tstep = pos_step / (self.particle.beta * c_lgt)
+
+        new_state = sim.find_prev_state(self.particle, self.gas, self.efield, -self.bfield, tstep)
         self.particle.state_vector = new_state
         return numpy.hstack([self.particle.position, self.particle.momentum])
 
