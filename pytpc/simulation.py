@@ -392,4 +392,4 @@ def track(particle, gas, ef, bf):
             print('Particle left chamber')
             break
 
-    return pos, mom, time, en, azi, pol
+    return list(map(numpy.array, (pos, mom, time, en, azi, pol)))

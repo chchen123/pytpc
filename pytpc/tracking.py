@@ -29,7 +29,7 @@ def find_tracks(data, eps=20, min_samples=20):
     """
     xyz = data[:, 0:3]
     dbs = DBSCAN(eps=eps, min_samples=min_samples)
-    dbs.fit(data)
+    dbs.fit(xyz)
 
     tracks = []
     for track in (numpy.where(dbs.labels_ == n)[0] for n in numpy.unique(dbs.labels_) if n != -1):
