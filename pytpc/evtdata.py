@@ -519,13 +519,24 @@ class Event:
 
         return flat_hits
 
-    def xyzs(self):
+    def xyzs(self, drift_vel=None, clock=None):
         """ Find the scatter points of the event in space.
+
+        If a drift velocity and write clock frequency are provided, then the result gives the z dimension in
+        meters. Otherwise, the z dimension is measured in time buckets.
+
+        **Arguments**
+
+        drift_vel : int or float
+            The drift velocity in the detector, in cm/us
+
+        clock : int or float
+            The write clock rate, in MHz
 
         **Returns**
 
         xyzs : numpy.ndarray
-            A 4D array of points including (x, y, tb, activation)
+            A 4D array of points including (x, y, tb or z, activation)
         """
 
         nz = self.traces['data'].nonzero()
@@ -534,6 +545,9 @@ class Event:
         xys = numpy.array([pcenters[self.traces[i]['pad']] for i in nz[0]])
         zs = nz[1].reshape(nz[1].shape[0], 1)
         cs = self.traces['data'][nz].reshape(nz[0].shape[0], 1)
+
+        if drift_vel is not None and clock is not None:
+            zs = drift_vel * zs / clock * 10  # 1 cm/(us.MHz) = 1 cm = 10 mm
 
         result = numpy.hstack((xys, zs, cs))
         return result
