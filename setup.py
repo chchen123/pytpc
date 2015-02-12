@@ -6,6 +6,6 @@ setup(name='pytpc',
       author='Joshua Bradt',
       author_email='bradt@nscl.msu.edu',
       modules=['pytpc/tracking.py', 'pytpc/simulation.py', 'pytpc/constants.py',
-               'pytpc/evtdata.py', 'pytpc/kalman.py', 'pytpc/tpcplot.py'],
+               'pytpc/evtdata.py', 'pytpc/kalman.py', 'pytpc/tpcplot.py', 'pytpc/runtables.py'],
       requires=['numpy', 'matplotlib', 'filterpy', 'scikit-learn', 'scipy']
       )
