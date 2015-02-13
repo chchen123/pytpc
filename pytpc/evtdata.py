@@ -35,6 +35,7 @@ import struct
 import numpy
 import os.path
 from .tpcplot import generate_pad_plane
+from scipy.stats import threshold
 
 
 class EventFile:
@@ -519,7 +520,7 @@ class Event:
 
         return flat_hits
 
-    def xyzs(self, drift_vel=None, clock=None):
+    def xyzs(self, drift_vel=None, clock=None, pads=None, peaks_only=False):
         """ Find the scatter points of the event in space.
 
         If a drift velocity and write clock frequency are provided, then the result gives the z dimension in
@@ -533,24 +534,81 @@ class Event:
         clock : int or float
             The write clock rate, in MHz
 
+        pads : ndarray
+            An array of pad vertices
+
         **Returns**
 
         xyzs : numpy.ndarray
             A 4D array of points including (x, y, tb or z, activation)
         """
 
-        nz = self.traces['data'].nonzero()
-        pcenters = generate_pad_plane().mean(1)
+        if peaks_only:
+            traces_copy = numpy.copy(self.traces)
+            for i, tr in enumerate(traces_copy):
+                traces_copy[i]['data'][:] = threshold(tr['data'], threshmin=tr['data'].max(), newval=0)
+            nz = traces_copy['data'].nonzero()
+
+        else:
+            nz = self.traces['data'].nonzero()
+
+        if pads is None:
+            pads = generate_pad_plane()
+
+        pcenters = pads.mean(1)
 
         xys = numpy.array([pcenters[self.traces[i]['pad']] for i in nz[0]])
         zs = nz[1].reshape(nz[1].shape[0], 1)
         cs = self.traces['data'][nz].reshape(nz[0].shape[0], 1)
 
         if drift_vel is not None and clock is not None:
-            zs = drift_vel * zs / clock * 10  # 1 cm/(us.MHz) = 1 cm = 10 mm
+            zs = calibrate_z(zs, drift_vel, clock)
 
         result = numpy.hstack((xys, zs, cs))
         return result
+
+
+def calibrate_z(data, drift_vel, clock):
+    """Calibrate the z values by converting from a time bucket to a position.
+
+    **Arguments**
+
+    data : ndarray, int, float
+        The uncalibrated data, in time bucket values
+
+    drift_vel : int, float
+        The drift velocity in the gas, in cm/us
+
+    clock : int, float
+        The CoBo write clock frequency, in MHz
+
+    """
+    return drift_vel * data / clock * 10  # 1 cm/(us.MHz) = 1 cm = 10 mm
+
+
+def uncalibrate_z(data, drift_vel, clock):
+    """Converts the z positions back to time stamps.
+
+    The can be useful to calculate times for plotting.
+
+    **Arguments**
+
+    data : ndarray, int, float
+        The calibrated z positions
+
+    drift_vel : int, float
+        The drift velocity in the gas, in cm/us
+
+    clock : int, float
+        The CoBo write clock frequency, in MHz
+    """
+    return data * clock / (10 * drift_vel)
+
+
+def tb_average(data):
+    data = numpy.asanyarray(data)
+
+
 
 
 def load_pedestals(filename):

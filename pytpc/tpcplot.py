@@ -11,6 +11,7 @@ import matplotlib.collections
 import matplotlib.pyplot as plt
 import matplotlib.colors
 import matplotlib.cm
+from mpl_toolkits.mplot3d import Axes3D
 
 from pytpc.padplane import generate_pad_plane
 
