@@ -128,6 +128,13 @@ def generate_pad_plane(rotation_angle=None):
         rotmat = numpy.array([[cos(rotation_angle), -sin(rotation_angle)],
                               [sin(rotation_angle), cos(rotation_angle)]])
 
+        # reshape the pads array so we can easily iterate over it
+        sh = pads.shape
+        pads.shape = (-1, 2)
+        for i, v in enumerate(pads):
+            pads[i] = numpy.dot(rotmat, v)
+        pads.shape = sh
+
     return pads
 
 
