@@ -68,7 +68,7 @@ class Tracker:
         self.particle.position = pos0
         self.particle.momentum = mom0
 
-        tstep = pos_step / (self.particle.beta * c_lgt)
+        tstep = dt
 
         new_state = sim.find_next_state(self.particle, self.gas, self.efield, self.bfield, tstep)
         self.particle.state_vector = new_state
