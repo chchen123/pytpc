@@ -38,7 +38,7 @@ def _make_pad_colormap():
     This differs from the standard colormap in that zero is mapped to gray.
     """
 
-    carr = mpl.cm.ScalarMappable(cmap='rainbow').to_rgba(range(256))[:, :-1]
+    carr = mpl.cm.ScalarMappable(cmap='YlGnBu').to_rgba(range(256))[:, :-1]
     carr[0] = numpy.array([230./256., 230./256., 230./256.])
     return mpl.colors.LinearSegmentedColormap.from_list('mymap', carr, N=256)
 
@@ -50,22 +50,31 @@ def pad_plot(data, pads=None):
     """
 
     mycm = _make_pad_colormap()
-    sm = mpl.cm.ScalarMappable(cmap=mycm)
+    sm = mpl.cm.ScalarMappable(cmap='GnBu', norm=matplotlib.colors.LogNorm())
     sm.set_array(data)
     colors = sm.to_rgba(data)
 
     if pads is None:
         pads = generate_pad_plane()
 
-    c = mpl.collections.PolyCollection(pads, facecolors=colors, edgecolors='white', linewidths=0.05)
+    c = mpl.collections.PolyCollection(pads, facecolors=colors, edgecolors='none')
+    cbg = mpl.collections.PolyCollection(pads, facecolors='white', edgecolors='none')
+
+    c.set_zorder(2)
+    cbg.set_zorder(1)
 
     fig, ax = plt.subplots()
 
+    ax.axison = False
+
+    bdcirc = plt.Circle((0, 0), radius=290., facecolor='#c4cccc', edgecolor='none')
+    bdcirc.set_zorder(0)
+    ax.add_artist(bdcirc)
+
+    ax.add_collection(cbg)
     ax.add_collection(c)
 
     plt.axis('equal')
-    plt.xlabel('X Position [mm]')
-    plt.ylabel('Y Position [mm]')
 
     cbar = fig.colorbar(sm)
     cbar.set_label('Activation')
