@@ -63,6 +63,21 @@ class UnscentedKalmanFilter(object):
         self.x = self.x + np.dot(K, y)
         self.P = self.P - np.dot(K, np.dot(Pz, K.T))
 
+    def batch_filter(self, zs):
+
+        n = np.size(zs, 0)
+
+        means = np.zeros((n, self._dim_x, 1))
+        covars = np.zeros((n, self._dim_x, self._dim_x))
+
+        for i, z in enumerate(zs):
+            self.predict()
+            self.update(z)
+            means[i, :] = self.x
+            covars[i, :, :] = self.P
+
+        return means, covars
+
     @staticmethod
     def find_sigma_points(x, P, k):
 
