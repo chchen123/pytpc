@@ -10,7 +10,7 @@ from math import atan2, log, sin, cos, sqrt
 
 import copy
 
-from .constants import *
+from pytpc.constants import *
 import pytpc.relativity as rel
 
 
@@ -250,7 +250,7 @@ def bethe(particle, gas):
     return dedx / e_chg * 1e-6  # converted to MeV/m
 
 
-def threshold(value, threshmin=0):
+def threshold(value, threshmin=0.):
     """Applies a threshold to the given value.
 
     Any value less than threshmin will be replaced by threshmin.
@@ -294,7 +294,7 @@ def find_next_state(particle, gas, ef, bf, tstep):
         new_state[3:6] = [0, 0, 0]  # Set the momentum to 0
         return new_state
     else:
-        en = float(threshold(en - de, threshmin=0))
+        en = float(threshold(en - de, threshmin=0.))
 
         new_beta = rel.beta(en, particle.mass)
         new_vel *= new_beta / beta

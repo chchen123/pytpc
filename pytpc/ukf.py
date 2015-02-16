@@ -13,6 +13,8 @@ from numpy.linalg import cholesky, inv
 
 
 class UnscentedKalmanFilter(object):
+    """Represents an unscented Kalman filter, as defined by Julier and Uhlmann.
+    """
 
     def __init__(self, dim_x, dim_z, fx, hx):
         self._dim_x = dim_x  #: The state vector dimension
@@ -37,15 +39,17 @@ class UnscentedKalmanFilter(object):
         sigmas = self.find_sigma_points(self.x, self.P, self.kappa)
 
         # Pass sigma points through prediction function
-        self.sigmas_f = self.fx(sigmas)
+        for i, s in enumerate(sigmas):
+            self.sigmas_f[i] = self.fx(s)
 
         # Find the weighted mean and covar matrix
         self.x, self.P = self.unscented_transform(self.sigmas_f, self.W, self.Q)
 
     def update(self, z):
-
         # Run predicted points through measurement function
-        sigmas_h = self.hx(self.sigmas_f)
+        sigmas_h = np.zeros((self.sigmas_f.shape[0], self._dim_z))
+        for i, s in enumerate(self.sigmas_f):
+            sigmas_h[i] = self.hx(s)
 
         # This is the predicted observation and its covar
         zp, Pz = self.unscented_transform(sigmas_h, self.W, self.R)
@@ -67,7 +71,7 @@ class UnscentedKalmanFilter(object):
 
         n = np.size(zs, 0)
 
-        means = np.zeros((n, self._dim_x, 1))
+        means = np.zeros((n, self._dim_x))
         covars = np.zeros((n, self._dim_x, self._dim_x))
 
         for i, z in enumerate(zs):
