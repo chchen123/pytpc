@@ -16,11 +16,12 @@ class UnscentedKalmanFilter(object):
     """Represents an unscented Kalman filter, as defined by Julier and Uhlmann.
     """
 
-    def __init__(self, dim_x, dim_z, fx, hx):
+    def __init__(self, dim_x, dim_z, fx, hx, dt):
         self._dim_x = dim_x  #: The state vector dimension
         self._dim_z = dim_z  #: The measurement vector dimension
         self.fx = fx         #: The prediction function
         self.hx = hx         #: The measurement update function
+        self._dt = dt
 
         self.Q = np.eye(dim_x)  #: The process noise matrix
         self.R = np.eye(dim_z)  #: The measurement noise matrix
@@ -33,14 +34,15 @@ class UnscentedKalmanFilter(object):
 
         self.sigmas_f = np.zeros((2*dim_x + 1, dim_x))
 
-    def predict(self):
+    def predict(self, z):
 
         # Calculate sigma points
         sigmas = self.find_sigma_points(self.x, self.P, self.kappa)
 
         # Pass sigma points through prediction function
         for i, s in enumerate(sigmas):
-            self.sigmas_f[i] = self.fx(s)
+            dp = np.linalg.norm(z - self.hx(self.x))
+            self.sigmas_f[i] = self.fx(s, dp)
 
         # Find the weighted mean and covar matrix
         self.x, self.P = self.unscented_transform(self.sigmas_f, self.W, self.Q)
@@ -75,7 +77,7 @@ class UnscentedKalmanFilter(object):
         covars = np.zeros((n, self._dim_x, self._dim_x))
 
         for i, z in enumerate(zs):
-            self.predict()
+            self.predict(z)
             self.update(z)
             means[i, :] = self.x
             covars[i, :, :] = self.P
