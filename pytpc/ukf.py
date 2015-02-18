@@ -16,12 +16,11 @@ class UnscentedKalmanFilter(object):
     """Represents an unscented Kalman filter, as defined by Julier and Uhlmann.
     """
 
-    def __init__(self, dim_x, dim_z, fx, hx, dt):
+    def __init__(self, dim_x, dim_z, fx, hx):
         self._dim_x = dim_x  #: The state vector dimension
         self._dim_z = dim_z  #: The measurement vector dimension
         self.fx = fx         #: The prediction function
         self.hx = hx         #: The measurement update function
-        self._dt = dt
 
         self.Q = np.eye(dim_x)  #: The process noise matrix
         self.R = np.eye(dim_z)  #: The measurement noise matrix

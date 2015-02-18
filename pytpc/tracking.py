@@ -50,7 +50,7 @@ class Tracker:
         self.efield = numpy.asarray(efield)
         self.bfield = numpy.asarray(bfield)
         self.kfilter = UKF(dim_x=self.sv_dim, dim_z=self.meas_dim, fx=self.update_state_vector,
-                           hx=self.generate_measurement, dt=1.)
+                           hx=self.generate_measurement)
 
         self.kfilter.Q *= 1e-6
         self.kfilter.R *= 1e-2
