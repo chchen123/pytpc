@@ -316,44 +316,6 @@ def find_next_state(particle, gas, ef, bf, dpos):
         return new_particle.state_vector
 
 
-def find_prev_state(particle, gas, ef, bf, tstep):
-    """ Find the next step for the given particle and conditions.
-
-    Returns the new state vector in the form (x, y, z, px, py, pz)
-    """
-
-    en = particle.energy
-    vel = particle.velocity
-    charge = particle.charge
-    pos = particle.position
-
-    beta = particle.beta
-    if beta == 0:
-        return particle.state_vector
-
-    force = lorentz(vel, ef, bf, charge)
-    new_vel = vel + force/particle.mass_kg * tstep  # this is questionable w.r.t. relativity...
-    stopping = bethe(particle, gas)  # in MeV/m
-    de = float(threshold(stopping*pos_step, threshmin=1e-3))
-
-    if stopping <= 0 or de == 0:
-        new_state = particle.state_vector
-        new_state[3:6] = [0, 0, 0]  # Set the momentum to 0
-        return new_state
-    else:
-        en = float(threshold(en + de, threshmin=0))
-
-        new_beta = rel.beta(en, particle.mass)
-        new_vel *= new_beta / beta
-        new_pos = pos - new_vel*tstep
-
-        new_particle = copy.copy(particle)
-        new_particle.position = new_pos
-        new_particle.velocity = new_vel
-
-        return new_particle.state_vector
-
-
 def track(particle, gas, ef, bf):
     """ Track the provided particle's trajectory.
 

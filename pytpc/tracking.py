@@ -75,19 +75,6 @@ class Tracker:
         self.particle.state_vector = new_state
         return numpy.hstack([self.particle.position, self.particle.momentum])
 
-    def prev_state_vector(self, state):
-        pos0 = state[0:3]
-        mom0 = state[3:6]
-
-        self.particle.position = pos0
-        self.particle.momentum = mom0
-
-        tstep = pos_step / (self.particle.beta * c_lgt)
-
-        new_state = sim.find_prev_state(self.particle, self.gas, self.efield, -self.bfield, tstep)
-        self.particle.state_vector = new_state
-        return numpy.hstack([self.particle.position, self.particle.momentum])
-
     def generate_measurement(self, state):
         pos = state[0:3]
         # self.particle.position = pos
