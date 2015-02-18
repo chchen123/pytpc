@@ -50,14 +50,14 @@ class Tracker:
         self.efield = numpy.asarray(efield)
         self.bfield = numpy.asarray(bfield)
         self.kfilter = UKF(dim_x=self.sv_dim, dim_z=self.meas_dim, fx=self.update_state_vector,
-                           hx=self.generate_measurement)
+                           hx=self.generate_measurement, dtx=self.find_timestep)
 
         self.kfilter.Q *= 1e-6
         self.kfilter.R *= 1e-2
         self.kfilter.x = seed
         self.kfilter.P *= 100
 
-    def update_state_vector(self, state, dpos):
+    def update_state_vector(self, state, dt):
         """Find the next state vector.
 
         State vector is of the form (x, y, z, px, py, pz)
@@ -71,7 +71,7 @@ class Tracker:
 
         # tstep = pos_step / (self.particle.beta * c_lgt)
 
-        new_state = sim.find_next_state(self.particle, self.gas, self.efield, self.bfield, dpos)
+        new_state = sim.find_next_state(self.particle, self.gas, self.efield, self.bfield, dt)
         self.particle.state_vector = new_state
         return numpy.hstack([self.particle.position, self.particle.momentum])
 
@@ -80,9 +80,15 @@ class Tracker:
         # self.particle.position = pos
         return pos
 
+    def find_timestep(self, sv, delta_meas):
+        dpos = numpy.linalg.norm(delta_meas)
+        self.particle.state_vector = sv
+        return dpos / (self.particle.beta * c_lgt)
+
+
     def track(self, meas):
-        res, covar = self.kfilter.batch_filter(meas)
-        return res, covar
+        res, covar, times = self.kfilter.batch_filter(meas)
+        return res, covar, times
 
 
 if __name__ == '__main__':

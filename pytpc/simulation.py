@@ -277,7 +277,7 @@ def threshold(value, threshmin=0.):
         return value
 
 
-def find_next_state(particle, gas, ef, bf, dpos):
+def find_next_state(particle, gas, ef, bf, tstep):
     """ Find the next step for the given particle and conditions.
 
     Returns the new state vector in the form (x, y, z, px, py, pz)
@@ -287,14 +287,12 @@ def find_next_state(particle, gas, ef, bf, dpos):
     mom = particle.momentum_si
     vel = particle.velocity
     charge = particle.charge
-    pos = particle.position
 
     beta = particle.beta
     if beta == 0:
         return particle.state_vector
 
     force = lorentz(vel, ef, bf, charge)
-    tstep = dpos / (beta * c_lgt)
     new_mom = mom + force * tstep
     stopping = bethe(particle, gas)  # in MeV/m
     de = float(threshold(stopping*pos_step, threshmin=1e-3))
@@ -344,7 +342,7 @@ def track(particle, gas, ef, bf):
 
     while True:
         tstep = pos_step / (particle.beta * c_lgt)
-        state = find_next_state(particle, gas, ef, bf, pos_step)
+        state = find_next_state(particle, gas, ef, bf, tstep)
         particle.state_vector = state
         if particle.energy == 0:
             print('Particle stopped')

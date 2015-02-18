@@ -16,11 +16,12 @@ class UnscentedKalmanFilter(object):
     """Represents an unscented Kalman filter, as defined by Julier and Uhlmann.
     """
 
-    def __init__(self, dim_x, dim_z, fx, hx):
+    def __init__(self, dim_x, dim_z, fx, hx, dtx):
         self._dim_x = dim_x  #: The state vector dimension
         self._dim_z = dim_z  #: The measurement vector dimension
         self.fx = fx         #: The prediction function
         self.hx = hx         #: The measurement update function
+        self.dtx = dtx
 
         self.Q = np.eye(dim_x)  #: The process noise matrix
         self.R = np.eye(dim_z)  #: The measurement noise matrix
@@ -28,20 +29,19 @@ class UnscentedKalmanFilter(object):
         self.x = np.zeros(dim_x)  #: The estimated state vector
         self.P = np.eye(dim_x)    #: The estimated covariance matrix
 
-        self.kappa = 0  #: A fine-tuning parameter
+        self.kappa = 3 - dim_x  #: A fine-tuning parameter
         self.W = self.find_weights(dim_x, self.kappa)
 
         self.sigmas_f = np.zeros((2*dim_x + 1, dim_x))
 
-    def predict(self, z):
+    def predict(self, dt):
 
         # Calculate sigma points
         sigmas = self.find_sigma_points(self.x, self.P, self.kappa)
 
         # Pass sigma points through prediction function
         for i, s in enumerate(sigmas):
-            dp = np.linalg.norm(z - self.hx(self.x))
-            self.sigmas_f[i] = self.fx(s, dp)
+            self.sigmas_f[i] = self.fx(s, dt)
 
         # Find the weighted mean and covar matrix
         self.x, self.P = self.unscented_transform(self.sigmas_f, self.W, self.Q)
@@ -74,14 +74,24 @@ class UnscentedKalmanFilter(object):
 
         means = np.zeros((n, self._dim_x))
         covars = np.zeros((n, self._dim_x, self._dim_x))
+        times = np.zeros(n)
+        current_time = 0.
 
-        for i, z in enumerate(zs):
-            self.predict(z)
-            self.update(z)
+        delta_zs = np.zeros((n, self._dim_z))
+        delta_zs[0, :] = zs[0] - self.hx(self.x)
+        delta_zs[1:, :] = np.diff(zs, axis=0)
+
+        for i in range(n):
+            # dt = self.dtx(self.x, np.array([1e-3, 0, 0]) - np.zeros(3))
+            dt = self.dtx(self.x, delta_zs) * 1e-1
+            self.predict(dt)
+            self.update(zs[i])
             means[i, :] = self.x
             covars[i, :, :] = self.P
+            current_time += dt
+            times[i] = current_time
 
-        return means, covars
+        return means, covars, times
 
     @staticmethod
     def find_sigma_points(x, P, k):
