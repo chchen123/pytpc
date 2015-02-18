@@ -6,7 +6,7 @@ This module contains functions to calculate quantities of interest in special re
 
 from __future__ import division, print_function
 import numpy
-from .constants import *
+from pytpc.constants import *
 from math import sqrt
 
 
