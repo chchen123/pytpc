@@ -99,6 +99,14 @@ class Particle(object):
         self._energy = sqrt(self._mom_mag**2 + self.mass**2) - self.mass
 
     @property
+    def momentum_si(self):
+        return self._momentum * 1e6 * e_chg / c_lgt
+
+    @momentum_si.setter
+    def momentum_si(self, value):
+        self.momentum = value * 1e-6 / e_chg * c_lgt
+
+    @property
     def azimuth(self):
         px, py, pz = self.momentum
         return atan2(py, px)
@@ -276,6 +284,7 @@ def find_next_state(particle, gas, ef, bf, dpos):
     """
 
     en = particle.energy
+    mom = particle.momentum_si
     vel = particle.velocity
     charge = particle.charge
     pos = particle.position
@@ -286,7 +295,7 @@ def find_next_state(particle, gas, ef, bf, dpos):
 
     force = lorentz(vel, ef, bf, charge)
     tstep = dpos / (beta * c_lgt)
-    new_vel = vel + force/particle.mass_kg * tstep  # this is questionable w.r.t. relativity...
+    new_mom = mom + force * tstep
     stopping = bethe(particle, gas)  # in MeV/m
     de = float(threshold(stopping*pos_step, threshmin=1e-3))
 
@@ -297,13 +306,12 @@ def find_next_state(particle, gas, ef, bf, dpos):
     else:
         en = float(threshold(en - de, threshmin=0.))
 
-        new_beta = rel.beta(en, particle.mass)
-        new_vel *= new_beta / beta
-        new_pos = pos + new_vel*tstep
-
         new_particle = copy.copy(particle)
-        new_particle.position = new_pos
-        new_particle.velocity = new_vel
+        new_particle.momentum_si = new_mom
+        new_particle.energy = en
+
+        new_vel = new_particle.velocity
+        new_particle.position += new_vel * tstep
 
         return new_particle.state_vector
 

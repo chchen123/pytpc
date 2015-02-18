@@ -116,6 +116,16 @@ class TestParticle(unittest.TestCase):
         nptest.assert_allclose(self.p.position, new_pos)
         nptest.assert_allclose(self.p.momentum, new_mom)
 
+    def test_momentum_si(self):
+        mom = self.p.momentum
+        exp = mom * 5.344286e-22  # conversion factor for MeV/c -> kg.m/s from Wolfram Alpha
+        nptest.assert_allclose(exp, self.p.momentum_si)
+
+    def test_momentum_si_setter_nonrel(self):
+        vel = numpy.array((5., 4., 3.8))
+        mom = self.p.mass_kg * vel
+        self.p.momentum_si = mom
+        nptest.assert_allclose(self.p.velocity, vel)
 
 class TestLorentz(unittest.TestCase):
     """Tests for sim.lorentz function"""
