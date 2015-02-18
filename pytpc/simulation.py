@@ -1,4 +1,6 @@
-"""simulation.py
+"""
+simulation.py
+=============
 
 Contains code for simulating the tracking of particles in a TPC.
 
@@ -15,30 +17,21 @@ import pytpc.relativity as rel
 
 
 class Gas(object):
-    """ Describes a gas in the detector.
+    """Describes a gas in the detector.
 
-    Attributes
+    Parameters
     ----------
-    molar_mass : The molar mass of the gas in g/mol
-    num_electrons : The number of electrons per molecule, or the total Z
-    mean_exc_pot : The mean excitation potential, as used in Bethe's formula, in eV
-    pressure : The gas pressure in Torr
-    density : The density in g/cm^3
-    electron_density : The electron density per cm^3
-    electron_density_per_m3 : The electron density per m^3
-
+    molar_mass : number
+        Provided in g/mol
+    num_electrons : int
+        Number of electrons per molecule, or the total Z
+    mean_exc_pot : float
+        The mean excitation potential, as used in Bethe's formula, in eV
+    pressure : float
+        The gas pressure in Torr
     """
 
     def __init__(self, molar_mass, num_electrons, mean_exc_pot, pressure):
-        """ Initialize the instance.
-
-        Arguments
-        ---------
-        molar_mass : Provided in g/mol
-        num_electrons : Number of electrons per molecule, or the total Z
-        mean_exc_pot : The mean excitation potential, as used in Bethe's formula, in eV
-        pressure : The gas pressure in Torr
-        """
         self.molar_mass = molar_mass
         self.num_electrons = num_electrons
         self.mean_exc_pot = mean_exc_pot
@@ -62,21 +55,24 @@ class Gas(object):
 
 class Particle(object):
     """ Describes a beam particle for tracking.
+
+    Parameters
+        ----------
+        mass_num : int
+            The A value of the particle (total number of nucleons)
+        charge_num : int
+            The Z value of the particle
+        energy_per_particle : float
+            Energy per nucleon, in MeV/u
+        position : array-like
+            The initial position of the particle
+        azimuth : float
+            The azimuthal angle of the particle's trajectory, in radians
+        polar : float
+            The polar angle of the particle's trajectory, in radians
     """
 
     def __init__(self, mass_num, charge_num, energy_per_particle=0, position=(0, 0, 0), azimuth=0, polar=0):
-        """ Initialize the class.
-
-        Arguments
-        ---------
-        mass_num : The A value of the particle (total number of nucleons)
-        charge_num : The Z value of the particle
-        energy_per_particle : Energy per nucleon, in MeV/u
-        position : The initial position of the particle, as a list
-        azimuth : The azimuthal angle of the particle's trajectory
-        polar : The polar angle of the particle's trajectory
-
-        """
         self.mass_num = mass_num
         self._mass = mass_num * p_mc2
         self.charge_num = charge_num
@@ -90,6 +86,7 @@ class Particle(object):
 
     @property
     def momentum(self):
+        """The particle's momentum in MeV/c"""
         return self._momentum
 
     @momentum.setter
@@ -100,6 +97,7 @@ class Particle(object):
 
     @property
     def momentum_si(self):
+        """The particle's momentum in kg.m/s"""
         return self._momentum * 1e6 * e_chg / c_lgt
 
     @momentum_si.setter
@@ -108,11 +106,13 @@ class Particle(object):
 
     @property
     def azimuth(self):
+        """The azimuthal angle of the trajectory in radians"""
         px, py, pz = self.momentum
         return atan2(py, px)
 
     @property
     def polar(self):
+        """The polar angle of the trajectory in radians"""
         px, py, pz = self.momentum
         return atan2(sqrt(px**2 + py**2), pz)
 
@@ -131,6 +131,7 @@ class Particle(object):
 
     @property
     def energy_j(self):
+        """The total energy in J"""
         return self.energy * 1e6 * e_chg
 
     @energy_j.setter
@@ -158,6 +159,7 @@ class Particle(object):
 
     @property
     def velocity(self):
+        """The particle's velocity in m/s"""
         p_si = self.momentum * 1e6 / c_lgt * e_chg
         return p_si / (self.gamma * self.mass_kg)
 
@@ -169,12 +171,14 @@ class Particle(object):
 
     @property
     def beta(self):
+        """The particle's beta, or v/c"""
         en = self.energy
         m = self.mass
         return rel.beta(en, m)
 
     @property
     def gamma(self):
+        """The particle's gamma, as defined in the Lorentz transform"""
         try:
             g = 1 / sqrt(1 - self.beta**2)
         except ZeroDivisionError:
@@ -187,7 +191,6 @@ class Particle(object):
         """The state vector of the particle, as (x, y, z, px, py, pz).
 
         Setting to this will update every other property automatically.
-
         """
         return numpy.hstack([self.position, self.momentum])
 
@@ -200,8 +203,16 @@ class Particle(object):
 def lorentz(vel, ef, bf, charge):
     """Calculate the Lorentz (electromagnetic) force.
 
-    Arguments
-    ---------
+    This is defined as
+
+    ..  math::
+        \\mathbf{F} = q(\\mathbf{E} + \\mathbf{v} \\times \\mathbf{B})
+
+    ..  note::
+        The units of the inputs must be consistant to get a consistant result.
+
+    Parameters
+    ----------
     vel : array-like
         The velocity
     ef : array-like
@@ -211,9 +222,10 @@ def lorentz(vel, ef, bf, charge):
     charge : float or int
         The charge of the particle
 
-    The units must be consistant to get a consistant result.
-
-    Returns: The force, in whatever units the inputs generate.
+    Returns
+    -------
+    force : array-like
+        The electromagnetic force, in whatever units the inputs generate
     """
 
     vx, vy, vz = vel
@@ -230,12 +242,16 @@ def lorentz(vel, ef, bf, charge):
 def bethe(particle, gas):
     """ Find the stopping power of the gas.
 
-    Arguments
-    ---------
-    particle : A Particle object
-    gas : A Gas object
+    Parameters
+    ----------
+    particle : Particle
+        The particle to be tracked. This will **not** be changed by the function.
+    gas : Gas
 
-    Returns: The stopping power in MeV/m
+    Returns
+    -------
+    dedx : float
+        The stopping power in MeV/m
 
     """
     ne = gas.electron_density_per_m3
@@ -263,11 +279,11 @@ def threshold(value, threshmin=0.):
 
     Any value less than threshmin will be replaced by threshmin.
 
-    **Arguments**
-
-    value : float or int
+    Parameters
+    ----------
+    value : number
         The value to be thresholded
-    threshmin : float or int
+    threshmin : number
         The minimum threshold value
 
     """
@@ -280,7 +296,25 @@ def threshold(value, threshmin=0.):
 def find_next_state(particle, gas, ef, bf, tstep):
     """ Find the next step for the given particle and conditions.
 
-    Returns the new state vector in the form (x, y, z, px, py, pz)
+    Parameters
+    ----------
+    particle : Particle
+        The particle to be tracked. It will **not** be changed by this function.
+    gas : Gas
+        The gas in the detector
+    ef : array-like
+        The electric field
+    bf : array-like
+        The magnetic field
+    tstep : float
+        The time step to the next state
+
+    Returns
+    -------
+    state_vector : ndarray
+        The new state vector. The format of this is (x, y, z, px, py, pz). This
+        can be provided to an instance of the Particle class to update its state
+        in a tracking loop.
     """
 
     en = particle.energy
@@ -315,13 +349,35 @@ def find_next_state(particle, gas, ef, bf, tstep):
 
 
 def track(particle, gas, ef, bf):
-    """ Track the provided particle's trajectory.
+    """ Track the provided particle's trajectory until it stops.
 
-    Arguments
-    ---------
-    particle : An instance of the Particle class
+    This can be used to simulate a particle's motion through the detector.
 
-    Returns a tuple of (pos, vel, energy, time) lists
+    Parameters
+    ----------
+    particle : Particle
+        The particle to be tracked.
+    gas : Gas
+        The gas in the detector
+    ef : array-like
+        The electric field
+    bf : array-like
+        The magnetic field
+
+    Returns
+    -------
+    pos : ndarray
+        The position of the particle at each step
+    mom : ndarray
+        The momentum at each step
+    time : ndarray
+        The time at each step
+    en : ndarray
+        The energy per particle at each step
+    azi : ndarray
+        The azimuthal angle of the trajectory at each step
+    pol : ndarray
+        The polar angle of the trajectory at each step
 
     """
     pos = []
