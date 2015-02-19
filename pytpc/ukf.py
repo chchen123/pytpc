@@ -77,13 +77,9 @@ class UnscentedKalmanFilter(object):
         times = np.zeros(n)
         current_time = 0.
 
-        delta_zs = np.zeros((n, self._dim_z))
-        delta_zs[0, :] = zs[0] - self.hx(self.x)
-        delta_zs[1:, :] = np.diff(zs, axis=0)
-
         for i in range(n):
             # dt = self.dtx(self.x, np.array([1e-3, 0, 0]) - np.zeros(3))
-            dt = self.dtx(self.x, delta_zs) * 1e-1
+            dt = self.dtx(self.x, zs[i])
             self.predict(dt)
             self.update(zs[i])
             means[i, :] = self.x
