@@ -80,15 +80,9 @@ class Tracker:
         # self.particle.position = pos
         return pos
 
-    def find_timestep(self, sv, new_meas):
-        mom = sv[3:6]
-        pos = sv[0:3]
-        delta = new_meas - pos
-        dpos = delta.dot(mom) / numpy.linalg.norm(mom)
-
+    def find_timestep(self, sv, dpos):
         self.particle.state_vector = sv
         return dpos / (self.particle.beta * c_lgt)
-
 
     def track(self, meas):
         res, covar, times = self.kfilter.batch_filter(meas)

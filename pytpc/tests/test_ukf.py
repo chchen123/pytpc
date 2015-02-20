@@ -11,13 +11,17 @@ def predict_func(x):
 def measure_func(z):
     pass
 
+def ts_func(z):
+    pass
+
 
 class TestUnscentedKalmanFilter(unittest.TestCase):
     def setUp(self):
         self.dim_x = 4
         self.dim_z = 2
         self.f = pytpc.ukf.UnscentedKalmanFilter(self.dim_x, self.dim_z,
-                                                 predict_func, measure_func)
+                                                 predict_func, measure_func,
+                                                 ts_func)
 
     def test_constructor(self):
         f = self.f
