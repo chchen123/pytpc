@@ -13,21 +13,7 @@ from numpy.linalg import cholesky, inv
 
 
 class UnscentedKalmanFilter(object):
-    """Represents an unscented Kalman filter.
-
-    The following attributes should be set after instantiation:
-
-    Q : ndarray
-        The process noise covariance matrix. The dimension is (dim_x, dim_x).
-    R : ndarray
-        The measurement noise covariance matrix. The dimension is (dim_z, dim_z).
-    x : ndarray
-        The current state vector. Set it to a good estimate of the initial state. The dimension is (dim_x).
-    P : ndarray
-        The state vector covariance matrix. Set it to a value that reflects your confidence in your initial
-        guess for the state vector. The dimension is (dim_x, dim_x).
-
-    This filter is based on the filter defined by [1]_.
+    """Represents an unscented Kalman filter, as defined by [1]_.
 
     Parameters
     ----------
@@ -45,6 +31,13 @@ class UnscentedKalmanFilter(object):
         A function that takes the current state vector and the scalar distance to the next data point and returns
         the timestep required to get to the next data point.
 
+    Attributes
+    ----------
+    Q
+    R
+    P
+    x
+
     References
     ----------
     ..  [1] Julier, S. J., & Uhlmann, J. K. (1997). A New Extension of the Kalman Filter to Nonlinear Systems.
@@ -59,7 +52,9 @@ class UnscentedKalmanFilter(object):
         self.hx = hx         #: The measurement update function
         self.dtx = dtx
 
-        self.Q = np.eye(dim_x)  #: The process noise matrix
+        self.Q = np.eye(dim_x)
+        """The process noise matrix."""
+
         self.R = np.eye(dim_z)  #: The measurement noise matrix
 
         self.x = np.zeros(dim_x)  #: The estimated state vector
