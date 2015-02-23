@@ -16,43 +16,6 @@ from pytpc.constants import *
 import pytpc.relativity as rel
 
 
-class Gas(object):
-    """Describes a gas in the detector.
-
-    Parameters
-    ----------
-    molar_mass : number
-        Provided in g/mol
-    num_electrons : int
-        Number of electrons per molecule, or the total Z
-    mean_exc_pot : float
-        The mean excitation potential, as used in Bethe's formula, in eV
-    pressure : float
-        The gas pressure in Torr
-    """
-
-    def __init__(self, molar_mass, num_electrons, mean_exc_pot, pressure):
-        self.molar_mass = molar_mass
-        self.num_electrons = num_electrons
-        self.mean_exc_pot = mean_exc_pot
-        self.pressure = pressure
-
-    @property
-    def density(self):
-        """Density in g/cm^3"""
-        return self.pressure / 760. * self.molar_mass / 24040.
-
-    @property
-    def electron_density(self):
-        """Electron density per cm^3"""
-        return N_avo * self.num_electrons * self.density / self.molar_mass
-
-    @property
-    def electron_density_per_m3(self):
-        """Electron density per m^3"""
-        return self.electron_density * 1e6
-
-
 class Particle(object):
     """ Describes a beam particle for tracking.
 
@@ -239,41 +202,6 @@ def lorentz(vel, ef, bf, charge):
     return numpy.array([fx, fy, fz])
 
 
-def bethe(particle, gas):
-    """ Find the stopping power of the gas.
-
-    Parameters
-    ----------
-    particle : Particle
-        The particle to be tracked. This will **not** be changed by the function.
-    gas : Gas
-
-    Returns
-    -------
-    dedx : float
-        The stopping power in MeV/m
-
-    """
-    ne = gas.electron_density_per_m3
-    z = particle.charge_num
-    I = gas.mean_exc_pot * 1e-6  # convert to MeV
-
-    beta_sq = particle.beta**2
-
-    if beta_sq == 0.0:
-        # The particle has stopped, so the dedx should be infinite
-        dedx = float('inf')
-    elif beta_sq == 1.0:
-        # This is odd, but then I guess dedx -> 0
-        dedx = 0
-    else:
-        frnt = ne * z**2 * e_chg**4 / (e_mc2 * MeVtokg * c_lgt**2 * beta_sq * 4 * pi * eps_0**2)
-        lnt = log(2 * e_mc2 * beta_sq / (I * (1 - beta_sq)))
-        dedx = frnt*(lnt - beta_sq)  # this should be in SI units, J/m
-
-    return dedx / e_chg * 1e-6  # converted to MeV/m
-
-
 def threshold(value, threshmin=0.):
     """Applies a threshold to the given value.
 
@@ -328,7 +256,7 @@ def find_next_state(particle, gas, ef, bf, tstep):
 
     force = lorentz(vel, ef, bf, charge)
     new_mom = mom + force * tstep
-    stopping = bethe(particle, gas)  # in MeV/m
+    stopping = gas.energy_loss(particle.energy, particle.mass_num, particle.charge_num)  # in MeV/m
     de = float(threshold(stopping*pos_step, threshmin=1e-3))
 
     if stopping <= 0 or de == 0:

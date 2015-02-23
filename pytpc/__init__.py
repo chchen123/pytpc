@@ -5,9 +5,11 @@ import pytpc.tracking
 import pytpc.simulation
 import pytpc.evtdata
 import pytpc.tpcplot
+import pytpc.gases
 
 from pytpc.tracking import find_tracks, Tracker
-from pytpc.simulation import Particle, Gas, track
+from pytpc.simulation import Particle, track
+from pytpc.gases import Gas
 from pytpc.evtdata import EventFile, Event
 from pytpc.tpcplot import chamber_plot, pad_plot
 from pytpc.padplane import generate_pad_plane

@@ -3,31 +3,11 @@
 from __future__ import division, print_function
 import unittest
 import pytpc.simulation as sim
+import pytpc.gases
 from math import sqrt, sin, cos, atan2
 import numpy
 import numpy.testing as nptest
 from pytpc.constants import *
-
-
-class TestGas(unittest.TestCase):
-    def setUp(self):
-        self.gas = sim.Gas(molar_mass=10., num_electrons=4.,
-                           mean_exc_pot=8., pressure=200.)
-
-    def test_density(self):
-        res = self.gas.density
-        expect = self.gas.pressure / 760. * self.gas.molar_mass / 24040.
-        self.assertEqual(res, expect)
-
-    def test_electron_density(self):
-        res = self.gas.electron_density
-        expect = N_avo * self.gas.num_electrons * self.gas.density / self.gas.molar_mass
-        self.assertEqual(res, expect)
-
-    def test_electron_density_per_m3(self):
-        res = self.gas.electron_density_per_m3
-        expect = N_avo * self.gas.num_electrons * self.gas.density / self.gas.molar_mass * 1e6
-        self.assertEqual(res, expect)
 
 
 class TestParticle(unittest.TestCase):
@@ -156,40 +136,12 @@ class TestLorentz(unittest.TestCase):
         self.assertRaises(TypeError, self.do_test_values, vel=1, bf=1)
 
 
-class TestBethe(unittest.TestCase):
-    """Tests for sim.bethe function"""
-
-    def setUp(self):
-        self.p = sim.Particle(4, 2, 3)
-        self.g = sim.Gas(10., 2, 10.2, 200.)
-
-    def test_zero_energy(self):
-        self.p.energy = 0
-        self.assertEqual(sim.bethe(self.p, self.g), float('inf'))
-
-    def test_large_energy(self):
-        self.p.velocity = numpy.array([0, 0, 0.999999999*c_lgt])
-        self.assertAlmostEqual(sim.bethe(self.p, self.g), 0.0, delta=0.1)
-
-    def test_high_pressure(self):
-        self.g.pressure = 1e100
-        self.assertGreater(sim.bethe(self.p, self.g), 1e10)
-
-    def test_zero_pressure(self):
-        self.g.pressure = 0
-        self.assertEqual(sim.bethe(self.p, self.g), 0.0)
-
-    def test_low_pressure(self):
-        self.g.pressure = 1e-3
-        self.assertLess(sim.bethe(self.p, self.g), 1e-3)
-
-
 class TestFindNextState(unittest.TestCase):
     """Tests for sim.find_next_state function"""
 
     def setUp(self):
         self.p = sim.Particle(4, 2, 3)
-        self.g = sim.Gas(4, 2, 41.8, 150.)
+        self.g = pytpc.gases.Gas(4, 2, 41.8, 150.)
         self.ef = numpy.array([0, 0, 15e3])
         self.bf = numpy.array([0, 0, -1])
         self.tstep = 5e-11
