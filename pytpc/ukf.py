@@ -253,7 +253,7 @@ class UnscentedKalmanFilter(object):
         return w
 
     @staticmethod
-    def unscented_transform(sigmas, weights, noise_covar):
+    def unscented_transform(sigmas, weights, noise_covar=None):
         r"""Performs the unscented transformation.
 
         This function uses the provided sigma points, weights, and noise covariance matrix to find the weighted averages
@@ -276,7 +276,7 @@ class UnscentedKalmanFilter(object):
             The sigma points
         weights : array-like
             The weights for each sigma point
-        noise_covar : array-like
+        noise_covar : array-like, optional
             An external noise covariance matrix to be included in the weighted average.
 
         Returns
