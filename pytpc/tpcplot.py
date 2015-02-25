@@ -15,8 +15,15 @@ from matplotlib.colors import LogNorm
 import matplotlib.cm
 from mpl_toolkits.mplot3d import Axes3D
 import mpl_toolkits.mplot3d.art3d as art3d
+import seaborn as sns
 
 from pytpc.padplane import generate_pad_plane
+
+
+# Define colormaps for the plots
+pad_colors = sns.cubehelix_palette(n_colors=6, start=0, rot=-0.4,
+                                   gamma=1, hue=0.8, light=0.95, dark=0.15)
+pad_cm = sns.blend_palette(pad_colors, as_cmap=True)
 
 
 def show_pad_plane(pads=None):
@@ -48,7 +55,7 @@ def _make_pad_colormap():
 
 def _generate_pad_collection(data, pads=None):
 
-    sm = mpl.cm.ScalarMappable(cmap='GnBu', norm=matplotlib.colors.LogNorm())
+    sm = mpl.cm.ScalarMappable(cmap=pad_cm, norm=matplotlib.colors.LogNorm())
     sm.set_array(data)
     colors = sm.to_rgba(data)
 
@@ -65,8 +72,7 @@ def pad_plot(data, pads=None):
     :param data: The data, as an array indexed by pad number.
     """
 
-    mycm = _make_pad_colormap()
-    sm = mpl.cm.ScalarMappable(cmap='GnBu', norm=matplotlib.colors.LogNorm())
+    sm = mpl.cm.ScalarMappable(cmap=pad_cm, norm=LogNorm())
     sm.set_array(data)
     colors = sm.to_rgba(data)
 
