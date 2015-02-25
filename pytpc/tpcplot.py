@@ -25,6 +25,10 @@ pad_colors = sns.cubehelix_palette(n_colors=6, start=0, rot=-0.4,
                                    gamma=1, hue=0.8, light=0.95, dark=0.15)
 pad_cm = sns.blend_palette(pad_colors, as_cmap=True)
 
+ch_colors = sns.cubehelix_palette(n_colors=6, start=0, rot=-0.4,
+                                  gamma=1, hue=1, light=0.75, dark=0.1)
+ch_cm = sns.blend_palette(ch_colors, as_cmap=True)
+
 
 def show_pad_plane(pads=None):
     """Displays the pad plane"""
@@ -42,20 +46,9 @@ def show_pad_plane(pads=None):
     fig.show()
 
 
-def _make_pad_colormap():
-    """Generates the color map used for the pad plots.
-
-    This differs from the standard colormap in that zero is mapped to gray.
-    """
-
-    carr = mpl.cm.ScalarMappable(cmap='YlGnBu').to_rgba(range(256))[:, :-1]
-    carr[0] = numpy.array([230./256., 230./256., 230./256.])
-    return mpl.colors.LinearSegmentedColormap.from_list('mymap', carr, N=256)
-
-
 def _generate_pad_collection(data, pads=None):
 
-    sm = mpl.cm.ScalarMappable(cmap=pad_cm, norm=matplotlib.colors.LogNorm())
+    sm = mpl.cm.ScalarMappable(cmap=pad_cm, norm=LogNorm())
     sm.set_array(data)
     colors = sm.to_rgba(data)
 
@@ -115,16 +108,28 @@ def chamber_plot(data, hits=None, pads=None):
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.set_axis_on()
-    #ax.view_init(azim=0, elev=0)
+    ax.set_axis_bgcolor('none')
+    ax.view_init(azim=0, elev=15)
     ax.set_xlim(-250, 250)
     ax.set_ylim(-250, 250)
     ax.set_zlim(0, 512)
-    ax.scatter(data[:, 0], data[:, 1], data[:, 2], marker='.', linewidth=0, s=2, cmap='winter', norm=LogNorm(), c=data[:, 3])
+    sc = ax.scatter(data[:, 0], data[:, 1], data[:, 2], marker='.', linewidth=0, s=2, cmap=ch_cm,
+                    norm=LogNorm(), c=data[:, 3])
+
+    # Draw the anode and cathode at the ends
+    anode = mpl.patches.CirclePolygon((0, 0), radius=250, resolution=50)
+    cathode = mpl.patches.CirclePolygon((0, 0), radius=250, resolution=50)
+    ends = mpl.collections.PolyCollection([anode.get_verts(), cathode.get_verts()],
+                                          facecolors=['#c4cccc', 'none'], edgecolors=['none', 'black'])
+    ax.add_collection3d(ends, zs=[0, 511])
 
     if hits is not None:
         pads = _generate_pad_collection(hits, pads)
         ax.add_collection3d(pads, zs=0)
+
+    # Add a color scale
+    cbar = fig.colorbar(sc, shrink=0.75)
+    cbar.set_label('Activation')
 
     return fig
 
