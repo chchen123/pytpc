@@ -24,10 +24,12 @@ from pytpc.padplane import generate_pad_plane
 pad_colors = sns.cubehelix_palette(n_colors=6, start=0, rot=-0.4,
                                    gamma=1, hue=0.8, light=0.95, dark=0.15)
 pad_cm = sns.blend_palette(pad_colors, as_cmap=True)
+"""The color map for the `pad_plot` function."""
 
 ch_colors = sns.cubehelix_palette(n_colors=6, start=0, rot=-0.4,
                                   gamma=1, hue=1, light=0.75, dark=0.1)
 ch_cm = sns.blend_palette(ch_colors, as_cmap=True)
+"""The color map for the `chamber_plot` function."""
 
 
 def show_pad_plane(pads=None):
@@ -62,8 +64,22 @@ def _generate_pad_collection(data, pads=None):
 def pad_plot(data, pads=None):
     """ Plot the given data on the pads of the Micromegas.
 
-    :param data: The data, as an array indexed by pad number.
+    Parameters
+    ----------
+    data : array-like
+        The data to be plotted. This should be a 1-D array with an entry for each pad.
+    pads : array-like, optional
+        The vertices of the pads. If this is not provided, the default pad plane will be generated using
+        `generate_pad_plane`. This can be used for a rotated pad plane, for example.
+
+    Returns
+    -------
+    fig : matplotlib figure
+        The generated figure
     """
+
+    data = numpy.asanyarray(data)
+    pads = numpy.asanyarray(pads)
 
     sm = mpl.cm.ScalarMappable(cmap=pad_cm, norm=LogNorm())
     sm.set_array(data)
@@ -103,8 +119,26 @@ def chamber_plot(data, hits=None, pads=None):
     The data should be four-dimensional. The first three dimensions are the coordinates of the data points, and the
     last dimension should contain the weight (or energy / activation) of the point. This is used for coloring.
 
-    :param data: The data, as an array of [x, y, z, weight]
+    Parameters
+    ----------
+    data : array-like
+        The data to be plotted. The format should be as described above.
+    hits : array-like, optional
+        The hits on the pad plane, as a 1-D array with an entry for each pad. If provided, the hit pads will be
+        drawn on the cathode.
+    pads : array-like, optional
+        The vertices of the pads. If this is not provided, the default pad plane will be generated using
+        `generate_pad_plane`. This can be used for a rotated pad plane, for example.
+
+    Returns
+    -------
+    fig : matplotlib figure
+        The generated figure
     """
+
+    data = numpy.asanyarray(data)
+    hits = numpy.asanyarray(hits)
+    pads = numpy.asanyarray(pads)
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
