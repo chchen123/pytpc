@@ -79,7 +79,6 @@ def pad_plot(data, pads=None):
     """
 
     data = numpy.asanyarray(data)
-    pads = numpy.asanyarray(pads)
 
     sm = mpl.cm.ScalarMappable(cmap=pad_cm, norm=LogNorm())
     sm.set_array(data)
@@ -87,6 +86,8 @@ def pad_plot(data, pads=None):
 
     if pads is None:
         pads = generate_pad_plane()
+    else:
+        pads = numpy.asanyarray(pads)
 
     c = mpl.collections.PolyCollection(pads, facecolors=colors, edgecolors='none')
     cbg = mpl.collections.PolyCollection(pads, facecolors='white', edgecolors='none')
@@ -137,8 +138,6 @@ def chamber_plot(data, hits=None, pads=None):
     """
 
     data = numpy.asanyarray(data)
-    hits = numpy.asanyarray(hits)
-    pads = numpy.asanyarray(pads)
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
