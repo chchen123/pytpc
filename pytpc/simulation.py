@@ -257,7 +257,7 @@ def find_next_state(particle, gas, ef, bf, tstep):
     force = lorentz(vel, ef, bf, charge)
     new_mom = mom + force * tstep
     stopping = gas.energy_loss(particle.energy, particle.mass_num, particle.charge_num)  # in MeV/m
-    de = float(threshold(stopping*pos_step, threshmin=1e-3))
+    de = float(threshold(stopping*pos_step, threshmin=0))
 
     if stopping <= 0 or de == 0:
         new_state = particle.state_vector
@@ -324,13 +324,14 @@ def track(particle, gas, ef, bf):
     azi.append(particle.azimuth)
     pol.append(particle.polar)
 
-    while True:
+    done = False
+    while not done:
         tstep = pos_step / (particle.beta * c_lgt)
         state = find_next_state(particle, gas, ef, bf, tstep)
         particle.state_vector = state
         if particle.energy == 0:
             print('Particle stopped')
-            break
+            done = True
 
         pos.append(particle.position)
         mom.append(particle.momentum)
@@ -343,6 +344,6 @@ def track(particle, gas, ef, bf):
 
         if particle.position[2] > 1 or sqrt(particle.position[0]**2 + particle.position[1]**2) > 0.275:
             print('Particle left chamber')
-            break
+            done = True
 
     return list(map(numpy.array, (pos, mom, time, en, azi, pol)))
