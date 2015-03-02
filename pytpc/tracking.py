@@ -5,14 +5,59 @@ This module contains code to track a particle in data.
 """
 
 from __future__ import division, print_function
-import numpy
+import numpy as np
 from sklearn.cluster import DBSCAN
+from functools import lru_cache
 
 from pytpc.constants import *
 import pytpc.simulation as sim
-
 from pytpc.ukf import UnscentedKalmanFilter as UKF
-#from filterpy.kalman import UnscentedKalmanFilter as UKF
+from pytpc.padplane import generate_pad_plane
+
+
+pads = generate_pad_plane()  # FIXME: Take rotation angle
+pr = np.round(pads)
+
+
+@lru_cache(maxsize=10240)
+def find_adj(p, depth=0):
+    """Recursively finds the neighboring pads to pad `p`.
+
+    This function returns a set of neighboring pad numbers. The neighboring pads are determined by looking for
+    all pads that (approximately) share a vertex with the given pad.
+
+    .. note::
+        Since only vertices are compared, this algorithm will not identify a neighboring pad that only shares a side,
+        and not a vertex.
+
+    The `depth` parameter allows recursion an arbitrary number of times. For instance, if `depth == 1`, the function
+    will return the pads adjacent to pad `p` and those adjacent to its immediate neighbors.
+
+    For efficiency, the results of this function are cached.
+
+    Parameters
+    ----------
+    p : int
+        The pad number whose neighbors you want to find
+    depth : int
+        The number of times to recurse
+
+    Returns
+    -------
+    adj : set
+        The adjacent pads
+
+    """
+    adj = set()
+    for pt in pr[p]:
+        i = np.argwhere(np.any(np.all(np.abs(pr[:, :] - pt) < np.array([2, 2]), axis=-1), axis=-1))
+        adj |= set(i.ravel())
+
+    if depth > 0:
+        for a in adj.copy():
+            adj |= find_adj(a, depth-1)
+
+    return adj
 
 
 def find_tracks(data, eps=20, min_samples=20):
@@ -33,7 +78,7 @@ def find_tracks(data, eps=20, min_samples=20):
     dbs.fit(xyz)
 
     tracks = []
-    for track in (numpy.where(dbs.labels_ == n)[0] for n in numpy.unique(dbs.labels_) if n != -1):
+    for track in (np.where(dbs.labels_ == n)[0] for n in np.unique(dbs.labels_) if n != -1):
         tracks.append(data[track])
 
     return tracks
@@ -47,8 +92,8 @@ class Tracker:
     def __init__(self, particle, gas, efield, bfield, seed):
         self.particle = particle
         self.gas = gas
-        self.efield = numpy.asarray(efield)
-        self.bfield = numpy.asarray(bfield)
+        self.efield = np.asarray(efield)
+        self.bfield = np.asarray(bfield)
         self.kfilter = UKF(dim_x=self.sv_dim, dim_z=self.meas_dim, fx=self.update_state_vector,
                            hx=self.generate_measurement, dtx=self.find_timestep)
 
@@ -73,7 +118,7 @@ class Tracker:
 
         new_state = sim.find_next_state(self.particle, self.gas, self.efield, self.bfield, dt)
         self.particle.state_vector = new_state
-        return numpy.hstack([self.particle.position, self.particle.momentum])
+        return np.hstack([self.particle.position, self.particle.momentum])
 
     def generate_measurement(self, state):
         pos = state[0:3]
@@ -87,14 +132,3 @@ class Tracker:
     def track(self, meas):
         res, covar, times = self.kfilter.batch_filter(meas)
         return res, covar, times
-
-
-if __name__ == '__main__':
-    he_gas = sim.Gas(4, 2, 41.8, 150.)
-    part = sim.Particle(mass_num=4, charge_num=2, energy_per_particle=2., azimuth=pi/5, polar=pi/4)
-    e_field = [0., 0., 15e3]  # V/m
-    b_field = [0., 0., 2.]  # T
-    res_pos, res_azi, res_pol, res_time, res_en = sim.track(part, he_gas, e_field, b_field)
-    tr = Tracker(part, he_gas, e_field, b_field)
-    kf = tr.track(res_pos)
-    print('Finished')
