@@ -22,19 +22,19 @@ class Particle(object):
     """ Describes a beam particle for tracking.
 
     Parameters
-        ----------
-        mass_num : int
-            The A value of the particle (total number of nucleons)
-        charge_num : int
-            The Z value of the particle
-        energy_per_particle : float
-            Energy per nucleon, in MeV/u
-        position : array-like
-            The initial position of the particle
-        azimuth : float
-            The azimuthal angle of the particle's trajectory, in radians
-        polar : float
-            The polar angle of the particle's trajectory, in radians
+    ----------
+    mass_num : int
+        The A value of the particle (total number of nucleons)
+    charge_num : int
+        The Z value of the particle
+    energy_per_particle : float
+        Energy per nucleon, in MeV/u
+    position : array-like
+        The initial position of the particle
+    azimuth : float
+        The azimuthal angle of the particle's trajectory, in radians
+    polar : float
+        The polar angle of the particle's trajectory, in radians
     """
 
     def __init__(self, mass_num, charge_num, energy_per_particle=0, position=(0, 0, 0), azimuth=0, polar=0):

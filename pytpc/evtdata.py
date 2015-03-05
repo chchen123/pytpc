@@ -34,7 +34,7 @@ from __future__ import division, print_function
 import struct
 import numpy
 import os.path
-from .tpcplot import generate_pad_plane
+from pytpc.tpcplot import generate_pad_plane
 from scipy.stats import threshold
 
 
@@ -47,27 +47,22 @@ class EventFile:
     When an event file is first opened, its contents are automatically indexed. The generated lookup table is saved
     in the same directory as the event file, but with the extension ".lookup".
 
-    The events can be accessed with the methods beginning with "read". Additionally, this class supports both
-    iteration and subscripting.
+    The events can be accessed via subscripting and iteration.
+
+    Parameters
+    ----------
+    filename : string, optional
+        If provided, opens the file located at this path. Otherwise, a file can be opened using the `open` method.
     """
 
     def __init__(self, filename=None):
-        """ Initializes and, optionally, opens an event file.
-
-        If a filename is provided, that file will be opened.
-
-        **Arguments**
-
-        filename : string
-            The name of the file to open.
-        """
 
         self.magic = 0x6e7ef11e  # The file's magic number
 
         self.lookup = []
         """A lookup table for the events in the file. This is simply an array of file offsets."""
 
-        self.current_event = 0  #: The current event
+        self.current_event = 0  #: The index of the current event
 
         if filename is not None:
             self.open(filename)
@@ -90,8 +85,8 @@ class EventFile:
         The file's first 4 bytes are compared to the magic value ``0x6e7ef11e`` to check that the file is of the
         correct type.
 
-        **Arguments**
-
+        Parameters
+        ----------
         filename : string
             The name of the file to open
         """
@@ -125,15 +120,15 @@ class EventFile:
 
         See the documentation of the Event File format for details.
 
-        **Arguments**
-
+        Parameters
+        ----------
         tb : int
             The time bucket
         val : int
             The sample
 
-        **Returns**
-
+        Returns
+        -------
         joined : int
             The packed sample
         """
@@ -158,13 +153,13 @@ class EventFile:
     def unpack_sample(packed):
         """Unpacks a packed time bucket / sample pair.
 
-        **Arguments**
-
+        Parameters
+        ----------
         packed : int
             The packed value
 
-        **Returns**
-
+        Returns
+        -------
         tb : int
             The time bucket
         sample : int
@@ -186,14 +181,14 @@ class EventFile:
 
         This is really just a modified version of unpack_sample that works with arrays.
 
-        **Arguments**
-
+        Parameters
+        ----------
         packed : array-like
             The packed values
 
-        **Returns**
-
-        samples : numpy.ndarray
+        Returns
+        -------
+        samples : ndarray
             The sample values, indexed by time bucket
         """
 
@@ -219,9 +214,9 @@ class EventFile:
 
         The position is checked by checking the event magic number ``0xEE``.
 
-        **Returns**
-
-        event : instance of :class:`Event`
+        Returns
+        -------
+        Event
             The read event
         """
 
@@ -282,7 +277,8 @@ class EventFile:
         read_previous() functions to navigate around the file. The table is returned, but it is also assigned to
         self.lookup.
 
-        **Returns**
+        Returns
+        -------
         lookup : list
             The lookup table
         """
@@ -324,8 +320,8 @@ class EventFile:
 
         The file should contain the (integer) file offsets, with one on each line.
 
-        **Arguments**
-
+        Parameters
+        ----------
         filename : string
             The path to the file.
         """
@@ -346,9 +342,9 @@ class EventFile:
         This function reads the next event from the file and increments the self.current_event value. For example,
         if the current_event is 4, then current_event will be set to 5, and event 5 will be read and returned.
 
-        **Returns**
-
-        evt : instance of :class:`Event`
+        Returns
+        -------
+        Event
             The next event in the file
         """
 
@@ -366,9 +362,9 @@ class EventFile:
         This function reads the current event from the file. For example, if the current_event is 4, then event 4
         will be read and returned.
 
-        **Returns**
-
-        evt : instance of :class:`Event`
+        Returns
+        -------
+        Event
             The current event
         """
 
@@ -381,9 +377,9 @@ class EventFile:
         This function reads the previous event from the file and decrements the self.current_event value. For example,
         if the current_event is 4, then current_event will be set to 3, and event 3 will be read and returned.
 
-        **Returns**
-
-        evt : instance of :class:`Event`
+        Returns
+        -------
+        Event
             The previous event from the file
         """
 
@@ -401,14 +397,14 @@ class EventFile:
         This function uses the lookup table to find the requested event in the file, and then reads and returns that
         event. The current_event index is updated to the event number that was requested.
 
-        **Arguments**
-
+        Parameters
+        ----------
         num : int
             The event number to read. This should be an index in the bounds of :attr:`lookup`
 
-        **Returns**
-
-        evt : instance of :class:`Event`
+        Returns
+        -------
+        Event
             The requested event from the file
         """
 
@@ -466,18 +462,17 @@ class Event:
     """ Represents an event from an :class:`EventFile`.
 
     The event is represented as a numpy array with a complex dtype.
+
+    Parameters
+    ----------
+    evt_id : int
+            The event ID
+    timestamp : int
+        The event timestamp
     """
 
     def __init__(self, evt_id=0, timestamp=0):
-        """ Initialize a new event.
 
-        **Arguments**
-
-        evt_id : int
-            The event ID
-        timestamp : int
-            The event timestamp
-        """
         assert (evt_id >= 0)
         assert (timestamp >= 0)
 
@@ -501,13 +496,15 @@ class Event:
         return s.format(id=self.evt_id, ts=self.timestamp, tr=len(self.traces))
 
     def hits(self):
-        """ Calculate the total activation of each pad.
+        """Calculate the total activation of each pad.
 
-        The activation is calculated by summing the activation for all time buckets in each channel.
+        The activation is calculated by summing the activation for all time buckets in each channel. This produces
+        something similar to the mesh trace that we monitor during experiments.
 
-        **Returns**
+        Returns
+        -------
 
-        hits : numpy.ndarray
+        hits : ndarray
             An array of hits, indexed by pad number
         """
 
@@ -521,24 +518,24 @@ class Event:
         return flat_hits
 
     def xyzs(self, drift_vel=None, clock=None, pads=None, peaks_only=False):
-        """ Find the scatter points of the event in space.
+        """Find the scatter points of the event in space.
 
         If a drift velocity and write clock frequency are provided, then the result gives the z dimension in
         meters. Otherwise, the z dimension is measured in time buckets.
 
-        **Arguments**
-
-        drift_vel : int or float
+        Parameters
+        ----------
+        drift_vel : int or float, optional
             The drift velocity in the detector, in cm/us
-
-        clock : int or float
+        clock : int or float, optional
             The write clock rate, in MHz
+        pads : ndarray, optional
+            An array of pad vertices. If provided, these pads will be used instead of the default pad plane.
+        peaks_only : bool, optional
+            If True, only the peak of each activation curve will be used.
 
-        pads : ndarray
-            An array of pad vertices
-
-        **Returns**
-
+        Returns
+        -------
         xyzs : numpy.ndarray
             A 4D array of points including (x, y, tb or z, activation)
         """
@@ -571,16 +568,19 @@ class Event:
 def calibrate_z(data, drift_vel, clock):
     """Calibrate the z values by converting from a time bucket to a position.
 
-    **Arguments**
-
+    Parameters
+    ----------
     data : ndarray, int, float
         The uncalibrated data, in time bucket values
-
     drift_vel : int, float
         The drift velocity in the gas, in cm/us
-
     clock : int, float
         The CoBo write clock frequency, in MHz
+
+    Return
+    ------
+    ndarray or int or float
+        The calibrated z values
 
     """
     return drift_vel * data / clock * 10  # 1 cm/(us.MHz) = 1 cm = 10 mm
@@ -591,24 +591,21 @@ def uncalibrate_z(data, drift_vel, clock):
 
     The can be useful to calculate times for plotting.
 
-    **Arguments**
-
+    Parameters
+    ----------
     data : ndarray, int, float
         The calibrated z positions
-
     drift_vel : int, float
         The drift velocity in the gas, in cm/us
-
     clock : int, float
         The CoBo write clock frequency, in MHz
+
+    Returns
+    -------
+    ndarray or int or float
+        The time buckets
     """
     return data * clock / (10 * drift_vel)
-
-
-def tb_average(data):
-    data = numpy.asanyarray(data)
-
-
 
 
 def load_pedestals(filename):
@@ -616,14 +613,14 @@ def load_pedestals(filename):
 
     The pedestals file should be in CSV format, and the columns should be cobo, asad, aget, and channel.
 
-    **Arguments**
-
+    Parameters
+    ----------
     filename : string
         The name of the file containing the pedestals.
 
-    **Returns**
-
-    peds : numpy.ndarray
+    Returns
+    -------
+    peds : ndarray
         The pedestals, in a 4D array with the same indices as above.
     """
 
@@ -641,14 +638,14 @@ def load_pedestals(filename):
 def load_padmap(filename):
     """Loads pad mapping from the provided file.
 
-    **Arguments**
-
+    Parameters
+    ----------
     filename : string
         The name of the file containing the pad mapping
 
-    **Returns**
-
-    pm : dictionary
+    Returns
+    -------
+    pm : dict
         The pad mapping as {(cobo, asad, aget, ch): pad}
     """
 
@@ -671,6 +668,13 @@ class Error(Exception):
 class FilePosError(Error):
     """Raised when data is read from a file whose read pointer does not seem
     to be in the correct position.
+
+    Parameters
+    ----------
+    filename : string
+        The name of the file
+    details : string, optional
+        More details about the error
     """
 
     def __init__(self, filename, details=""):
