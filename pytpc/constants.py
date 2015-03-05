@@ -23,3 +23,5 @@ num_iters = 100
 MeVtokg = 1e6 * e_chg / c_lgt**2
 amuTokg = 1.66054e-27
 amuToMeV = 931.494
+
+degrees = pi / 180.

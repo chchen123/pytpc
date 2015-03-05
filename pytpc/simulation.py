@@ -7,13 +7,15 @@ Contains code for simulating the tracking of particles in a TPC.
 """
 
 from __future__ import division, print_function
-import numpy
-from math import atan2, log, sin, cos, sqrt
+import numpy as np
+from math import atan2, sin, cos, sqrt
 
 import copy
 
 from pytpc.constants import *
 import pytpc.relativity as rel
+from pytpc.padplane import generate_pad_plane, inner_rad, inner_tri_base, inner_tri_height, tri_base, tri_height
+from pytpc.utilities import skew_matrix, rot_matrix
 
 
 class Particle(object):
@@ -40,10 +42,10 @@ class Particle(object):
         self._mass = mass_num * p_mc2
         self.charge_num = charge_num
         self.charge = charge_num * e_chg
-        self.position = numpy.array(position)
+        self.position = np.array(position)
         self._energy = energy_per_particle * self.mass_num
         self._mom_mag = sqrt((self._energy + self.mass)**2 - self.mass**2)
-        self._momentum = self._mom_mag * numpy.array([cos(azimuth) * sin(polar),
+        self._momentum = self._mom_mag * np.array([cos(azimuth) * sin(polar),
                                                       sin(azimuth) * sin(polar),
                                                       cos(polar)])
 
@@ -55,7 +57,7 @@ class Particle(object):
     @momentum.setter
     def momentum(self, new):
         self._momentum = new
-        self._mom_mag = numpy.linalg.norm(new)
+        self._mom_mag = np.linalg.norm(new)
         self._energy = sqrt(self._mom_mag**2 + self.mass**2) - self.mass
 
     @property
@@ -87,7 +89,7 @@ class Particle(object):
     @energy.setter
     def energy(self, new):
         self._mom_mag = sqrt((new + self.mass)**2 - self.mass**2)
-        self._momentum = self._mom_mag * numpy.array([cos(self.azimuth) * sin(self.polar),
+        self._momentum = self._mom_mag * np.array([cos(self.azimuth) * sin(self.polar),
                                                       sin(self.azimuth) * sin(self.polar),
                                                       cos(self.polar)])
         self._energy = sqrt(self._mom_mag**2 + self.mass**2) - self.mass
@@ -155,7 +157,7 @@ class Particle(object):
 
         Setting to this will update every other property automatically.
         """
-        return numpy.hstack([self.position, self.momentum])
+        return np.hstack([self.position, self.momentum])
 
     @state_vector.setter
     def state_vector(self, new):
@@ -199,7 +201,7 @@ def lorentz(vel, ef, bf, charge):
     fy = charge * (ey + vz*bx - vx*bz)
     fz = charge * (ez + vx*by - vy*bx)
 
-    return numpy.array([fx, fy, fz])
+    return np.array([fx, fy, fz])
 
 
 def threshold(value, threshmin=0.):
@@ -346,4 +348,112 @@ def track(particle, gas, ef, bf):
             print('Particle left chamber')
             done = True
 
-    return list(map(numpy.array, (pos, mom, time, en, azi, pol)))
+    return list(map(np.array, (pos, mom, time, en, azi, pol)))
+
+
+_leftskewmat = skew_matrix(-60.*degrees)
+_rightskewmat = skew_matrix(60.*degrees)
+_rotneg120mat = rot_matrix(-120*degrees)
+_rotpos120mat = rot_matrix(120*degrees)
+_rotneg240mat = rot_matrix(-240*degrees)
+_rotpos240mat = rot_matrix(240*degrees)
+_idmat = np.eye(2)
+
+
+def _two_pt_line(x, x1, y1, x2, y2):
+
+    return (y2-y1)/(x2-x1) * (x-x1) + y1
+
+# NOTE: The function below does not work, but I'm keeping it here as a starting point
+#
+# def find_pad_coords_vec(x, y):
+#
+#     coords = np.vstack((x, y)).T  # Make x-y pairs
+#
+#     # Which third? Rotate if necessary
+#     angle = np.arctan2(y, x) + np.where(y < 0, 2*pi, 0)
+#
+#     trans = np.zeros((coords.shape[0], 2, 2))
+#     trans_temp = np.where(np.logical_and(120*degrees <= angle, angle < 240*degrees), _rotneg120mat, 0)
+#     trans += trans_temp
+#     trans_temp = np.where(angle >= 240*degrees, _rotneg240mat, 0)
+#     trans += trans_temp
+#     trans_temp = np.where(angle < 120*degrees, _idmat, 0)
+#     trans += trans_temp
+#
+#     trans_inv = np.zeros((coords.shape[0], 2, 2))
+#     trans_temp = np.where(np.logical_and(120*degrees <= angle, angle < 240*degrees), _rotpos120mat, 0)
+#     trans_inv += trans_temp
+#     trans_temp = np.where(angle >= 240*degrees, _rotpos240mat, 0)
+#     trans_inv += trans_temp
+#     trans_temp = np.where(angle < 120*degrees, _idmat, 0)
+#     trans_inv += trans_temp
+#     del trans_temp
+#
+#     rot = np.tensordot(trans, coords, axes=(2, 1))
+#
+#     rect = np.tensordot(_rightskewmat, rot, axes=(2, 1))
+#
+#     b = np.where(np.logical_and(np.abs(rect[:, 0]) < inner_rad * tri_base, np.abs(rect[:, 1]) < inner_rad * tri_height),
+#                  inner_tri_base, tri_base)
+#     h = np.where(b == inner_tri_base, inner_tri_height, tri_height)
+#     t = np.vstack((b, h)).T
+#
+#     v1 = np.floor(rect / t) * t
+#     v2 = v1 + t
+#
+#     tpl = _two_pt_line(rect[:, 0], v1[:, 0], v1[:, 1], v2[:, 0], v2[:, 1])
+#     harr = np.zeros_like(t)
+#     harr[:, 1] = h
+#     barr = np.zeros_like(t)
+#     barr[:, 0] = b
+#
+#     v3 = np.where(rect[1] > tpl, v1 + harr, v1 + barr)
+#
+#     res = np.tensordot(_leftskewmat, (v1+v2+v3)/3, axes=(2, 1))
+#     res = np.tensordot(trans_inv, res)
+#     return res
+
+
+def find_pad_coords(x, y):
+
+    coords = np.array([x, y])
+
+    # Which third? Rotate if necessary
+    angle = atan2(y, x)
+    if y < 0:
+        angle += 2*pi
+
+    if 120*degrees <= angle < 240*degrees:
+        rot = np.dot(_rotneg120mat, coords)
+        finalrot = _rotpos120mat
+    elif angle >= 240*degrees:
+        rot = np.dot(_rotneg240mat, coords)
+        finalrot = _rotpos240mat
+    else:
+        rot = coords
+        finalrot = _idmat
+
+    rect = np.dot(_rightskewmat, rot)
+
+    # Inner or outer?
+    if abs(rect[0]) < inner_rad * tri_base and abs(rect[1]) < inner_rad * tri_height:
+        b = inner_tri_base
+        h = inner_tri_height
+        t = np.array([b, h])
+    else:
+        b = tri_base
+        h = tri_height
+        t = np.array([b, h])
+
+    v1 = np.floor(rect / t) * t
+    v2 = v1 + t
+
+    if rect[1] > _two_pt_line(rect[0], v1[0], v1[1], v2[0], v2[1]):
+        v3 = v1 + np.array([0, h])
+    else:
+        v3 = v1 + np.array([b, 0])
+
+    res = np.dot(_leftskewmat, (v1+v2+v3)/3)
+    res = np.dot(finalrot, res)
+    return res
