@@ -3,3 +3,6 @@ workspace.xml
 doc/_build
 __pycache__
 *.pyc
+build/
+dist/
+*egg*
