@@ -13,7 +13,7 @@ from numpy.linalg import cholesky, inv
 
 
 class UnscentedKalmanFilter(object):
-    """Represents an unscented Kalman filter, as defined by [1]_.
+    """Represents an unscented Kalman filter.
 
     Parameters
     ----------
@@ -33,10 +33,14 @@ class UnscentedKalmanFilter(object):
 
     Attributes
     ----------
-    Q
-    R
-    P
-    x
+    Q : ndarray
+        The process noise matrix
+    R : ndarray
+        The measurement noise matrix
+    P : ndarray
+        The estimated covariance matrix of the state vector
+    x : ndarray
+        The state vector estimate
 
     References
     ----------

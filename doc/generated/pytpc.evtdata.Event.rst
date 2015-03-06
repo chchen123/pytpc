@@ -9,8 +9,7 @@ pytpc.evtdata.Event
 
    .. autosummary::
       :toctree:
-   
-      ~Event.__init__
+
       ~Event.hits
       ~Event.xyzs
    

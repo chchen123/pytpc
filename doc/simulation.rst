@@ -1,12 +1,24 @@
-Simulation
-==========
+..  currentmodule:: pytpc
 
-The motion of a particle through the detector can be simulated using the simulation.py module.
+Physics Model and Simulation of Tracks -- `simulation`
+======================================================
 
-Classes
--------
-.. autoclass:: pytpc.simulation.Gas
-    :members:
+This module establishes the physics model used by the Kalman filter, and can also be used to produce simulated particle
+tracks. This is useful for testing.
 
-.. autoclass:: pytpc.simulation.Particle
-    :members:
+..  rubric:: Classes
+
+..  autosummary::
+    :toctree: generated/
+
+    simulation.Particle
+
+..  rubric:: Functions
+
+..  autosummary::
+    :toctree: generated/
+
+    simulation.track
+    simulation.find_next_state
+    simulation.lorentz
+    simulation.threshold

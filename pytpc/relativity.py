@@ -11,14 +11,19 @@ from math import sqrt
 
 
 def gamma(v):
-    r"""Returns gamma.
+    r"""Calculates the Lorentz gamma factor.
 
-    Gamma is defined as :math:`\gamma = \frac{1}{\sqrt{1-\beta^2}}` where :math:`\beta = \frac{v}{c}`.
+    Gamma is defined as 1 / sqrt(1 - beta**2) where beta = v / c.
 
-    **Arguments**
-
+    Parameters
+    ----------
     v : array-like or number
-        the velocity
+        The velocity
+
+    Raises
+    ------
+    ValueError
+        If the magnitude of `v` is greater than the speed of light.
     """
     vmag = numpy.linalg.norm(v)
     if vmag >= c_lgt:
@@ -27,18 +32,21 @@ def gamma(v):
 
 
 def beta(en, mass):
-    """ Returns beta, or :math:`v / c`.
+    """Returns beta, or v / c.
 
     The arguments should be in compatible units.
 
-    **Arguments**
-
+    Parameters
+    ----------
     en : int or float
-        the relativistic kinetic energy
+        The relativistic kinetic energy
     mass : int or float
-        the rest mass
+        The rest mass
 
-    :param int en: the energy
+    Raises
+    ------
+    ValueError
+        If mass and energy are zero.
     """
     if en < 0.0 or mass < 0.0:
         raise ValueError('mass and energy must be positive')

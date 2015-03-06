@@ -53,6 +53,20 @@ class EventFile:
     ----------
     filename : string, optional
         If provided, opens the file located at this path. Otherwise, a file can be opened using the `open` method.
+
+    Attributes
+    ----------
+    magic : int
+        The magic number of the file, used to make sure we've opened a file of the correct type. Its value
+        is `0x6e7ef11e`.
+    lookup : list
+        A lookup table indexing the offset of each event in the file. This is generated automatically.
+    current_event : int
+        The current event number, or which event the file pointer is at.
+    is_open : bool
+        Whether a file is currently open
+    fp : file
+        The file object itself
     """
 
     def __init__(self, filename=None):
@@ -459,16 +473,29 @@ class EventFile:
 
 
 class Event:
-    """ Represents an event from an :class:`EventFile`.
+    """Represents an event from an event file.
 
     The event is represented as a numpy array with a complex dtype.
 
     Parameters
     ----------
     evt_id : int
-            The event ID
+        The event ID
     timestamp : int
         The event timestamp
+
+    Attributes
+    ----------
+    evt_id : int
+        The event ID
+    timestamp : int
+        The event timestamp
+    dt : numpy.dtype
+        The datatype used for the ndarray storing the traces. This defines fields `cobo`, `asad`, `aget`, `channel`,
+        `pad`, and `data`. The `data` is an array of samples indexed by time bucket.
+    traces : ndarray
+        The event data. The datatype is given above.
+
     """
 
     def __init__(self, evt_id=0, timestamp=0):
@@ -503,7 +530,6 @@ class Event:
 
         Returns
         -------
-
         hits : ndarray
             An array of hits, indexed by pad number
         """
