@@ -25,10 +25,19 @@ def create_triangle(x_offset, y_offset, side, orient):
 def generate_pad_plane(rotation_angle=None):
     """ Generates a list of the vertices of the pads on the pad plane.
 
-    **Arguments**
+    The pads themselves are (approximately) equilateral triangles. The first and last vertices
+    represent the ends of the base of the triangle, and the middle vertex is the tip. The points
+    are given as [x, y] pairs. The pads are listed in order of increasing pad number.
 
+    Parameters
+    ----------
     rotation_angle : int or float
         The angle (in rad) by which to rotate the result. This is useful if the micromegas is not right-side-up.
+
+    Returns
+    -------
+    pads : ndarray
+        A list of vertices of the pads.
     """
 
     small_z_spacing = 2 * 25.4 / 1000
@@ -142,17 +151,17 @@ def generate_pad_plane(rotation_angle=None):
 
 pads = generate_pad_plane()
 
-pad_height = pads[0, 1, 1] - pads[0, 0, 1]
-inner_pad_height = pads[50, 1, 1] - pads[50, 0, 1]
-pad_base = pads[0, 2, 0] - pads[0, 0, 0]
-inner_pad_base = pads[50, 2, 0] - pads[50, 0, 0]
-xgap = pads[153, 0, 0] - pads[152, 1, 0]
-ygap = pads[152, 0, 1] - pads[5272, 0, 1]
+pad_height = pads[0, 1, 1] - pads[0, 0, 1]  #: The height of an outer pad
+inner_pad_height = pads[50, 1, 1] - pads[50, 0, 1]  #: The height of an inner pad
+pad_base = pads[0, 2, 0] - pads[0, 0, 0]  #: The base of an outer pad
+inner_pad_base = pads[50, 2, 0] - pads[50, 0, 0]  #: The base of an inner pad
+xgap = pads[153, 0, 0] - pads[152, 1, 0]  #: The horizontal gap between adjacent pads
+ygap = pads[152, 0, 1] - pads[5272, 0, 1]  #: The vertical gap between adjacent pads
 
-tri_height = pad_height + ygap
-tri_base = pad_base + 2. * xgap
-inner_tri_base = tri_base / 2.
-inner_tri_height = tri_height / 2.
+tri_height = pad_height + ygap  #: The height of an outer pad, including the gap
+tri_base = pad_base + 2. * xgap  #: The base of an outer pad, including the gap
+inner_tri_base = tri_base / 2.  #: The base of an inner pad, including the gap
+inner_tri_height = tri_height / 2.  #: The height of an inner pad, including the gap
 
 inner_rad = 16
 

@@ -3,8 +3,11 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to PyTPC's documentation!
-=================================
+PyTPC Documentation
+===================
+
+PyTPC provides Python modules for reading, analyzing, and fitting data from the AT-TPC at the
+`NSCL <http://nscl.msu.edu>`_.
 
 Contents:
 
@@ -13,16 +16,14 @@ Contents:
 
    evtdata
    tpcplot
-   relativity
    simulation
    ukf
-
-
+   gases
+   misc
 
 Indices and tables
 ==================
 
 * :ref:`genindex`
-* :ref:`modindex`
 * :ref:`search`
 
