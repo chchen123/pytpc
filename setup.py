@@ -7,5 +7,5 @@ setup(name='pytpc',
       author_email='bradt@nscl.msu.edu',
       modules=['pytpc/tracking.py', 'pytpc/simulation.py', 'pytpc/constants.py',
                'pytpc/evtdata.py', 'pytpc/kalman.py', 'pytpc/tpcplot.py', 'pytpc/runtables.py'],
-      requires=['numpy', 'matplotlib', 'filterpy', 'scikit-learn', 'scipy']
+      requires=['numpy', 'matplotlib', 'filterpy', 'scikit-learn', 'scipy', 'seaborn']
       )
