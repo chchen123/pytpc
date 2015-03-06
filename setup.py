@@ -7,5 +7,5 @@ setup(name='pytpc',
       author_email='bradt@nscl.msu.edu',
       packages=['pytpc'],
       install_requires=['numpy', 'matplotlib', 'filterpy', 'scipy', 'scikit-learn', 'seaborn', 'sphinx',
-                        'sphinx_bootstrap_theme'],
+                        'sphinx-bootstrap-theme'],
       )
