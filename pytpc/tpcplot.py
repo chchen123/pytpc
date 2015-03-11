@@ -121,7 +121,7 @@ def pad_plot(data, pads=None, scale='log'):
     return fig
 
 
-def chamber_plot(data, hits=None, pads=None):
+def chamber_plot(data, hits=None, pads=None, zscale='time'):
     """ Plot the given data in 3D.
 
     The data should be four-dimensional. The first three dimensions are the coordinates of the data points, and the
@@ -137,6 +137,8 @@ def chamber_plot(data, hits=None, pads=None):
     pads : array-like, optional
         The vertices of the pads. If this is not provided, the default pad plane will be generated using
         `generate_pad_plane`. This can be used for a rotated pad plane, for example.
+    zscale : string, optional
+        The type of data to be plotted on the z axis. Options are ['time', 'dist'].
 
     Returns
     -------
@@ -146,13 +148,20 @@ def chamber_plot(data, hits=None, pads=None):
 
     data = numpy.asanyarray(data)
 
+    if zscale is 'time':
+        zmax = 512
+    elif zscale is 'dist':
+        zmax = 1000  # FIXME: Change these units to be consistent with simulation (m)
+    else:
+        raise ValueError('invalid zscale: {}'.format(zscale))
+
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.set_axis_bgcolor('none')
     ax.view_init(azim=0, elev=15)
     ax.set_xlim(-250, 250)
     ax.set_ylim(-250, 250)
-    ax.set_zlim(0, 512)
+    ax.set_zlim(0, zmax)
     sc = ax.scatter(data[:, 0], data[:, 1], data[:, 2], marker='.', linewidth=0, s=2, cmap=ch_cm,
                     norm=LogNorm(), c=data[:, 3])
 
@@ -161,7 +170,7 @@ def chamber_plot(data, hits=None, pads=None):
     cathode = mpl.patches.CirclePolygon((0, 0), radius=250, resolution=50)
     ends = mpl.collections.PolyCollection([anode.get_verts(), cathode.get_verts()],
                                           facecolors=['#c4cccc', 'none'], edgecolors=['none', 'black'])
-    ax.add_collection3d(ends, zs=[0, 511])
+    ax.add_collection3d(ends, zs=[0, zmax-1])
 
     if hits is not None:
         pads = _generate_pad_collection(hits, pads)
