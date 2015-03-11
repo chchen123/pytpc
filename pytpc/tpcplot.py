@@ -18,6 +18,7 @@ import mpl_toolkits.mplot3d.art3d as art3d
 import seaborn as sns
 
 from pytpc.padplane import generate_pad_plane
+from pytpc.utilities import numpyize
 
 
 # Define colormaps for the plots
@@ -222,5 +223,96 @@ def event_view(evt, pads=None):
     pdax.add_collection(bg_pads)
     pdax.add_collection(hit_pads)
 
+
+    return fig
+
+
+@numpyize
+def state_vector_plots(x_act=None, act=None, x_calc=None, calc=None, x_data=None, data=None, covar=None):
+    """Plot the state vectors and compare them to the data.
+
+    This would mainly be used to see the results of the fit.
+
+    Each set of parameters is optional, but if one y parameter is included, its corresponding x parameter must also
+    be present. For instance, if `calc` is provided, then `x_calc` must also be provided.
+
+    Parameters
+    ----------
+    x_act : array-like, optional
+        x values of the actual state vector
+    act : array-like, optional
+        actual state vector
+    x_calc : array-like, optional
+        x values of calculated state vector
+    calc : array-like, optional
+        the calculated state vector
+    x_data : array-like, optional
+        x values of the data
+    data : array-like, optional
+        measured data points
+    covar : array-like, optional
+        the covariance matrix of the fit
+
+    Returns
+    -------
+    figure
+        The state vector plots
+    """
+    fig, ax = plt.subplots(3, 2)
+    fig.set_figheight(15)
+    fig.set_figwidth(15)
+
+    blue = sns.xkcd_rgb['denim blue']
+    red = sns.xkcd_rgb['crimson']
+    purple = sns.xkcd_rgb['amethyst']
+
+    if x_act is not None and act is not None:
+        ax[0, 0].plot(x_act, act[:, 0], color=blue, label='Actual', zorder=2)
+        ax[1, 0].plot(x_act, act[:, 1], color=blue, label='Actual', zorder=2)
+        ax[2, 0].plot(x_act, act[:, 2], color=blue, label='Actual', zorder=2)
+        ax[0, 1].plot(x_act, act[:, 3], color=blue, label='Actual', zorder=2)
+        ax[1, 1].plot(x_act, act[:, 4], color=blue, label='Actual', zorder=2)
+        ax[2, 1].plot(x_act, act[:, 5], color=blue, label='Actual', zorder=2)
+
+    if calc is not None and x_calc is not None:
+        ax[0, 0].plot(x_calc, calc[:, 0], color=purple, label='Calculated', zorder=3)
+        ax[1, 0].plot(x_calc, calc[:, 1], color=purple, label='Calculated', zorder=3)
+        ax[2, 0].plot(x_calc, calc[:, 2], color=purple, label='Calculated', zorder=3)
+        ax[0, 1].plot(x_calc, calc[:, 3], color=purple, label='Calculated', zorder=3)
+        ax[1, 1].plot(x_calc, calc[:, 4], color=purple, label='Calculated', zorder=3)
+        ax[2, 1].plot(x_calc, calc[:, 5], color=purple, label='Calculated', zorder=3)
+
+    if data is not None and x_data is not None:
+        ax[0, 0].plot(x_data, data[:, 0], '.', markersize=4, color=red, label='Data', zorder=1, alpha=0.5)
+        ax[1, 0].plot(x_data, data[:, 1], '.', markersize=4, color=red, label='Data', zorder=1, alpha=0.5)
+        ax[2, 0].plot(x_data, data[:, 2], '.', markersize=4, color=red, label='Data', zorder=1, alpha=0.5)
+
+    if covar is not None:
+        ubd = calc + numpy.sqrt(numpy.diagonal(covar, axis1=1, axis2=2))
+        lbd = calc - numpy.sqrt(numpy.diagonal(covar, axis1=1, axis2=2))
+        ax[0, 0].fill_between(x_calc, ubd[:, 0], lbd[:, 0], color=purple, alpha=0.3, zorder=0)
+        ax[1, 0].fill_between(x_calc, ubd[:, 1], lbd[:, 1], color=purple, alpha=0.3, zorder=0)
+        ax[2, 0].fill_between(x_calc, ubd[:, 2], lbd[:, 2], color=purple, alpha=0.3, zorder=0)
+        ax[0, 1].fill_between(x_calc, ubd[:, 3], lbd[:, 3], color=purple, alpha=0.3, zorder=0)
+        ax[1, 1].fill_between(x_calc, ubd[:, 4], lbd[:, 4], color=purple, alpha=0.3, zorder=0)
+        ax[2, 1].fill_between(x_calc, ubd[:, 5], lbd[:, 5], color=purple, alpha=0.3, zorder=0)
+
+    ax[0, 0].set_ylabel('x [m]')
+    ax[0, 0].legend(loc='best')
+
+    ax[1, 0].set_ylabel('y [m]')
+    ax[1, 0].legend(loc='best')
+
+    ax[2, 0].set_ylabel('z [m]')
+    ax[2, 0].legend(loc='best')
+
+    ax[0, 1].set_ylabel('px [MeV/c]')
+    ax[0, 1].legend(loc='best')
+
+    ax[1, 1].set_ylabel('py [MeV/c]')
+    ax[1, 1].legend(loc='best')
+
+    ax[2, 1].set_ylabel('pz [MeV/c]')
+    ax[2, 1].legend(loc='best')
 
     return fig
