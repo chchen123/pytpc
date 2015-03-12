@@ -107,6 +107,15 @@ class TestParticle(unittest.TestCase):
         self.p.momentum_si = mom
         nptest.assert_allclose(self.p.velocity, vel)
 
+    def test_azimuth_setter(self):
+        self.p.azimuth = pi/24
+        self.assertAlmostEqual(self.p.azimuth, pi/24, delta=1e-3)
+
+    def test_polar_setter(self):
+        self.p.polar = pi/24
+        self.assertAlmostEqual(self.p.polar, pi/24, delta=1e-3)
+
+
 class TestLorentz(unittest.TestCase):
     """Tests for sim.lorentz function"""
 

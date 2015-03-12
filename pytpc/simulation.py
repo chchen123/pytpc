@@ -75,11 +75,27 @@ class Particle(object):
         px, py, pz = self.momentum
         return atan2(py, px)
 
+    @azimuth.setter
+    def azimuth(self, new):
+        azi = new
+        pol = self.polar
+        self._momentum = self._mom_mag * np.array([cos(azi) * sin(pol),
+                                                   sin(azi) * sin(pol),
+                                                   cos(pol)])
+
     @property
     def polar(self):
         """The polar angle of the trajectory in radians"""
         px, py, pz = self.momentum
         return atan2(sqrt(px**2 + py**2), pz)
+
+    @polar.setter
+    def polar(self, new):
+        azi = self.azimuth
+        pol = new
+        self._momentum = self._mom_mag * np.array([cos(azi) * sin(pol),
+                                                   sin(azi) * sin(pol),
+                                                   cos(pol)])
 
     @property
     def energy(self):
