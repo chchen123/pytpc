@@ -296,24 +296,22 @@ def track(particle, gas, ef, bf):
 
     Returns
     -------
-    pos : ndarray
-        The position of the particle at each step
-    mom : ndarray
-        The momentum at each step
-    time : ndarray
-        The time at each step
-    en : ndarray
-        The energy per particle at each step
-    azi : ndarray
-        The azimuthal angle of the trajectory at each step
-    pol : ndarray
-        The polar angle of the trajectory at each step
+    dict
+        The results, as a dictionary. The keys in this dictionary are shown below.
+            - pos: The position of the particle at each step
+            - mom: The momentum at each step
+            - time: The time at each step
+            - en: The energy per particle at each step
+            - de: The change in energy at each step
+            - azi: The azimuthal angle of the trajectory at each step
+            - pol: The polar angle of the trajectory at each step
 
     """
     pos = []
     mom = []
     time = []
     en = []
+    de = []
     azi = []
     pol = []
 
@@ -323,6 +321,7 @@ def track(particle, gas, ef, bf):
     mom.append(particle.momentum)
     time.append(current_time)
     en.append(particle.energy_per_particle)
+    de.append(0.0)
     azi.append(particle.azimuth)
     pol.append(particle.polar)
 
@@ -338,6 +337,7 @@ def track(particle, gas, ef, bf):
         pos.append(particle.position)
         mom.append(particle.momentum)
         en.append(particle.energy_per_particle)
+        de.append(en[-2] - en[-1])
         azi.append(particle.azimuth)
         pol.append(particle.polar)
 
@@ -348,7 +348,10 @@ def track(particle, gas, ef, bf):
             print('Particle left chamber')
             done = True
 
-    return list(map(np.array, (pos, mom, time, en, azi, pol)))
+    res_keys = ['pos', 'mom', 'time', 'en', 'de', 'azi', 'pol']
+    res_vals = map(np.array, (pos, mom, time, en, de, azi, pol))
+
+    return dict(zip(res_keys, res_vals))
 
 
 _leftskewmat = skew_matrix(-60.*degrees)
