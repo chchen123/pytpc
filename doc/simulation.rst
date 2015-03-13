@@ -22,3 +22,4 @@ tracks. This is useful for testing.
     simulation.find_next_state
     simulation.lorentz
     simulation.threshold
+    simulation.drift_velocity_vector

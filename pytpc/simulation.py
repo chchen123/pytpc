@@ -476,3 +476,37 @@ def find_pad_coords(x, y):
     res = np.dot(_leftskewmat, (v1+v2+v3)/3)
     res = np.dot(finalrot, res)
     return res
+
+
+def drift_velocity_vector(vd, efield, bfield, tilt):
+    """Returns the drift velocity vector.
+
+    This includes the effects due to the Lorentz angle from the non-parallel electric and magnetic fields.
+
+    Parameters
+    ----------
+    vd : number
+        The drift velocity
+    efield : number
+        The electric field magnitude, in SI units
+    bfield : number
+        The magnetic field magnitude, in Tesla
+    tilt : number
+        The angle between the electric and magnetic fields, in radians
+
+    Returns
+    -------
+    ndarray
+        The drift velocity vector
+
+    """
+
+    ot = bfield / efield * vd  # omega * tau in formula
+
+    front = vd / (1 + ot**2)
+
+    xcomp = -front * ot * sin(tilt)
+    ycomp = front * ot**2 * cos(tilt) * sin(tilt)
+    zcomp = front * (1 + ot**2 * cos(tilt)**2)
+
+    return np.array([xcomp, ycomp, zcomp])

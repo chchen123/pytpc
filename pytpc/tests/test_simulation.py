@@ -180,5 +180,36 @@ class TestThreshold(unittest.TestCase):
     def test_equal(self):
         self.assertEqual(sim.threshold(10., 10.), 10.)
 
+
+class TestDriftVelocityVector(unittest.TestCase):
+    """Tests for drift_velocity_vector"""
+
+    def setUp(self):
+        self.vd = 5
+        self.bfield = 10
+        self.efield = 2
+        self.tilt = 10*degrees
+        self.ot = self.bfield / self.efield * self.vd
+
+    def test_zero_angle(self):
+        vdv = sim.drift_velocity_vector(self.vd, self.efield, self.bfield, 0)
+        self.assertEqual(vdv[0], 0.)
+        self.assertEqual(vdv[1], 0.)
+
+    def test_no_bfield(self):
+        vdv = sim.drift_velocity_vector(self.vd, self.efield, 0, self.tilt)
+        self.assertEqual(vdv[0], 0.)
+        self.assertEqual(vdv[1], 0.)
+
+    def test_perpendicular(self):
+        vdv = sim.drift_velocity_vector(self.vd, self.efield, self.bfield, pi/2)
+        xcomp = -self.vd / (1 + self.ot**2) * self.ot
+        ycomp = 0.0
+        zcomp = self.vd / (1 + self.ot**2)
+        self.assertAlmostEqual(vdv[0], xcomp)
+        self.assertAlmostEqual(vdv[1], ycomp)
+        self.assertAlmostEqual(vdv[2], zcomp)
+
+
 if __name__ == '__main__':
     unittest.main()
