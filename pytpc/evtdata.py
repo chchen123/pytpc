@@ -551,8 +551,9 @@ class Event:
 
         Parameters
         ----------
-        drift_vel : int or float, optional
-            The drift velocity in the detector, in cm/us
+        drift_vel : number or array-like
+            The drift velocity in the detector, in cm/us. This can be the scalar magnitude or a vector. A vectorial
+            drift velocity can be used to correct for the Lorentz angle.
         clock : int or float, optional
             The write clock rate, in MHz
         pads : ndarray, optional
@@ -564,6 +565,10 @@ class Event:
         -------
         xyzs : numpy.ndarray
             A 4D array of points including (x, y, tb or z, activation)
+
+        See also
+        --------
+        pytpc.simulation.drift_velocity_vector
         """
 
         if peaks_only:
@@ -584,22 +589,28 @@ class Event:
         zs = nz[1].reshape(nz[1].shape[0], 1)
         cs = self.traces['data'][nz].reshape(nz[0].shape[0], 1)
 
+        xyzs = numpy.hstack((xys, zs, cs))
+
         if drift_vel is not None and clock is not None:
-            zs = calibrate_z(zs, drift_vel, clock)
+            xyzs = calibrate(xyzs, drift_vel, clock)
 
-        result = numpy.hstack((xys, zs, cs))
-        return result
+        return xyzs
 
 
-def calibrate_z(data, drift_vel, clock):
-    """Calibrate the z values by converting from a time bucket to a position.
+def calibrate(data, drift_vel, clock):
+    """Calibrate the data using the drift velocity.
+
+    With a scalar drift velocity, this will simply convert the time buckets into position coordinates. With a vector
+    drift velocity, this can also correct the 3D representation for the effects of the magnetic field on the tracks of
+    the drift electrons, a.k.a. the Lorentz angle.
 
     Parameters
     ----------
     data : ndarray, int, float
-        The uncalibrated data, in time bucket values
-    drift_vel : int, float
-        The drift velocity in the gas, in cm/us
+        The uncalibrated data, in the form [x, y, z, ...]
+    drift_vel : number or array-like
+        The drift velocity in the gas, in cm/us. If scalar, it will only affect the z values. If it's a vector, all
+        spatial points will be transformed accordingly.
     clock : int, float
         The CoBo write clock frequency, in MHz
 
@@ -608,8 +619,20 @@ def calibrate_z(data, drift_vel, clock):
     ndarray or int or float
         The calibrated z values
 
+    See also
+    --------
+    pytpc.simulation.drift_velocity_vector
+
     """
-    return drift_vel * data / clock * 10  # 1 cm/(us.MHz) = 1 cm = 10 mm
+    new_data = data.copy()
+
+    if numpy.isscalar(drift_vel):
+        new_data[:, 2] *= drift_vel / clock * 10  # 1 cm/(us.MHz) = 1 cm = 10 mm
+    else:
+        assert drift_vel.shape == (3,), 'vector drift velocity must have 3 dimensions'
+        new_data[:, 0:3] += numpy.outer(data[:, 2], drift_vel) / clock * 10
+
+    return new_data
 
 
 def uncalibrate_z(data, drift_vel, clock):

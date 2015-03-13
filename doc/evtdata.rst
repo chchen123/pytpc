@@ -40,7 +40,7 @@ The subscripting and iterating methods shown above are the preferred (and easies
 .. autosummary::
     :toctree: generated/
 
-    evtdata.calibrate_z
+    evtdata.calibrate
     evtdata.uncalibrate_z
     evtdata.load_pedestals
     evtdata.load_padmap
