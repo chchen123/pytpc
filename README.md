@@ -20,9 +20,10 @@ The code itself was written and tested with Python 3.3, but it *should* also wor
 
 ## Documentation
 
+Read the documentation online at: https://groups.nscl.msu.edu/attpc/doc/pytpc
+
 Most of the code has documentation written into it in the form of docstrings. There is also Sphinx documentation, which
-can be built by running `make html` from inside the `docs` directory. I'll post the documentation online somewhere once
-I find a good place for it.
+can be built by running `make html` from inside the `docs` directory.
 
 ## Contact
 

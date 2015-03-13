@@ -15,13 +15,13 @@ def numpyize(func):
 
     Parameters
     ----------
-    func : function(*args, **kwargs)
+    func : function
         The function to be decorated. Any positional arguments that are non-scalar
         will be converted to an ndarray
 
     Returns
     -------
-    decorated : function(*newargs, **kwargs)
+    decorated : function
         The decorated function, with all array-like arguments being ndarrays
 
     """
