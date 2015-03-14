@@ -21,6 +21,10 @@ from pytpc.utilities import skew_matrix, rot_matrix
 class Particle(object):
     """ Describes a beam particle for tracking.
 
+    The state of the particle is stored internally as its energy and momentum. However, since most of the attributes
+    are implemented as properties, setting any of them will update the internal state appropriately and make all other
+    properties be up-to-date as well.
+
     Parameters
     ----------
     mass_num : int
