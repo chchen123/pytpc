@@ -214,6 +214,10 @@ class TestDriftVelocityVector(unittest.TestCase):
         vdv = sim.drift_velocity_vector(self.vd, self.efield, self.bfield, self.tilt)
         self.assertAlmostEqual(numpy.linalg.norm(vdv), self.vd, delta=0.1)
 
+    def test_unit_vector_magnitude(self):
+        vdv = sim.drift_velocity_vector(1.0, self.efield, self.bfield, self.tilt)
+        self.assertAlmostEqual(numpy.linalg.norm(vdv), 1.0, delta=1e-1)
+
 
 if __name__ == '__main__':
     unittest.main()
