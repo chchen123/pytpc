@@ -189,7 +189,7 @@ class TestDriftVelocityVector(unittest.TestCase):
         self.bfield = 10
         self.efield = 2
         self.tilt = 10*degrees
-        self.ot = self.bfield / self.efield * self.vd
+        self.ot = self.bfield / self.efield * self.vd * 1e4
 
     def test_zero_angle(self):
         vdv = sim.drift_velocity_vector(self.vd, self.efield, self.bfield, 0)
