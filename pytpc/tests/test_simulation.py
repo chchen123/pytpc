@@ -111,6 +111,17 @@ class TestParticle(unittest.TestCase):
         self.p.azimuth = pi/24
         self.assertAlmostEqual(self.p.azimuth, pi/24, delta=1e-3)
 
+    def test_set_azimuth_zero_polar(self):
+        """Check to see if azimuth is still set right when polar angle is zero.
+
+        Mathematically, the azimuthal angle is degenerate at zero polar angle, but that's not what I want here.
+        """
+
+        self.p.polar = 0
+        self.p.azimuth = pi/2
+        self.p.polar = pi/4
+        self.assertAlmostEqual(self.p.azimuth, pi/2)
+
     def test_polar_setter(self):
         self.p.polar = pi/24
         self.assertAlmostEqual(self.p.polar, pi/24, delta=1e-3)
