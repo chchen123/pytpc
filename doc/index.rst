@@ -23,6 +23,7 @@ Contents:
    ukf
    gases
    misc
+   coords
 
 Indices and tables
 ==================
