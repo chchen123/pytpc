@@ -630,7 +630,8 @@ def calibrate(data, drift_vel, clock):
         new_data[:, 2] *= drift_vel / clock * 10  # 1 cm/(us.MHz) = 1 cm = 10 mm
     else:
         assert drift_vel.shape == (3,), 'vector drift velocity must have 3 dimensions'
-        new_data[:, 0:3] += numpy.outer(data[:, 2], drift_vel) / clock * 10
+        new_data[:, 2] = 0.0  # This prevents adding the time buckets to the last dimension
+        new_data[:, 0:3] += numpy.outer(data[:, 2], -drift_vel) / clock * 10
 
     return new_data
 
