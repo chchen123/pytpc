@@ -617,7 +617,7 @@ def calibrate(data, drift_vel, clock):
     Return
     ------
     ndarray or int or float
-        The calibrated z values
+        The calibrated data
 
     See also
     --------
