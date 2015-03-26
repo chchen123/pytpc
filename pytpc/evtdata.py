@@ -636,26 +636,43 @@ def calibrate(data, drift_vel, clock):
     return new_data
 
 
-def uncalibrate_z(data, drift_vel, clock):
-    """Converts the z positions back to time stamps.
+def uncalibrate(data, drift_vel, clock):
+    """Uncalibrate the data using the drift velocity.
 
-    The can be useful to calculate times for plotting.
+    With a scalar drift velocity, this will simply convert the z position coordinates into time buckets. With a vector
+    drift velocity, this will project the points down onto the pad plane, taking into account the Lorentz angle from
+    the magnetic field.
 
     Parameters
     ----------
     data : ndarray, int, float
-        The calibrated z positions
-    drift_vel : int, float
-        The drift velocity in the gas, in cm/us
+        The calibrated position data, in the form [x, y, z, ...]
+    drift_vel : number or array-like
+        The drift velocity in the gas, in cm/us. If scalar, it will only affect the z values. If it's a vector, all
+        spatial points will be transformed accordingly.
     clock : int, float
         The CoBo write clock frequency, in MHz
 
-    Returns
-    -------
+    Return
+    ------
     ndarray or int or float
-        The time buckets
+        The uncalibrated data
+
+    See also
+    --------
+    pytpc.simulation.drift_velocity_vector
+
     """
-    return data * clock / (10 * drift_vel)
+    new_data = data.copy()
+
+    if numpy.isscalar(drift_vel):
+        new_data[:, 2] *= clock / (10 * drift_vel)  # 1 cm/(us.MHz) = 1 cm = 10 mm
+    else:
+        assert drift_vel.shape == (3,), 'vector drift velocity must have 3 dimensions'
+        new_data[:, 0:3] -= numpy.outer(data[:, 2], -drift_vel) / clock * 10
+        new_data[:, 2] = data[:, 2] * clock / (10 * drift_vel[2])  # 1 cm/(us.MHz) = 1 cm = 10 mm
+
+    return new_data
 
 
 def load_pedestals(filename):

@@ -44,7 +44,7 @@ class TestCalibration(unittest.TestCase):
         exp = self.data * self.vd / self.clock * 10
         nptest.assert_allclose(cal, exp)
 
-    def test_uncalibrate(self):
+    def test_uncalibrate_scalar(self):
         uncal = pytpc.evtdata.uncalibrate_z(self.data, self.vd, self.clock)
         exp = self.data / self.vd * self.clock / 10
         nptest.assert_allclose(uncal, exp)
@@ -52,5 +52,5 @@ class TestCalibration(unittest.TestCase):
     def test_inversion(self):
         """Make sure the process is reversible"""
         cal = pytpc.evtdata.calibrate(self.data, self.vd, self.clock)
-        uncal = pytpc.evtdata.uncalibrate_z(cal, self.vd, self.clock)
+        uncal = pytpc.evtdata.uncalibrate(cal, self.vd, self.clock)
         nptest.assert_allclose(self.data, uncal)
