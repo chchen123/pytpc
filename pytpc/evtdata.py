@@ -669,8 +669,9 @@ def uncalibrate(data, drift_vel, clock):
         new_data[:, 2] *= clock / (10 * drift_vel)  # 1 cm/(us.MHz) = 1 cm = 10 mm
     else:
         assert drift_vel.shape == (3,), 'vector drift velocity must have 3 dimensions'
-        new_data[:, 0:3] -= numpy.outer(data[:, 2], -drift_vel) / clock * 10
-        new_data[:, 2] = data[:, 2] * clock / (10 * drift_vel[2])  # 1 cm/(us.MHz) = 1 cm = 10 mm
+        tbs = data[:, 2] * clock / (10 * -drift_vel[2])  # 1 cm/(us.MHz) = 1 cm = 10 mm
+        new_data[:, 0:3] -= numpy.outer(tbs, -drift_vel) / clock * 10
+        new_data[:, 2] = tbs
 
     return new_data
 
