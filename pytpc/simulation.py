@@ -369,7 +369,7 @@ def track(particle, gas, ef, bf):
         current_time += tstep
         time.append(current_time)
 
-        if particle.position[2] > 1 or sqrt(particle.position[0]**2 + particle.position[1]**2) > 0.275:
+        if not(0 <= particle.position[2] <= 1) or sqrt(particle.position[0]**2 + particle.position[1]**2) > 0.275:
             print('Particle left chamber')
             done = True
 
