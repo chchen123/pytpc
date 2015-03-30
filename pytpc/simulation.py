@@ -304,7 +304,7 @@ def find_next_state(particle, gas, ef, bf, tstep):
         return new_particle.state_vector
 
 
-def track(particle, gas, ef, bf):
+def track(particle, gas, ef, bf, interact_energy=None):
     """ Track the provided particle's trajectory until it stops.
 
     This can be used to simulate a particle's motion through the detector.
@@ -341,6 +341,8 @@ def track(particle, gas, ef, bf):
     azi = []
     pol = []
 
+    tracks = []
+
     current_time = 0
 
     pos.append(particle.position)
@@ -359,6 +361,12 @@ def track(particle, gas, ef, bf):
         if particle.energy == 0:
             print('Particle stopped')
             done = True
+
+        if interact_energy is not None and particle.energy <= interact_energy:
+            product = Particle(4, 2, particle.energy_per_particle, azimuth=45*degrees, polar=45*degrees)
+            prodres = track(product, gas, ef, bf)
+            tracks += prodres
+            break
 
         pos.append(particle.position)
         mom.append(particle.momentum)
@@ -380,7 +388,8 @@ def track(particle, gas, ef, bf):
     mom = np.array(mom)
     res = np.hstack((pos, mom, np.array([time, en, de, azi, pol]).T))
 
-    return pd.DataFrame(res, columns=res_keys)
+    tracks.append(pd.DataFrame(res, columns=res_keys))
+    return tracks
 
 
 _leftskewmat = skew_matrix(-60.*degrees)
