@@ -7,6 +7,7 @@ import pytpc.gases
 from math import sqrt, sin, cos, atan2
 import numpy
 import numpy.testing as nptest
+import pandas as pd
 from pytpc.constants import *
 
 
@@ -232,6 +233,23 @@ class TestDriftVelocityVector(unittest.TestCase):
     def test_shape(self):
         vdv = sim.drift_velocity_vector(self.vd, self.efield, self.bfield, self.tilt)
         self.assertEqual(vdv.shape, (3,))
+
+
+class TestTrack(unittest.TestCase):
+    """Tests for the track simulation function"""
+
+    def setUp(self):
+        self.pt = sim.Particle(4, 2, 0.1)
+        self.gas = pytpc.gases.HeliumGas(150)
+        self.ef = numpy.array([0, 0, 15e3])
+        self.bf = numpy.array([0, 0, 1])
+
+    def test_structure(self):
+        df = sim.track(self.pt, self.gas, self.ef, self.bf)
+        self.assertTrue(isinstance(df, pd.DataFrame))
+
+        self.assertGreater(df.size, 1, msg='empty frame returned')
+
 
 
 if __name__ == '__main__':

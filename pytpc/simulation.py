@@ -8,6 +8,7 @@ Contains code for simulating the tracking of particles in a TPC.
 
 from __future__ import division, print_function
 import numpy as np
+import pandas as pd
 from math import atan2, sin, cos, sqrt
 
 import copy
@@ -373,10 +374,13 @@ def track(particle, gas, ef, bf):
             print('Particle left chamber')
             done = True
 
-    res_keys = ['pos', 'mom', 'time', 'en', 'de', 'azi', 'pol']
-    res_vals = map(np.array, (pos, mom, time, en, de, azi, pol))
+    res_keys = ['x', 'y', 'z', 'px', 'py', 'pz', 'time', 'en', 'de', 'azi', 'pol']
 
-    return dict(zip(res_keys, res_vals))
+    pos = np.array(pos)
+    mom = np.array(mom)
+    res = np.hstack((pos, mom, np.array([time, en, de, azi, pol]).T))
+
+    return pd.DataFrame(res, columns=res_keys)
 
 
 _leftskewmat = skew_matrix(-60.*degrees)
