@@ -135,6 +135,99 @@ class HeliumGas(Gas):
         return result
 
 
+class HeCO2Gas(Gas):
+    """Represents a mixture of 90 percent helium and 10 percent carbon dioxide.
+
+    This is a subclass of the `Gas` class with a replacement for the energy loss function. The energy loss function
+    used here is a fit to data from the NIST ASTAR website (http://physics.nist.gov/PhysRefData/Star/Text/ASTAR.html).
+
+    ..  Warning::
+        Some of the properties inherited from the generic `Gas` class (such as electron density properties) are
+        not valid for this gas. They will return a value, but it will not be correct.
+
+    Parameters
+    ----------
+    pressure : float
+        The gas pressure, in Torr
+
+    See Also
+    --------
+    Gas
+
+    """
+
+    def __init__(self, pressure):
+        he_mol_mass = 4.002  # g/mol
+        co2_mol_mass = 44.01  # g/mol
+        mol_mass = he_mol_mass * 0.9 + co2_mol_mass * 0.1
+        Gas.__init__(self, mol_mass, 2, 41.8, pressure)  # these parameters are wrong, but they don't matter (I hope)
+
+    @staticmethod
+    def _fit_func(en, a, b, c, d, e, f, g, h):
+        """The fit function for the energy loss parameterization.
+
+        This is in the form required for scipy.optimize.curve_fit.
+
+        All of the parameters after the first one are coefficients.
+
+        Parameters
+        ----------
+        en : number
+            The energy
+
+        Returns
+        -------
+        number
+            The energy loss
+        """
+        return a*(1./en**b)*(1./(c+d/(en**e))) + f*exp(-g*(en-h)**2)
+
+    def energy_loss(self, en, proj_mass, proj_charge):
+        """Calculates the energy loss of a projectile in the gas.
+
+        This is an empirical fit of experimental data, and only works for a small variety of projectiles.
+
+        The currently supported projectiles are:
+
+        - Alphas / 4He
+
+        Parameters
+        ----------
+        en : float
+            The projectile's kinetic energy in MeV
+        proj_mass : int
+            The mass number of the projectile
+        proj_charge : int
+            The charge number of the projectile
+
+        Returns
+        -------
+        float
+            The stopping power of the gas, in MeV/m
+
+        Raises
+        ------
+        ValueError
+            If the projectile is one of the known projectiles. See the list above for acceptible projectiles.
+
+        """
+
+        if proj_mass == 4 and proj_charge == 2:
+            # This is an alpha particle
+            fit_params = np.array([3.96952385e+02,   9.33364832e-01,   9.59137201e-02,
+                                   8.82262274e-02,   1.51501228e+00,  -1.82205350e+03,
+                                   9.93911292e+03,  -1.81747643e-01])
+            result = self._fit_func(en, *fit_params)
+
+        else:
+            raise ValueError('Unknown projectile: mass={m}, charge={q}'.format(m=proj_mass,
+                                                                               q=proj_charge))
+
+        # Result of fit function is in MeV / (g/cm^2), so multipy by density
+        result *= self.density * 100  # This is in MeV/m
+        return result
+
+
 def bethe(beta, z, ne, exc_en):
     """ Find the stopping power of the gas.
 
