@@ -93,5 +93,31 @@ class TestHeliumGas(unittest.TestCase):
         res = self.he.energy_loss(en, m, z)
         self.assertLess(res, 0.1)
 
+class TestHeCO2Gas(unittest.TestCase):
+    """Tests the pytpc.gases.HeCO2Gas class"""
+    def setUp(self):
+        self.he = pytpc.gases.HeCO2Gas(100.)
+
+    def test_eloss_with_4he(self):
+        en = 1.
+        m = 4
+        z = 2
+        res = self.he.energy_loss(en, m, z)
+        bth = pytpc.gases.bethe(rel.beta(en, m*p_mc2), z, self.he.electron_density_per_m3, self.he.mean_exc_pot)
+        self.assertAlmostEqual(res, bth, delta=10)
+
+    def test_eloss_bad_proj(self):
+        en = 1.
+        m = 100
+        z = 100
+        self.assertRaises(ValueError, self.he.energy_loss, en, m, z)
+
+    def test_eloss_high_en(self):
+        en = 1e3
+        m = 4
+        z = 2
+        res = self.he.energy_loss(en, m, z)
+        self.assertLess(res, 0.1)
+
 if __name__ == '__main__':
     unittest.main()
