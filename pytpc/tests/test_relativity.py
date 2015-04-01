@@ -69,17 +69,27 @@ class TestElasticScatter_IdenticalParticles(unittest.TestCase):
         self.azi = pi / 3
 
     def test_polar(self):
-        ejec, recoil = rel.elastic_scatter(self.proj, self.target, self.cm_angle, self.azi)
-        self.assertAlmostEqual(ejec.polar, recoil.polar)
+        for cm_angle in numpy.linspace(0.01, pi, 20, endpoint=False):
+            ejec, recoil = rel.elastic_scatter(self.proj, self.target, cm_angle, self.azi)
+            self.assertAlmostEqual(ejec.polar, recoil.polar)
 
     def test_azimuth(self):
-        ejec, recoil = rel.elastic_scatter(self.proj, self.target, self.cm_angle, self.azi)
-        self.assertAlmostEqual(ejec.azimuth, self.azi)
-        self.assertAlmostEqual(recoil.azimuth, self.azi + pi)
+        for azi in numpy.linspace(0, 2*pi, 20):
+            ejec, recoil = rel.elastic_scatter(self.proj, self.target, self.cm_angle, azi)
+            self.assertAlmostEqual(ejec.azimuth, azi)
+            self.assertAlmostEqual(recoil.azimuth, azi + pi)
 
-    def test_energy(self):
-        ejec, recoil = rel.elastic_scatter(self.proj, self.target, self.cm_angle, self.azi)
-        self.assertAlmostEqual(ejec.energy, recoil.energy)
+    def test_energy_small_angle(self):
+        ejec, recoil = rel.elastic_scatter(self.proj, self.target, 0.01, self.azi)
+        self.assertAlmostEqual(recoil.energy, 0, places=3)
+
+    def test_energy_equal(self):
+        ejec, recoil = rel.elastic_scatter(self.proj, self.target, pi/2, self.azi)
+        self.assertAlmostEqual(recoil.energy, ejec.energy)
+
+    def test_energy_large_angle(self):
+        ejec, recoil = rel.elastic_scatter(self.proj, self.target, pi-0.01, self.azi)
+        self.assertAlmostEqual(ejec.energy, 0, places=3)
 
 
 class TestElasticScatter_HeavyTarget(unittest.TestCase):
@@ -87,14 +97,15 @@ class TestElasticScatter_HeavyTarget(unittest.TestCase):
 
     def setUp(self):
         self.proj = pytpc.Particle(4, 2, 2)       # helium-4
-        self.target = pytpc.Particle(208, 82, 0)  # lead-208
+        self.target = pytpc.Particle(1e8, 100, 0)  # nonphysical, but hopefully fixed
         self.cm_angle = pi / 4
         self.azi = pi / 3
 
     def test_energy(self):
         ejec, recoil = rel.elastic_scatter(self.proj, self.target, self.cm_angle, self.azi)
-        self.assertAlmostEqual(recoil.energy, 0)
-        self.assertAlmostEqual(ejec.energy, self.proj.energy)
+        self.assertAlmostEqual(recoil.energy, 0, places=4)
+        self.assertAlmostEqual(ejec.energy, self.proj.energy, places=4)
+
 
 if __name__ == '__main__':
     unittest.main()
