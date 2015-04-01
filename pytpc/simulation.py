@@ -304,7 +304,7 @@ def find_next_state(particle, gas, ef, bf, tstep):
         return new_particle.state_vector
 
 
-def track(particle, gas, ef, bf, interact_energy=None):
+def track(particle, gas, ef, bf, final_energy=0.0):
     """ Track the provided particle's trajectory until it stops.
 
     This can be used to simulate a particle's motion through the detector.
@@ -341,8 +341,6 @@ def track(particle, gas, ef, bf, interact_energy=None):
     azi = []
     pol = []
 
-    tracks = []
-
     current_time = 0
 
     pos.append(particle.position)
@@ -358,24 +356,9 @@ def track(particle, gas, ef, bf, interact_energy=None):
         tstep = pos_step / (particle.beta * c_lgt)
         state = find_next_state(particle, gas, ef, bf, tstep)
         particle.state_vector = state
-        if particle.energy == 0:
-            print('Particle stopped')
+        if particle.energy <= final_energy:
+            print('Reached final energy')
             done = True
-
-        if interact_energy is not None and particle.energy <= interact_energy:
-            product = copy.copy(particle)
-            product2 = copy.copy(particle)
-            product.azimuth = pi/4
-            product.polar = pi/4
-            product2.azimuth = pi + pi/4
-            product2.polar = pi/4
-            prodres = track(product, gas, ef, bf)
-            prodres[0]['time'] += current_time
-            tracks += prodres
-            prodres2 = track(product2, gas, ef, bf)
-            prodres2[0]['time'] += current_time
-            tracks += prodres2
-            break
 
         pos.append(particle.position)
         mom.append(particle.momentum)
@@ -397,8 +380,76 @@ def track(particle, gas, ef, bf, interact_energy=None):
     mom = np.array(mom)
     res = np.hstack((pos, mom, np.array([time, en, de, azi, pol]).T))
 
-    tracks.append(pd.DataFrame(res, columns=res_keys))
+    tracks = pd.DataFrame(res, columns=res_keys)
     return tracks
+
+
+def simulate_elastic_scattering_track(proj, target, gas, ef, bf, interact_energy, cm_angle, azimuth):
+    """Simulate an elastic scattering event with the given particles and parameters.
+
+    The projectile will be tracked in the detector until it has total energy equal to `interact_energy`. Then, an
+    elastic scattering interaction will happen with the provided COM angle and final azimuthal angle.
+
+    Parameters
+    ----------
+    proj : Particle
+        The projectile. It must have non-zero energy.
+    target : Particle
+        The target. It must have zero energy (at least for now)
+    gas : pytpc.gases.Gas or subclass
+        The gas in the detector. If it's a subclass, make sure it is compatible with both the target and the
+        projectile.
+    ef : array-like
+        The electric field, in SI units
+    bf : array-like
+        The magnetic field, in Tesla
+    interact_energy : number
+        The energy at which to stop tracking the projectile and perform the interaction
+    cm_angle : number
+        The center-of-momentum angle for the relativistic scattering calculation
+    azimuth : number
+        The final azimuthal angle of the ejectile particle
+
+    Returns
+    -------
+    pandas.DataFrame
+        The concatenated outputs of the `track` function for each particle
+
+    Raises
+    ------
+    ValueError
+        If the projectile has zero energy
+    NotImplementedError
+        If the target has nonzero energy. In the future, the code could be changed to allow a moving target particle,
+        but it seems unnecessary for now.
+
+    See Also
+    --------
+    pytpc.relativity.elastic_scatter
+
+    """
+
+    if proj.energy == 0:
+        raise ValueError('Projectile must have energy > 0')
+    if target.energy > 0.0:
+        raise NotImplementedError('Target energy must be zero (for now at least)')
+
+    # Track projectile until the collision
+    proj_track = track(proj, gas, ef, bf, interact_energy)
+    if not(0 <= proj.position[2] <= 1) or sqrt(proj.position[0]**2 + proj.position[1]**2) > 0.275:
+        # The particle left the chamber before interacting
+        return proj_track
+
+    reaction_time = proj_track.time.max()
+
+    ejec, recoil = rel.elastic_scatter(proj, target, cm_angle, azimuth)
+
+    ejec_track = track(ejec, gas, ef, bf)
+    ejec_track.time += reaction_time
+    recoil_track = track(recoil, gas, ef, bf)
+    recoil_track.time += reaction_time
+
+    return pd.concat((proj_track, ejec_track, recoil_track), ignore_index=True)
 
 
 _leftskewmat = skew_matrix(-60.*degrees)

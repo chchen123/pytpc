@@ -117,10 +117,12 @@ def elastic_scatter(proj, target, cm_angle, azi):
     ejec.energy = T3
     ejec.polar = pol3
     ejec.azimuth = azi
+    ejec.position = proj.position
 
     recoil.energy = T4
     recoil.polar = pol4
     recoil.azimuth = azi + pi
+    recoil.position = proj.position
 
     return ejec, recoil
 
