@@ -363,9 +363,18 @@ def track(particle, gas, ef, bf, interact_energy=None):
             done = True
 
         if interact_energy is not None and particle.energy <= interact_energy:
-            product = Particle(4, 2, particle.energy_per_particle, azimuth=45*degrees, polar=45*degrees)
+            product = copy.copy(particle)
+            product2 = copy.copy(particle)
+            product.azimuth = pi/4
+            product.polar = pi/4
+            product2.azimuth = pi + pi/4
+            product2.polar = pi/4
             prodres = track(product, gas, ef, bf)
+            prodres[0]['time'] += current_time
             tracks += prodres
+            prodres2 = track(product2, gas, ef, bf)
+            prodres2[0]['time'] += current_time
+            tracks += prodres2
             break
 
         pos.append(particle.position)
