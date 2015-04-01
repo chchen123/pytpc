@@ -7,7 +7,8 @@ This module contains functions to calculate quantities of interest in special re
 from __future__ import division, print_function
 import numpy
 from pytpc.constants import *
-from math import sqrt
+from math import sqrt, log, sinh, cosh, sin, cos, atan
+import copy
 
 
 def gamma(v):
@@ -59,3 +60,43 @@ def beta(en, mass):
     if b > 1.0:
         b = 1.0
     return b
+
+
+def elastic_scatter(proj, target, cm_angle, azi):
+
+    recoil = copy.copy(target)
+    ejec = copy.copy(proj)
+    m1 = target.mass
+    m2 = proj.mass
+    m3 = ejec.mass
+    m4 = recoil.mass
+    T1 = proj.energy
+
+    s = (m1 + m2)**2 * c_lgt**2 + 2 * m1 * T1
+    pcm  = sqrt(((s - m1**2 * c_lgt**2 - m2**2 * c_lgt**2)**2 - 4 * m1**2 * m2**2 * c_lgt**4) / (4 * s))
+    ppcm = sqrt(((s - m3**2 * c_lgt**2 - m4**2 * c_lgt**2)**2 - 4 * m3**2 * m4**2 * c_lgt**4) / (4 * s))
+
+    chi = log((sqrt(pcm**2 * c_lgt**2 + m1**2 * c_lgt**4) + pcm * c_lgt) / (m1 * c_lgt**2))
+
+    T3 = (sqrt(ppcm**2 * c_lgt**2 + m3**2 * c_lgt**4) * cosh(chi) + ppcm * c_lgt * cos(cm_angle) * sinh(chi)
+          - m3 * c_lgt**2)
+    T4 = (sqrt(ppcm**2 * c_lgt**2 + m4**2 * c_lgt**4) * cosh(chi) - ppcm * c_lgt * cos(cm_angle) * sinh(chi)
+          - m4 * c_lgt**2)
+
+    E3cm = sqrt(ppcm**2 * c_lgt**2 + m3**2 * c_lgt**4)
+    E4cm = sqrt(ppcm**2 * c_lgt**2 + m4**2 * c_lgt**4)
+
+    pol3 = atan(ppcm * c_lgt * sin(cm_angle) / (sinh(chi) * E3cm + cosh(chi) * ppcm * c_lgt * cos(cm_angle)))
+    pol4 = atan(ppcm * c_lgt * sin(cm_angle) / (sinh(chi) * E4cm + cosh(chi) * ppcm * c_lgt * cos(cm_angle)))
+
+    ejec.energy = T3
+    ejec.polar = pol3
+    ejec.azimuth = azi
+
+    recoil.energy = T4
+    recoil.polar = pol4
+    recoil.azimuth = azi + pi
+
+    return ejec, recoil
+
+
