@@ -36,6 +36,8 @@ import numpy
 import os.path
 from pytpc.tpcplot import generate_pad_plane
 from scipy.stats import threshold
+from scipy.ndimage.filters import gaussian_filter
+from pytpc.padplane import find_pad_coords, padcenter_dict
 
 
 class EventFile:
@@ -595,6 +597,72 @@ class Event:
             xyzs = calibrate(xyzs, drift_vel, clock)
 
         return xyzs
+
+
+def make_event(pos, de, clock, vd, ioniz, proj_mass, shapetime):
+    """Generate an Event from simulated data.
+
+    This will take the given position and energy loss information and project it onto the pad plane to create
+    an event out of it. This can take the drift velocity, shaping time of the electronics, and the Lorentz angle from
+    the fields into account. (For the shaping in the electronics, the signal is assumed to be a Gaussian with standard
+    deviation equal to the shaping time.
+
+    Parameters
+    ----------
+    pos : ndarray
+        The [x, y, z] positions of the simulated track
+    de : ndarray
+        The energy loss *per nucleon* for each step. It is important that this have the same length as `pos`.
+    clock : number
+        The CoBo write clock frequency, in MHz.
+    vd : array-like or number
+        The drift velocity in the detector. Provide as a vector to account for the Lorentz angle. The units
+        should be cm/µs in either case.
+    ioniz : number
+        The ionization energy of the detector gas, in eV.
+    proj_mass : integer
+        The projectile mass number
+    shapetime : number
+        The shaping time, in ns.
+
+    Returns
+    -------
+    evt : Event
+        The simulated data as an Event object.
+
+    See Also
+    --------
+    pytpc.simulation.drift_velocity_vector
+    pytpc.simulation.track
+    pytpc.simulation.simulate_elastic_scattering_track
+
+    """
+
+    # Find energy deposition for each point
+    ne = numpy.round(de*1e6*proj_mass / ioniz)  # last factor after mass is gain
+
+    # Uncalibrate the position data
+    uncal = uncalibrate(pos, vd, clock)
+    tbs = uncal[:, -1]
+
+    # Find the pad for each point
+    pca = numpy.round(numpy.array([find_pad_coords(p[0], p[1]) for p in uncal[:, 0:2]]))
+    pnums = numpy.array([padcenter_dict[tuple(a)] for a in pca])
+    unique_pads = numpy.unique(pnums)
+
+    shapetime_tb = shapetime*1e-9 * clock*1e6
+
+    # Build the event
+    evt = Event()
+    evt.traces = numpy.zeros(unique_pads.shape, dtype=evt.dt)
+    for i, p in enumerate(unique_pads):
+        idxs = numpy.where(pnums == p)
+        tr = numpy.zeros(512)
+        for t, v in zip(tbs[idxs], ne[idxs]):
+            tr[t] += v
+        evt.traces[i]['pad'] = p
+        evt.traces[i]['data'][:] = gaussian_filter(tr, shapetime_tb, mode='constant')
+    return evt
 
 
 def calibrate(data, drift_vel, clock):

@@ -121,12 +121,9 @@ def elastic_scatter(proj, target, cm_angle, azi):
 
     recoil.energy = T4
     recoil.polar = abs(pol4 - proj.polar)
-    print(pol3, pol4)
     if pol4 > proj.polar:
-        print('Greater')
         recoil.azimuth = proj.azimuth + azi + pi
     else:
-        print('Less')
         recoil.azimuth = proj.azimuth + azi
     recoil.position = proj.position
 

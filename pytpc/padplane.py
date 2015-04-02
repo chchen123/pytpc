@@ -10,8 +10,10 @@ generate_pad_plane. An angle can be provided to this function if the micromegas 
 """
 
 import math
-from math import sin, cos
-import numpy
+from math import sin, cos, atan2
+import numpy as np
+from pytpc.utilities import rot_matrix, skew_matrix
+from pytpc.constants import degrees, pi
 
 
 def create_triangle(x_offset, y_offset, side, orient):
@@ -68,7 +70,7 @@ def generate_pad_plane(rotation_angle=None):
 
     # Create half a circle
 
-    pads = numpy.zeros((10240, 3, 2))
+    pads = np.zeros((10240, 3, 2))
 
     for j in range(row_len_l):
         pads_in_half_hex = 0
@@ -134,17 +136,104 @@ def generate_pad_plane(rotation_angle=None):
         pads[pad_index + i] = pads[i] * [1, -1]
 
     if rotation_angle is not None:
-        rotmat = numpy.array([[cos(rotation_angle), -sin(rotation_angle)],
+        rotmat = np.array([[cos(rotation_angle), -sin(rotation_angle)],
                               [sin(rotation_angle), cos(rotation_angle)]])
 
         # reshape the pads array so we can easily iterate over it
         sh = pads.shape
         pads.shape = (-1, 2)
         for i, v in enumerate(pads):
-            pads[i] = numpy.dot(rotmat, v)
+            pads[i] = np.dot(rotmat, v)
         pads.shape = sh
 
     return pads
+
+
+_leftskewmat = skew_matrix(-60.*degrees)
+_rightskewmat = skew_matrix(60.*degrees)
+_rotneg120mat = rot_matrix(-120*degrees)
+_rotpos120mat = rot_matrix(120*degrees)
+_rotneg240mat = rot_matrix(-240*degrees)
+_rotpos240mat = rot_matrix(240*degrees)
+_idmat = np.eye(2)
+
+
+def _two_pt_line(x, x1, y1, x2, y2):
+    """Find the y-value of the equation of the line connecting [x1, y1] to [x2, y2] at the point x.
+    """
+
+    return (y2-y1)/(x2-x1) * (x-x1) + y1
+
+
+def find_pad_coords(x, y):
+    """Find the center of the nearest pad to the provided x and y coordinates.
+
+    This works as follows:
+
+        1) Divide the pad plane into three 120-degree sectors. Examine the angle that the given point is located at
+           and rotate it so that it lies in the first sector. Remember this rotation angle for later.
+        2) Apply a skew transformation to the point that would straighten up the triangular pads into rectangular
+           (approximately square) pads. Make sure to take into account whether we're in the inner or outer pads.
+        3) Using floor division, figure out which rectangular pad the transformed point is in. Each rectangle is
+           subdivided into an upper and lower triangle (two triangular pads in each skewed rectangle), so figure out
+           which sub-section the point is in by seeing if it's above or below the line dividing the two triangles.
+        4) The center of this sub-section is the center of the pad the point is above. Now reverse the skew and rotation
+           transformations and return the result.
+
+    Parameters
+    ----------
+    x : number
+        The horizontal coordinate
+    y : number
+        The vertical coordinate
+
+    Returns
+    -------
+    res : ndarray
+        The [x, y] position of the center of the pad the given point is above.
+
+    """
+
+    coords = np.array([x, y])
+
+    # Which third? Rotate if necessary
+    angle = atan2(y, x)
+    if y < 0:
+        angle += 2*pi
+
+    if 120*degrees <= angle < 240*degrees:
+        rot = np.dot(_rotneg120mat, coords)
+        finalrot = _rotpos120mat
+    elif angle >= 240*degrees:
+        rot = np.dot(_rotneg240mat, coords)
+        finalrot = _rotpos240mat
+    else:
+        rot = coords
+        finalrot = _idmat
+
+    rect = np.dot(_rightskewmat, rot)
+
+    # Inner or outer?
+    if abs(rect[0]) < inner_rad * tri_base and abs(rect[1]) < inner_rad * tri_height:
+        b = inner_tri_base
+        h = inner_tri_height
+        t = np.array([b, h])
+    else:
+        b = tri_base
+        h = tri_height
+        t = np.array([b, h])
+
+    v1 = np.floor(rect / t) * t
+    v2 = v1 + t
+
+    if rect[1] > _two_pt_line(rect[0], v1[0], v1[1], v2[0], v2[1]):
+        v3 = v1 + np.array([0, h])
+    else:
+        v3 = v1 + np.array([b, 0])
+
+    res = np.dot(_leftskewmat, (v1+v2+v3)/3)
+    res = np.dot(finalrot, res)
+    return res
 
 
 # Now generate some parameters about the pads
@@ -164,5 +253,10 @@ inner_tri_base = tri_base / 2.  #: The base of an inner pad, including the gap
 inner_tri_height = tri_height / 2.  #: The height of an inner pad, including the gap
 
 inner_rad = 16
+
+# Make a dictionary of pad centers
+keys = tuple(map(tuple, np.round(pads.mean(1)).tolist()))
+padcenter_dict = {k: i for i, k in enumerate(keys)}
+del keys
 
 del pads
