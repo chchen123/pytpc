@@ -115,13 +115,19 @@ def elastic_scatter(proj, target, cm_angle, azi):
     pol4 = atan(ppcm * sin(cm_angle) / (sinh(chi) * E4cm + cosh(chi) * ppcm * cos(cm_angle)))  # recoil lab polar angle
 
     ejec.energy = T3
-    ejec.polar = pol3
-    ejec.azimuth = azi
+    ejec.polar = pol3 + proj.polar
+    ejec.azimuth = proj.azimuth + azi
     ejec.position = proj.position
 
     recoil.energy = T4
-    recoil.polar = pol4
-    recoil.azimuth = azi + pi
+    recoil.polar = abs(pol4 - proj.polar)
+    print(pol3, pol4)
+    if pol4 > proj.polar:
+        print('Greater')
+        recoil.azimuth = proj.azimuth + azi + pi
+    else:
+        print('Less')
+        recoil.azimuth = proj.azimuth + azi
     recoil.position = proj.position
 
     return ejec, recoil
