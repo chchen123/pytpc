@@ -34,6 +34,7 @@ from __future__ import division, print_function
 import struct
 import numpy
 import os.path
+import warnings
 from pytpc.tpcplot import generate_pad_plane
 from scipy.stats import threshold
 from scipy.ndimage.filters import gaussian_filter
@@ -599,7 +600,7 @@ class Event:
         return xyzs
 
 
-def make_event(pos, de, clock, vd, ioniz, proj_mass, shapetime):
+def make_event(pos, de, clock, vd, ioniz, proj_mass, shapetime, offset=0):
     """Generate an Event from simulated data.
 
     This will take the given position and energy loss information and project it onto the pad plane to create
@@ -624,6 +625,8 @@ def make_event(pos, de, clock, vd, ioniz, proj_mass, shapetime):
         The projectile mass number
     shapetime : number
         The shaping time, in ns.
+    offset : integer, optional
+        A time bucket offset. If provided, the signal will be shifted right (toward higher time buckets by this amount.
 
     Returns
     -------
@@ -643,7 +646,7 @@ def make_event(pos, de, clock, vd, ioniz, proj_mass, shapetime):
 
     # Uncalibrate the position data
     uncal = uncalibrate(pos, vd, clock)
-    tbs = uncal[:, -1]
+    tbs = uncal[:, -1] + offset
 
     # Find the pad for each point
     pca = numpy.round(numpy.array([find_pad_coords(p[0], p[1]) for p in uncal[:, 0:2]]))
@@ -659,7 +662,10 @@ def make_event(pos, de, clock, vd, ioniz, proj_mass, shapetime):
         idxs = numpy.where(pnums == p)
         tr = numpy.zeros(512)
         for t, v in zip(tbs[idxs], ne[idxs]):
-            tr[t] += v
+            if 0 <= t <= 511:
+                tr[t] += v
+            else:
+                warnings.warn('Event clipped: time bucket overflow/underflow', RuntimeWarning)
         evt.traces[i]['pad'] = p
         evt.traces[i]['data'][:] = gaussian_filter(tr, shapetime_tb, mode='constant')
     return evt
