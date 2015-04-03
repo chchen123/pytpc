@@ -4,6 +4,10 @@ import numpy as np
 from pytpc.constants import *
 import pytpc.relativity as rel
 from numpy import log, exp
+from scipy.interpolate import InterpolatedUnivariateSpline
+
+import os
+import json
 
 
 class Gas(object):
@@ -21,16 +25,52 @@ class Gas(object):
         The gas pressure in Torr
     """
 
-    def __init__(self, molar_mass, num_electrons, mean_exc_pot, pressure):
+    def __init__(self, molar_mass, pressure):
         self.molar_mass = molar_mass
-        self.num_electrons = num_electrons
-        self.mean_exc_pot = mean_exc_pot
         self.pressure = pressure
 
     @property
     def density(self):
         """Density in g/cm^3"""
         return self.pressure / 760. * self.molar_mass / 24040.
+
+    def energy_loss(self, en, proj_mass, proj_charge):
+        raise NotImplementedError()
+
+
+class InterpolatedGas(Gas):
+
+    def __init__(self, name, pressure):
+
+        # TODO: Make this less of a kludge
+        filename = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'gases', name + '.json'))
+        try:
+            with open(filename) as f:
+                gas_dict = json.load(f)
+
+        except FileNotFoundError:
+            raise ValueError('Gas data file not found. Is {} a valid gas name?'.format(name))
+
+        dedx = np.array(gas_dict['dedx'])
+        self.spline = InterpolatedUnivariateSpline(dedx[:, 0], dedx[:, 1])
+
+        Gas.__init__(self, gas_dict['molar_mass'], pressure)
+
+
+    def energy_loss(self, en, proj_mass, proj_charge):
+
+        if proj_mass != 4 or proj_charge != 2:
+            raise NotImplementedError('Not implemented for particles other than alpha')
+
+        return self.spline(en) * self.density * 100  # in MeV/m
+
+
+class GenericGas(Gas):
+
+    def __init__(self, molar_mass, pressure, num_electrons, mean_exc_pot):
+        self.num_electrons = num_electrons
+        self.mean_exc_pot = mean_exc_pot
+        Gas.__init__(self, molar_mass, pressure)
 
     @property
     def electron_density(self):
@@ -66,7 +106,38 @@ class Gas(object):
         return bethe(beta, proj_charge, self.electron_density_per_m3, self.mean_exc_pot)
 
 
-class HeliumGas(Gas):
+class InterpolatedGasMixture(Gas):
+
+    def __init__(self, pressure, *args):
+
+        self.components = []
+        molar_mass = 0.0
+        total_prop = 0.0
+        for comp in args:
+            assert len(comp) == 2, 'specify components as (gas name, proportion)'
+            name, prop = comp
+            assert 0 < prop <= 1, 'gas proportions should be between 0 and 1'
+            gas = InterpolatedGas(name, pressure * prop)
+            molar_mass += prop * gas.molar_mass
+            total_prop += prop
+            self.components.append((gas, prop))
+
+        assert total_prop == 1.0, 'total gas fractions must sum to 1.0'
+
+        Gas.__init__(self, molar_mass, pressure)
+
+    def energy_loss(self, en, proj_mass, proj_charge):
+
+        if proj_mass != 4 or proj_charge != 2:
+            raise NotImplementedError('Not implemented yet for particles other than alphas')
+
+        # The total energy loss is the sum of the energy lost to each component.
+        # This is valid since each component has the correct partial pressure.
+        de = sum([g.energy_loss(en, 4, 2) for g, prop in self.components])
+        return de  # in MeV/m
+
+
+class HeliumGas(GenericGas):
     """Represents the properties of pure helium-4 gas.
 
     This is a subclass of the `Gas` class for helium-4. The main change is that the energy loss function has been
@@ -85,7 +156,7 @@ class HeliumGas(Gas):
     """
 
     def __init__(self, pressure):
-        Gas.__init__(self, 4, 2, 41.8, pressure)
+        GenericGas.__init__(self, 4, pressure, 2, 41.8)
 
     def energy_loss(self, en, proj_mass, proj_charge):
         """Calculates the energy loss of a projectile in the gas.
@@ -135,7 +206,7 @@ class HeliumGas(Gas):
         return result
 
 
-class HeCO2Gas(Gas):
+class HeCO2Gas(GenericGas):
     """Represents a mixture of 90 percent helium and 10 percent carbon dioxide.
 
     This is a subclass of the `Gas` class with a replacement for the energy loss function. The energy loss function
@@ -160,7 +231,7 @@ class HeCO2Gas(Gas):
         he_mol_mass = 4.002  # g/mol
         co2_mol_mass = 44.01  # g/mol
         mol_mass = he_mol_mass * 0.9 + co2_mol_mass * 0.1
-        Gas.__init__(self, mol_mass, 2, 41.8, pressure)  # these parameters are wrong, but they don't matter (I hope)
+        GenericGas.__init__(self, mol_mass, pressure, 2, 41.8)  # these parameters are wrong, but they don't matter (I hope)
 
     @staticmethod
     def _fit_func(en, a, b, c, d, e, f, g, h):
