@@ -11,18 +11,32 @@ import json
 
 
 class Gas(object):
-    """Describes a gas in the detector.
+    """Base class that describes a gas in the detector.
+
+    This should generally not be used directly as it doesn't provide an energy loss information. Instead use one of
+    its derived classes.
 
     Parameters
     ----------
     molar_mass : number
         Provided in g/mol
-    num_electrons : int
-        Number of electrons per molecule, or the total Z
-    mean_exc_pot : float
-        The mean excitation potential, as used in Bethe's formula, in eV
     pressure : float
         The gas pressure in Torr
+
+    Attributes
+    ----------
+    density : float
+        The density of the gas
+    molar_mass : float
+        The molar mass of the gas molecules
+    pressure : float
+        The gas pressure
+
+    See Also
+    --------
+    GenericGas
+    InterpolatingGas
+    InterpolatingGasMixture
     """
 
     def __init__(self, molar_mass, pressure):
@@ -39,6 +53,41 @@ class Gas(object):
 
 
 class InterpolatedGas(Gas):
+    r"""A gas that calculates its stopping power by interpolating from experimental data.
+
+    The experimental data is stored in the directory ``PYTPCROOT/data/gases`` where ``PYTPCROOT`` is wherever the
+    whole package is stored.
+
+    On instantiation, this will look for a JSON file corresponding to the name given to __init__. The JSON file
+    must have (at least) the following keys:
+
+    ============  =========================================================
+         Key                                Value
+    ============  =========================================================
+    'molar_mass'  The molar mass as a float
+    'dedx'        The energy loss, as a list of pairs like [energy, dedx].
+                  The energy loss is assumed to be in units of MeV/(g.cm^2)
+    ============  =========================================================
+
+    After reading in the data, it is interpolated using SciPy's ``InterpolatedUnivariateSpline`` class. This spline
+    is then used by the `energy_loss` function to produce the energy loss.
+
+    Parameters
+    ----------
+    name : string
+        The name of the gas. This must match an existing file in the gas data folder.
+    pressure : float
+        The gas pressure in Torr
+
+    Attributes
+    ----------
+    density : float
+        The density of the gas
+    molar_mass : float
+        The molar mass of the gas molecules
+    pressure : float
+        The gas pressure
+    """
 
     def __init__(self, name, pressure):
 
@@ -56,8 +105,24 @@ class InterpolatedGas(Gas):
 
         Gas.__init__(self, gas_dict['molar_mass'], pressure)
 
-
     def energy_loss(self, en, proj_mass, proj_charge):
+        """Calculates the energy loss of a projectile in the gas using the interpolated spline.
+
+        Parameters
+        ----------
+        en : float
+            The projectile's kinetic energy in MeV
+        proj_mass : int
+            The mass number of the projectile
+        proj_charge : int
+            The charge number of the projectile
+
+        Returns
+        -------
+        float
+            The stopping power of the gas, in MeV/m
+
+        """
 
         if proj_mass != 4 or proj_charge != 2:
             raise NotImplementedError('Not implemented for particles other than alpha')
@@ -127,6 +192,23 @@ class InterpolatedGasMixture(Gas):
         Gas.__init__(self, molar_mass, pressure)
 
     def energy_loss(self, en, proj_mass, proj_charge):
+        """Calculates the energy loss of a projectile in the gas using the interpolated spline.
+
+        Parameters
+        ----------
+        en : float
+            The projectile's kinetic energy in MeV
+        proj_mass : int
+            The mass number of the projectile
+        proj_charge : int
+            The charge number of the projectile
+
+        Returns
+        -------
+        float
+            The stopping power of the gas, in MeV/m
+
+        """
 
         if proj_mass != 4 or proj_charge != 2:
             raise NotImplementedError('Not implemented yet for particles other than alphas')
@@ -140,7 +222,7 @@ class InterpolatedGasMixture(Gas):
 class HeliumGas(GenericGas):
     """Represents the properties of pure helium-4 gas.
 
-    This is a subclass of the `Gas` class for helium-4. The main change is that the energy loss function has been
+    This is a subclass of the `GenericGas` class for helium-4. The main change is that the energy loss function has been
     overridden with an empirical fit. The fit data comes from the AT-TPC Fortran simulation, and the data itself may
     have originally come from Northcliffe and Schilling (1970).
 
@@ -209,7 +291,8 @@ class HeliumGas(GenericGas):
 class HeCO2Gas(GenericGas):
     """Represents a mixture of 90 percent helium and 10 percent carbon dioxide.
 
-    This is a subclass of the `Gas` class with a replacement for the energy loss function. The energy loss function
+    This is a subclass of the `GenericGas` class with a replacement for the energy loss function.
+    The energy loss function
     used here is a fit to data from the NIST ASTAR website (http://physics.nist.gov/PhysRefData/Star/Text/ASTAR.html).
 
     ..  Warning::
