@@ -162,7 +162,7 @@ class TestFindNextState(unittest.TestCase):
 
     def setUp(self):
         self.p = sim.Particle(4, 2, 3)
-        self.g = pytpc.gases.Gas(4, 2, 41.8, 150.)
+        self.g = pytpc.gases.GenericGas(4, 2, 41.8, 150.)
         self.ef = numpy.array([0, 0, 15e3])
         self.bf = numpy.array([0, 0, -1])
         self.tstep = 5e-11

@@ -4,10 +4,10 @@ import pytpc.relativity as rel
 from pytpc.constants import *
 
 
-class TestGas(unittest.TestCase):
+class TestGenericGas(unittest.TestCase):
     def setUp(self):
-        self.gas = pytpc.gases.Gas(molar_mass=10., num_electrons=4.,
-                                   mean_exc_pot=8., pressure=200.)
+        self.gas = pytpc.gases.GenericGas(molar_mass=10., num_electrons=4.,
+                                          mean_exc_pot=8., pressure=200.)
 
     def test_density(self):
         res = self.gas.density
@@ -25,11 +25,57 @@ class TestGas(unittest.TestCase):
         self.assertEqual(res, expect)
 
 
+class TestGas(unittest.TestCase):
+    def setUp(self):
+        self.gas = pytpc.gases.Gas(molar_mass=10., pressure=200.)
+
+    def test_density(self):
+        res = self.gas.density
+        expect = self.gas.pressure / 760. * self.gas.molar_mass / 24040.
+        self.assertEqual(res, expect)
+
+
+class TestInterpolatedGas(unittest.TestCase):
+
+    def setUp(self):
+        self.gas = pytpc.gases.InterpolatedGas('helium', 200)
+
+    def test_energy_loss(self):
+        for en in range(0, 10):
+            res = self.gas.energy_loss(en, 4, 2)
+            exp = self.gas.spline(en) * self.gas.density * 100
+            self.assertAlmostEqual(res, exp)
+
+
+class TestInterpolatedGasMixture(unittest.TestCase):
+
+    def setUp(self):
+        self.heco = pytpc.gases.InterpolatedGasMixture(200, ('helium', 0.5),
+                                                            ('carbon_dioxide', 0.5))
+        self.he = pytpc.gases.InterpolatedGas('helium', 100)
+        self.co = pytpc.gases.InterpolatedGas('carbon_dioxide', 100)
+
+    def test_density(self):
+        res = self.heco.density
+        exp = self.he.density + self.co.density
+        self.assertAlmostEqual(res, exp)
+
+    def test_molar_mass(self):
+        res = self.heco.molar_mass
+        exp = self.he.molar_mass * 0.5 + self.co.molar_mass * 0.5
+        self.assertAlmostEqual(res, exp)
+
+    def test_pressure(self):
+        total = self.heco.pressure
+        comps = sum([g.pressure for g, p in self.heco.components])
+        self.assertAlmostEqual(comps, total)
+
+
 class TestBethe(unittest.TestCase):
     """Tests for pytpc.gases.bethe function"""
 
     def setUp(self):
-        self.gas = pytpc.gases.Gas(4, 2, 41.8, 100)
+        self.gas = pytpc.gases.GenericGas(4, 2, 41.8, 100)
 
     def test_zero_beta(self):
         self.assertEqual(pytpc.gases.bethe(0., 2, self.gas.electron_density_per_m3, self.gas.mean_exc_pot),
