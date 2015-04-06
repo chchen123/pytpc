@@ -131,6 +131,33 @@ class InterpolatedGas(Gas):
 
 
 class GenericGas(Gas):
+    """Represents a gas whose energy loss is determined using the Bethe formula.
+
+    Parameters
+    ----------
+    molar_mass : number
+        The molar mass of the gas, in g/mol
+    pressure : number
+        The gas pressure, in Torr
+    num_electrons : int
+        Number of electrons per molecule, or the total Z
+    mean_exc_pot : float
+        The mean excitation potential, as used in Bethe's formula, in eV
+
+    Attributes
+    ----------
+    density : float
+        The density of the gas
+    molar_mass : float
+        The molar mass of the gas molecules
+    pressure : float
+        The gas pressure
+    electron_density : float
+        The density of electrons in cm^-3
+    electron_density_per_m3 : float
+        The density of electrons in m^-3
+
+    """
 
     def __init__(self, molar_mass, pressure, num_electrons, mean_exc_pot):
         self.num_electrons = num_electrons
@@ -172,9 +199,35 @@ class GenericGas(Gas):
 
 
 class InterpolatedGasMixture(Gas):
+    r"""Represents a mixture of interpolated gases.
+
+    Each gas specified must be a valid ``InterpolatedGas``. That is, there must be a file in the gas data directory for
+    each gas named. See the documentation on :class:`InterpolatedGas` for more information.
+
+    Parameters
+    ----------
+    pressure : float
+        The gas pressure in Torr
+    gas_fractions : tuple
+        The remaining arguments are assumed to be tuples of ``(gas_name, proportion)``, where ``gas_name`` is a string
+        naming a valid gas from the gas data folder, and ``proportion`` is a float between 0 and 1 representing the
+        fraction of the mixture that is that gas.
+
+    Attributes
+    ----------
+    density : float
+        The density of the gas
+    molar_mass : float
+        The molar mass of the gas molecules
+    pressure : float
+        The gas pressure
+
+    See Also
+    --------
+    InterpolatedGas
+    """
 
     def __init__(self, pressure, *args):
-
         self.components = []
         molar_mass = 0.0
         total_prop = 0.0
@@ -207,6 +260,12 @@ class InterpolatedGasMixture(Gas):
         -------
         float
             The stopping power of the gas, in MeV/m
+
+        Raises
+        ------
+        NotImplementedError
+            If the projectile charge or mass do not correspond to an alpha particle. This will eventually be changed
+            to allow different particles.
 
         """
 
