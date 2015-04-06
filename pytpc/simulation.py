@@ -282,8 +282,9 @@ def find_next_state(particle, gas, ef, bf, tstep):
 
     force = lorentz(vel, ef, bf, charge)
     new_mom = mom + force * tstep
+    dpos = tstep * particle.beta * c_lgt
     stopping = gas.energy_loss(particle.energy, particle.mass_num, particle.charge_num)  # in MeV/m
-    de = float(threshold(stopping*pos_step, threshmin=0))
+    de = float(threshold(stopping*dpos, threshmin=0))
 
     if stopping <= 0 or de == 0:
         new_state = particle.state_vector
