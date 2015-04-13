@@ -170,6 +170,49 @@ class UnscentedKalmanFilter(object):
 
         return means, covars, times
 
+    def smooth(self, xs, Ps, times):
+
+        assert len(xs) == len(Ps)
+        n, dim_x = xs.shape
+
+        xs_new = xs.copy()
+        Ps_new = Ps.copy()
+
+        num_sigmas = 2*dim_x + 1
+        sigmas_f = np.zeros((num_sigmas, dim_x))
+
+        for k in range(n-2, -1, -1):
+            dt = times[k+1] - times[k]
+
+            # find and process sigma points
+            sigmas = self.find_sigma_points(xs_new[k], Ps_new[k], self.kappa)
+            for i in range(num_sigmas):
+                sigmas_f[i] = self.fx(sigmas[i], dt)
+
+            # find prior state and covariance
+            xb = self.W.dot(sigmas_f)
+            Pb = 0
+            for i in range(num_sigmas):
+                y = sigmas_f[i] - xs[k]
+                Pb += self.W[i] + np.outer(y, y)
+            Pb += self.Q
+
+            # find cross-covariance
+            Pxb = 0
+            for i in range(num_sigmas):
+                z = sigmas[i] - xs[k]
+                y = sigmas_f[i] - xb
+                Pxb += self.W[i] * np.outer(z, y)
+
+            # find the gain
+            K = Pxb.dot(inv(Pb))
+
+            # update the smoothed estimates
+            xs_new[k] += K.dot(xs_new[k+1] - xb)
+            Ps_new[k] += K.dot(Ps_new[k+1] - Pb).dot(K.T)
+
+        return xs_new, Ps_new
+
     @staticmethod
     def find_sigma_points(x, P, k):
         r"""Finds the sigma points for the unscented transform.
