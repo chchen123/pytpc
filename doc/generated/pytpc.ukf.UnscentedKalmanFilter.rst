@@ -11,6 +11,7 @@ pytpc.ukf.UnscentedKalmanFilter
       :toctree:
 
       ~UnscentedKalmanFilter.batch_filter
+      ~UnscentedKalmanFilter.smooth
       ~UnscentedKalmanFilter.find_sigma_points
       ~UnscentedKalmanFilter.find_weights
       ~UnscentedKalmanFilter.predict
