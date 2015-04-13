@@ -41,6 +41,8 @@ extensions = [
 
 numpydoc_show_class_members = False
 autosummary_generate = True
+# Change mathjax path to use https url
+mathjax_path = 'https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML'
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
