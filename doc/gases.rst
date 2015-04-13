@@ -6,49 +6,78 @@ Gases
 The module :mod:`gases` provides some classes to represent gases in the TPC. This is mainly used to calculate the
 stopping power of the gas in order to find the energy loss of the tracked particle as it moves through the TPC.
 
-The generic :class:`gases.Gas` class uses the `Bethe equation <https://en.wikipedia.org/wiki/Bethe_formula>`_ to
-calculate the stopping power. However, since this formula is neither incredibly accurate nor numerically stable at
-low energies, it is better to derive from the `Gas` class and replace this with a better calculation of the stopping
-power, perhaps from a fit of experimental data.
+There are two general ways to specify a gas for the program. The first (and best) way is with the
+:class:`gases.InterpolatedGas` class. This class calculates the stopping power using an interpolated spline applied to
+experimental or externally simulated data. This gives the most precise stopping power data.
+
+The other option is to use the :class:`gases.GenericGas` class, which uses the
+`Bethe equation <https://en.wikipedia.org/wiki/Bethe_formula>`_ to calculate the stopping power.
+However, since this formula is neither incredibly accurate nor numerically stable at
+low energies, this is probably not the best choice.
+
+The abstract :class:`gases.Gas` class is the parent of these two classes, and should not be used directly.
+
+Mixtures
+--------
+
+A mixture of gases can be created using the :class:`gases.InterpolatedGasMixture` class. This uses the same method
+as the :class:`gases.InterpolatedGas` class to calculate the stopping power of each component gas. The stopping powers are
+then averaged together using the partial density of each gas as a weighting factor.
 
 Usage
 -----
 
+The :class:`gases.InterpolatedGas` class can be loaded by specifying a gas name and pressure::
+
+    gas = pytpc.gases.InterpolatedGas('helium', 150.)  # helium gas at 150 torr, using the interpolated class
+
+The name of the gas must match a file in the directory :file:`$PYTPC/data/gases`, where :file:`$PYTPC` is the directory
+where the ``pytpc`` module is installed. Some example gas names are ``'helium'`` and ``'carbon dioxide'``.
+
 The generic class can be instantiated with the molar mass, number of electrons per molecule, mean excitation potential,
 and pressure of the gas::
 
-    gas = pytpc.gases.Gas(4, 2, 41.8, 100.)  # helium gas at 100 torr, using the generic class
+    gas = pytpc.gases.GenericGas(4, 100., 2, 41.8)  # helium gas at 100 torr, using the generic class
 
-The specific gases are a bit simpler to use, as all that needs to be specified is the pressure::
+To make a mixture of gases, specify the total pressure and the composition of the gas::
 
-    he = pytpc.gases.HeliumGas(100.)  # helium gas at 100 torr, using the specific class
+    # This makes a mixture of 90% helium and 10% CO2
+    mix = pytpc.gases.InterpolatedGasMixture(150., ('helium', 0.9), ('carbon dioxide', 0.1))
 
-Currently Implemented Gases
----------------------------
+Any mixture of gases can be specified this way. The only restrictions are that each component must be a valid
+:class:`InterpolatedGas` and the proportions of the gases must sum to 1.
 
-The following gases are currently available:
+Format of gas data files
+------------------------
 
-- Pure helium-4
-- Generic
+The files in the gas data directory mentioned above are JSON files with the following keys:
 
-Deriving a New Gas
-------------------
+.. cssclass:: table-striped
 
-A new gas can be derived by adding a subclass to the :file:`gases.py` file. A basic outline of a gas is below::
+============  ============================================
+     Key                       Value
+============  ============================================
+'molar_mass'  The molar mass of the gas
+'dedx'        The energy loss information, in MeV/(g/cm^2)
+============  ============================================
 
-    class SomeNewGas(Gas):
+Any other keys will be ignored.
 
-        def __init__(self, pressure):
-            # Call the superclass to initialize it. Pass in the parameters of the gas.
-            Gas.__init__(self, 4, 2, 41.8, pressure)
+The data itself could come from a paper, from SRIM, or from a website like http://www.nist.gov/pml/data/star/.
 
-        def energy_loss(self, en, proj_mass, proj_charge):
-            # This overrides the Bethe function in the generic gas.
-            # Insert a fit from data or some other code here to calculate the
-            # stopping power.
-            pass
+In the JSON format, a file might look like this:
 
-Naturally, this should also be filled in with appropriate docstrings to add to this documentation!
+..  code-block:: json
+
+    {
+        "molar_mass": 4.002,
+
+        "dedx": [[0.001, 382.2],
+                 [0.0015, 367.8],
+                 [0.002, 360.3],
+                 ...
+                 ]
+    }
 
 API Reference
 -------------
@@ -66,7 +95,9 @@ This module describes the gases used in the detector.
     :toctree: generated/
 
     Gas
-    HeliumGas
+    GenericGas
+    InterpolatedGas
+    InterpolatedGasMixture
 
 ..  rubric:: Functions
 

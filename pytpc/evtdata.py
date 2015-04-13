@@ -688,8 +688,8 @@ def calibrate(data, drift_vel, clock):
     clock : int, float
         The CoBo write clock frequency, in MHz
 
-    Return
-    ------
+    Returns
+    -------
     ndarray or int or float
         The calibrated data
 
@@ -727,8 +727,8 @@ def uncalibrate(data, drift_vel, clock):
     clock : int, float
         The CoBo write clock frequency, in MHz
 
-    Return
-    ------
+    Returns
+    -------
     ndarray or int or float
         The uncalibrated data
 

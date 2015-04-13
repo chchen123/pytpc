@@ -99,6 +99,6 @@ This module contains the functions for working with event files.
     :toctree: generated/
 
     calibrate
-    uncalibrate_z
+    uncalibrate
     load_pedestals
     load_padmap
