@@ -171,6 +171,29 @@ class UnscentedKalmanFilter(object):
         return means, covars, times
 
     def smooth(self, xs, Ps, times):
+        """Perform Rauch-Tung-Streibel smoothing on the filtered data.
+
+        This essentially runs the filter again over the filter results in the reverse order. This may help smooth
+        out the fit for the earlier points.
+
+        Parameters
+        ----------
+        xs : ndarray
+            The filter means, or the output from the filter. This can be found, e.g., using ``batch_filter``.
+        Ps : ndarray
+            The covariance matrices from the Kalman filter. These can also be found using ``batch_filter``.
+        times : ndarray
+            The calculated time at each data point. This is used to calulate the timestep between each point. This is
+            also output by the ``batch_filter`` function.
+
+        Returns
+        -------
+        xs_new : ndarray
+            The smoothed means
+        Ps_new : ndarray
+            The smoothed covariance matrices
+
+        """
 
         assert len(xs) == len(Ps)
         n, dim_x = xs.shape
