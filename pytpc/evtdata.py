@@ -650,14 +650,15 @@ def make_event(pos, de, clock, vd, ioniz, proj_mass, shapetime, offset=0):
 
     # Find the pad for each point
     pca = numpy.round(numpy.array([find_pad_coords(p[0], p[1]) for p in uncal[:, 0:2]]))
-    pnums = numpy.array([padcenter_dict[tuple(a)] for a in pca])
-    unique_pads = numpy.unique(pnums)
+    pnums = numpy.array([padcenter_dict.get(tuple(a), -1) for a in pca])
+    unique_pads = set(pnums)
+    unique_pads.discard(-1)
 
     shapetime_tb = shapetime*1e-9 * clock*1e6
 
     # Build the event
     evt = Event()
-    evt.traces = numpy.zeros(unique_pads.shape, dtype=evt.dt)
+    evt.traces = numpy.zeros(len(unique_pads), dtype=evt.dt)
     for i, p in enumerate(unique_pads):
         idxs = numpy.where(pnums == p)
         tr = numpy.zeros(512)
