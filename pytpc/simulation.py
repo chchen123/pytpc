@@ -356,7 +356,7 @@ def track(particle, gas, ef, bf, final_energy=0.0):
         state = find_next_state(particle, gas, ef, bf, tstep)
         particle.state_vector = state
         if particle.energy <= final_energy:
-            print('Reached final energy')
+            # print('Reached final energy')
             done = True
 
         pos.append(particle.position)
@@ -370,7 +370,7 @@ def track(particle, gas, ef, bf, final_energy=0.0):
         time.append(current_time)
 
         if not(0 <= particle.position[2] <= 1) or sqrt(particle.position[0]**2 + particle.position[1]**2) > 0.275:
-            print('Particle left chamber')
+            # print('Particle left chamber')
             done = True
 
     res_keys = ['x', 'y', 'z', 'px', 'py', 'pz', 'time', 'en', 'de', 'azi', 'pol']
