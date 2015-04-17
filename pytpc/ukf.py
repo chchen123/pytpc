@@ -10,6 +10,7 @@ class from the filterpy library (http://github.com/rlabbe/filterpy).
 from __future__ import division, print_function
 import numpy as np
 from numpy.linalg import cholesky, inv
+from scipy.interpolate import UnivariateSpline
 
 
 class UnscentedKalmanFilter(object):
@@ -155,12 +156,17 @@ class UnscentedKalmanFilter(object):
         times = np.zeros(n)
         current_time = 0.
 
-        idxs = np.linspace(0, n-1, 4, dtype='int')  # Use 4 points along curve. Number chosen empirically.
-        delta_zs = np.diff(zs[idxs], axis=0)
-        dpos = np.linalg.norm(delta_zs, axis=-1).sum() / n  # average is total length / number of pts
+        splx = UnivariateSpline(zs[:, 2], zs[:, 0])
+        sply = UnivariateSpline(zs[:, 2], zs[:, 1])
+
+        dx = np.diff(splx(zs[:, 2]))
+        dy = np.diff(sply(zs[:, 2]))
+        dz = np.diff(zs[:, 2])
+        dpos = np.sqrt(dx**2 + dy**2 + dz**2)
+        dpos = np.insert(dpos, 0, dpos[0])  # Otherwise dpos has length n-1 because of np.diff
 
         for i in range(n):
-            dt = self.dtx(self.x, dpos)  # The dt varies since the particle energy changes with time
+            dt = self.dtx(self.x, dpos[i])  # The dt varies since the particle energy changes with time
             self.predict(dt)
             self.update(zs[i])
             means[i, :] = self.x
