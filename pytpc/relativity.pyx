@@ -1,3 +1,5 @@
+# cython: profile=True
+
 """Special Relativity Functions
 
 This module contains functions to calculate quantities of interest in special relativity.
@@ -5,13 +7,14 @@ This module contains functions to calculate quantities of interest in special re
 """
 
 from __future__ import division, print_function
+cimport numpy
 import numpy
 from pytpc.constants import *
-from math import sqrt, log, sinh, cosh, sin, cos, atan
+from libc.math cimport sqrt, log, sinh, cosh, sin, cos, atan
 import copy
 
 
-def gamma(v):
+cpdef double gamma(v) except -1:
     r"""Calculates the Lorentz gamma factor.
 
     Gamma is defined as 1 / sqrt(1 - beta**2) where beta = v / c.
@@ -26,9 +29,15 @@ def gamma(v):
     ValueError
         If the magnitude of `v` is greater than the speed of light.
     """
-    vmag = numpy.linalg.norm(v)
+    cdef double vmag
+
+    if numpy.isscalar(v):
+        vmag = v
+    else:
+        vmag = sqrt(v[0]*v[0] + v[1]*v[1] * v[2]*v[2])
     if vmag >= c_lgt:
-        raise ValueError('Velocity was {}, which exceeds c.'.format(vmag))
+        # raise ValueError('Velocity was {}, which exceeds c.'.format(vmag))
+        return -1
     return 1/sqrt(1-vmag**2/c_lgt**2)
 
 

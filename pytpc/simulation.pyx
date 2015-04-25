@@ -1,3 +1,5 @@
+# cython: profile=True
+
 """
 simulation.py
 =============
@@ -155,7 +157,7 @@ cdef class Particle(object):
     property velocity:
         def __get__(self):
             """The particle's velocity in m/s"""
-            p_si = self.momentum * 1e6 / c_lgt * e_chg
+            cdef np.ndarray p_si = self.momentum * 1e6 / c_lgt * e_chg
             return p_si / (self.gamma * self.mass_kg)
 
         def __set__(self, np.ndarray value):
