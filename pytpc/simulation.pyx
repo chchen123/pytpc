@@ -10,7 +10,9 @@ from __future__ import division, print_function
 cimport numpy as np
 import numpy as np
 import pandas as pd
-from math import atan2, sin, cos, sqrt
+
+from libc.math cimport atan2, sin, cos, sqrt
+import cython
 
 import copy
 
@@ -71,6 +73,7 @@ cdef class Particle(object):
 
         def __set__(self, np.ndarray value):
             self._momentum = value
+            cdef double px, py, pz
             px, py, pz = value
             self._mom_mag = sqrt(px**2 + py**2 + pz**2)
             self._energy = sqrt(self._mom_mag**2 + self.mass**2) - self.mass
@@ -156,8 +159,8 @@ cdef class Particle(object):
             return p_si / (self.gamma * self.mass_kg)
 
         def __set__(self, np.ndarray value):
-            gam = rel.gamma(value)
-            p_si = gam * self.mass_kg * value
+            cdef double gam = rel.gamma(value)
+            cdef np.ndarray p_si = gam * self.mass_kg * value
             self.momentum = p_si / e_chg * c_lgt * 1e-6
 
     property beta:
@@ -190,7 +193,11 @@ cdef class Particle(object):
             self.momentum = value[3:6]
 
 
-def lorentz(vel, ef, bf, charge):
+@cython.boundscheck(False)
+cpdef lorentz(np.ndarray vel,
+              np.ndarray ef,
+              np.ndarray bf,
+              double charge):
     """Calculate the Lorentz (electromagnetic) force.
 
     This is defined as
@@ -218,9 +225,17 @@ def lorentz(vel, ef, bf, charge):
         The electromagnetic force, in whatever units the inputs generate
     """
 
-    vx, vy, vz = vel
-    ex, ey, ez = ef
-    Bx, By, Bz = bf
+    cdef double vx, vy, vz, ex, ey, ez, Bx, By, Bz, fx, fy, fz
+
+    vx = vel[0]
+    vy = vel[1]
+    vz = vel[2]
+    ex = ef[0]
+    ey = ef[1]
+    ez = ef[2]
+    Bx = bf[0]
+    By = bf[1]
+    Bz = bf[2]
 
     fx = charge * (ex + vy*Bz - vz*By)
     fy = charge * (ey + vz*Bx - vx*Bz)
@@ -229,7 +244,7 @@ def lorentz(vel, ef, bf, charge):
     return np.array([fx, fy, fz])
 
 
-def threshold(value, threshmin=0.):
+cpdef threshold(double value, double threshmin=0.):
     """Applies a threshold to the given value.
 
     Any value less than threshmin will be replaced by threshmin.
@@ -304,7 +319,8 @@ def find_next_state(particle, gas, ef, bf, tstep):
         return new_particle.state_vector
 
 
-def track(particle, gas, ef, bf, final_energy=0.0):
+cpdef track(Particle particle, gas, np.ndarray ef, np.ndarray bf,
+          double final_energy=0.0):
     """ Track the provided particle's trajectory until it stops.
 
     This can be used to simulate a particle's motion through the detector.
@@ -333,15 +349,16 @@ def track(particle, gas, ef, bf, final_energy=0.0):
             - pol: The polar angle of the trajectory at each step
 
     """
-    pos = []
-    mom = []
-    time = []
-    en = []
-    de = []
-    azi = []
-    pol = []
+    cdef list pos = []
+    cdef list mom = []
+    cdef list time = []
+    cdef list en = []
+    cdef list de = []
+    cdef list azi = []
+    cdef list pol = []
 
-    current_time = 0
+    cdef double current_time = 0.0
+    cdef double tstep
 
     pos.append(particle.position)
     mom.append(particle.momentum)
@@ -351,7 +368,7 @@ def track(particle, gas, ef, bf, final_energy=0.0):
     azi.append(particle.azimuth)
     pol.append(particle.polar)
 
-    done = False
+    cdef bint done = False
     while not done:
         tstep = pos_step / (particle.beta * c_lgt)
         state = find_next_state(particle, gas, ef, bf, tstep)
@@ -376,11 +393,10 @@ def track(particle, gas, ef, bf, final_energy=0.0):
 
     res_keys = ['x', 'y', 'z', 'px', 'py', 'pz', 'time', 'en', 'de', 'azi', 'pol']
 
-    pos = np.array(pos)
-    mom = np.array(mom)
-    res = np.hstack((pos, mom, np.array([time, en, de, azi, pol]).T))
-
-    tracks = pd.DataFrame(res, columns=res_keys)
+    tracks = pd.DataFrame(columns=res_keys, index=range(len(time)))
+    tracks[['x', 'y', 'z']] = np.array(pos)
+    tracks[['px', 'py', 'pz']] = np.array(mom)
+    tracks[['time', 'en', 'de', 'azi', 'pol']] = time, en, de, azi, pol
     return tracks
 
 
