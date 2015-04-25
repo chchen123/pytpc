@@ -60,6 +60,10 @@ cdef class Particle(object):
         self._polar = polar
         self._azimuth = azimuth
 
+    def __copy__(self):
+        return Particle(self.mass_num, self.charge_num, self.energy_per_particle,
+                        self.position, self.azimuth, self.polar)
+
     property momentum:
         def __get__(self):
             """The particle's momentum in MeV/c"""

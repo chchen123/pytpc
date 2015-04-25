@@ -9,6 +9,7 @@ import numpy
 import numpy.testing as nptest
 import pandas as pd
 from pytpc.constants import *
+import copy
 
 
 class TestParticle(unittest.TestCase):
@@ -126,6 +127,20 @@ class TestParticle(unittest.TestCase):
     def test_polar_setter(self):
         self.p.polar = pi/24
         self.assertAlmostEqual(self.p.polar, pi/24, delta=1e-3)
+
+    def test_copy(self):
+        cp = copy.copy(self.p)
+        self.assertEqual(cp.mass_num, self.p.mass_num)
+        self.assertEqual(cp._mass, self.p._mass)
+        self.assertEqual(cp.charge_num, self.p.charge_num)
+        self.assertEqual(cp.charge, self.p.charge)
+        nptest.assert_equal(cp.position, self.p.position)
+        self.assertEqual(cp._energy, self.p._energy)
+        self.assertEqual(cp._mom_mag, self.p._mom_mag)
+        nptest.assert_equal(cp._momentum, self.p.momentum)
+        self.assertEqual(cp._polar, self.p._polar)
+        self.assertEqual(cp._azimuth, self.p._azimuth)
+
 
 
 class TestLorentz(unittest.TestCase):
