@@ -7,6 +7,7 @@ Contains code for simulating the tracking of particles in a TPC.
 """
 
 from __future__ import division, print_function
+cimport numpy as np
 import numpy as np
 import pandas as pd
 from math import atan2, sin, cos, sqrt
@@ -17,7 +18,7 @@ from pytpc.constants import *
 import pytpc.relativity as rel
 
 
-class Particle(object):
+cdef class Particle(object):
     """ Describes a beam particle for tracking.
 
     The state of the particle is stored internally as its energy and momentum. However, since most of the attributes
@@ -40,7 +41,12 @@ class Particle(object):
         The polar angle of the particle's trajectory, in radians
     """
 
-    def __init__(self, mass_num, charge_num, energy_per_particle=0, position=(0, 0, 0), azimuth=0, polar=0):
+    cdef public int mass_num, charge_num
+    cdef public double _mass, _energy, _mom_mag, _polar, _azimuth, charge
+    cdef public np.ndarray position, _momentum
+
+    def __init__(self, int mass_num, int charge_num, double energy_per_particle=0,
+                 position=np.zeros(3, dtype=np.double), double azimuth=0., double polar=0.):
         self.mass_num = mass_num
         self._mass = mass_num * p_mc2
         self.charge_num = charge_num
@@ -54,139 +60,130 @@ class Particle(object):
         self._polar = polar
         self._azimuth = azimuth
 
-    @property
-    def momentum(self):
-        """The particle's momentum in MeV/c"""
-        return self._momentum
+    property momentum:
+        def __get__(self):
+            """The particle's momentum in MeV/c"""
+            return self._momentum
 
-    @momentum.setter
-    def momentum(self, new):
-        self._momentum = new
-        px, py, pz = new
-        self._mom_mag = np.linalg.norm(new)
-        self._energy = sqrt(self._mom_mag**2 + self.mass**2) - self.mass
-        self._polar = atan2(sqrt(px**2 + py**2), pz)
-        self._azimuth = atan2(py, px)
+        def __set__(self, np.ndarray value):
+            self._momentum = value
+            px, py, pz = value
+            self._mom_mag = sqrt(px**2 + py**2 + pz**2)
+            self._energy = sqrt(self._mom_mag**2 + self.mass**2) - self.mass
+            self._polar = atan2(sqrt(px**2 + py**2), pz)
+            self._azimuth = atan2(py, px)
 
-    @property
-    def momentum_si(self):
-        """The particle's momentum in kg.m/s"""
-        return self._momentum * 1e6 * e_chg / c_lgt
+    property momentum_si:
+        def __get__(self):
+            """The particle's momentum in kg.m/s"""
+            return self._momentum * 1e6 * e_chg / c_lgt
 
-    @momentum_si.setter
-    def momentum_si(self, value):
-        self.momentum = value * 1e-6 / e_chg * c_lgt
+        def __set__(self, np.ndarray value):
+            self.momentum = value * 1e-6 / e_chg * c_lgt
 
-    @property
-    def azimuth(self):
-        """The azimuthal angle of the trajectory in radians"""
-        return self._azimuth
+    property azimuth:
+        def __get__(self):
+            """The azimuthal angle of the trajectory in radians"""
+            return self._azimuth
 
-    @azimuth.setter
-    def azimuth(self, new):
-        self._azimuth = new
-        azi = new
-        pol = self._polar
-        self._momentum = self._mom_mag * np.array([cos(azi) * sin(pol),
-                                                   sin(azi) * sin(pol),
-                                                   cos(pol)])
+        def __set__(self, double value):
+            self._azimuth = value
+            azi = value
+            pol = self._polar
+            self._momentum = self._mom_mag * np.array([cos(azi) * sin(pol),
+                                                       sin(azi) * sin(pol),
+                                                       cos(pol)])
 
-    @property
-    def polar(self):
-        """The polar angle of the trajectory in radians"""
-        return self._polar
+    property polar:
+        def __get__(self):
+            """The polar angle of the trajectory in radians"""
+            return self._polar
 
-    @polar.setter
-    def polar(self, new):
-        self._polar = new
-        azi = self._azimuth
-        pol = new
-        self._momentum = self._mom_mag * np.array([cos(azi) * sin(pol),
-                                                   sin(azi) * sin(pol),
-                                                   cos(pol)])
+        def __set__(self, double value):
+            self._polar = value
+            azi = self._azimuth
+            pol = value
+            self._momentum = self._mom_mag * np.array([cos(azi) * sin(pol),
+                                                       sin(azi) * sin(pol),
+                                                       cos(pol)])
 
-    @property
-    def energy(self):
-        """The total energy in MeV"""
-        return self._energy
+    property energy:
+        def __get__(self):
+            """The total energy in MeV"""
+            return self._energy
 
-    @energy.setter
-    def energy(self, new):
-        self._mom_mag = sqrt((new + self.mass)**2 - self.mass**2)
-        self._momentum = self._mom_mag * np.array([cos(self.azimuth) * sin(self.polar),
-                                                      sin(self.azimuth) * sin(self.polar),
-                                                      cos(self.polar)])
-        self._energy = sqrt(self._mom_mag**2 + self.mass**2) - self.mass
+        def __set__(self, double value):
+            self._mom_mag = sqrt((value + self.mass)**2 - self.mass**2)
+            self._momentum = self._mom_mag * np.array([cos(self.azimuth) * sin(self.polar),
+                                                          sin(self.azimuth) * sin(self.polar),
+                                                          cos(self.polar)])
+            self._energy = sqrt(self._mom_mag**2 + self.mass**2) - self.mass
 
-    @property
-    def energy_j(self):
-        """The total energy in J"""
-        return self.energy * 1e6 * e_chg
+    property energy_j:
+        def __get__(self):
+            """The total energy in J"""
+            return self.energy * 1e6 * e_chg
 
-    @energy_j.setter
-    def energy_j(self, value):
-        self.energy = value / 1e6 / e_chg
+        def __set__(self, double value):
+            self.energy = value / 1e6 / e_chg
 
-    @property
-    def energy_per_particle(self):
-        """The energy per particle in MeV/u"""
-        return self.energy / self.mass_num
+    property energy_per_particle:
+        def __get__(self):
+            """The energy per particle in MeV/u"""
+            return self.energy / self.mass_num
 
-    @energy_per_particle.setter
-    def energy_per_particle(self, new):
-        self.energy = new * self.mass_num
+        def __set__(self, double value):
+            self.energy = value * self.mass_num
 
-    @property
-    def mass(self):
-        """The particle mass in MeV/c^2"""
-        return self._mass
+    property mass:
+        def __get__(self):
+            """The particle mass in MeV/c^2"""
+            return self._mass
 
-    @property
-    def mass_kg(self):
-        """The particle mass in kg"""
-        return self._mass * MeVtokg
+    property mass_kg:
+        def __get__(self):
+            """The particle mass in kg"""
+            return self._mass * MeVtokg
 
-    @property
-    def velocity(self):
-        """The particle's velocity in m/s"""
-        p_si = self.momentum * 1e6 / c_lgt * e_chg
-        return p_si / (self.gamma * self.mass_kg)
+    property velocity:
+        def __get__(self):
+            """The particle's velocity in m/s"""
+            p_si = self.momentum * 1e6 / c_lgt * e_chg
+            return p_si / (self.gamma * self.mass_kg)
 
-    @velocity.setter
-    def velocity(self, new):
-        gam = rel.gamma(new)
-        p_si = gam * self.mass_kg * new
-        self.momentum = p_si / e_chg * c_lgt * 1e-6
+        def __set__(self, np.ndarray value):
+            gam = rel.gamma(value)
+            p_si = gam * self.mass_kg * value
+            self.momentum = p_si / e_chg * c_lgt * 1e-6
 
-    @property
-    def beta(self):
-        """The particle's beta, or v/c"""
-        en = self.energy
-        m = self.mass
-        return rel.beta(en, m)
+    property beta:
+        def __get__(self):
+            """The particle's beta, or v/c"""
+            en = self.energy
+            m = self.mass
+            return rel.beta(en, m)
 
-    @property
-    def gamma(self):
-        """The particle's gamma, as defined in the Lorentz transform"""
-        try:
-            g = 1 / sqrt(1 - self.beta**2)
-        except ZeroDivisionError:
-            g = 1e100
+    property gamma:
+        def __get__(self):
+            """The particle's gamma, as defined in the Lorentz transform"""
+            try:
+                g = 1 / sqrt(1 - self.beta**2)
+            except ZeroDivisionError:
+                g = 1e100
 
-        return g
+            return g
 
-    @property
-    def state_vector(self):
-        """The state vector of the particle, as (x, y, z, px, py, pz).
+    property state_vector:
+        def __get__(self):
+            """The state vector of the particle, as (x, y, z, px, py, pz).
 
-        Setting to this will update every other property automatically.
-        """
-        return np.hstack([self.position, self.momentum])
+            Setting to this will update every other property automatically.
+            """
+            return np.hstack([self.position, self.momentum])
 
-    @state_vector.setter
-    def state_vector(self, new):
-        self.position = new[0:3]
-        self.momentum = new[3:6]
+        def __set__(self, np.ndarray value):
+            self.position = value[0:3]
+            self.momentum = value[3:6]
 
 
 def lorentz(vel, ef, bf, charge):
@@ -219,11 +216,11 @@ def lorentz(vel, ef, bf, charge):
 
     vx, vy, vz = vel
     ex, ey, ez = ef
-    bx, by, bz = bf
+    Bx, By, Bz = bf
 
-    fx = charge * (ex + vy*bz - vz*by)
-    fy = charge * (ey + vz*bx - vx*bz)
-    fz = charge * (ez + vx*by - vy*bx)
+    fx = charge * (ex + vy*Bz - vz*By)
+    fy = charge * (ey + vz*Bx - vx*Bz)
+    fz = charge * (ez + vx*By - vy*Bx)
 
     return np.array([fx, fy, fz])
 
