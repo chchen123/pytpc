@@ -105,6 +105,10 @@ class InterpolatedGas(Gas):
 
         Gas.__init__(self, gas_dict['molar_mass'], pressure)
 
+        self._precomp_max_en = 100000  # max precomputed energy in keV (as integer)
+        en_grid = np.linspace(0, self._precomp_max_en / 1000, self._precomp_max_en + 1, dtype=np.float64)
+        self._precomp_eloss = self.spline(en_grid) * self.density * 100  # precomputed energy loss in MeV/m
+
     def energy_loss(self, en, proj_mass, proj_charge):
         """Calculates the energy loss of a projectile in the gas using the interpolated spline.
 
@@ -127,7 +131,11 @@ class InterpolatedGas(Gas):
         if proj_mass != 4 or proj_charge != 2:
             raise NotImplementedError('Not implemented for particles other than alpha')
 
-        return self.spline(en) * self.density * 100  # in MeV/m
+        en_idx = int(round(en * 1000))
+        if en_idx <= self._precomp_max_en:
+            return self._precomp_eloss[en_idx]
+        else:
+            return self.spline(en) * self.density * 100  # in MeV/m
 
 
 class GenericGas(Gas):
