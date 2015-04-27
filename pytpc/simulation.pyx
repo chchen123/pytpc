@@ -1,4 +1,4 @@
-# cython: profile=True
+# cython: profile=False 
 
 """
 simulation.py
@@ -195,11 +195,13 @@ cdef class Particle(object):
             self.momentum = value[3:6]
 
 
+@cython.profile(False)
+@cython.wraparound(False)
 @cython.boundscheck(False)
-cpdef lorentz(np.ndarray vel,
-              np.ndarray ef,
-              np.ndarray bf,
-              double charge):
+cpdef inline np.ndarray lorentz(np.ndarray vel,
+                                np.ndarray ef,
+                                np.ndarray bf,
+                                double charge):
     """Calculate the Lorentz (electromagnetic) force.
 
     This is defined as
@@ -246,7 +248,8 @@ cpdef lorentz(np.ndarray vel,
     return np.array([fx, fy, fz])
 
 
-cpdef threshold(double value, double threshmin=0.):
+@cython.profile(False)
+cpdef inline double threshold(double value, double threshmin=0.):
     """Applies a threshold to the given value.
 
     Any value less than threshmin will be replaced by threshmin.
@@ -265,7 +268,7 @@ cpdef threshold(double value, double threshmin=0.):
         return value
 
 
-def find_next_state(particle, gas, ef, bf, tstep):
+cpdef find_next_state(Particle particle, gas, np.ndarray ef, np.ndarray bf, double tstep):
     """ Find the next step for the given particle and conditions.
 
     Parameters
@@ -288,6 +291,10 @@ def find_next_state(particle, gas, ef, bf, tstep):
         can be provided to an instance of the Particle class to update its state
         in a tracking loop.
     """
+
+    cdef double en, charge, beta, dpos, stopping, de
+    cdef np.ndarray mom, vel, force, new_mom, new_vel
+    cdef Particle new_particle
 
     en = particle.energy
     mom = particle.momentum_si
