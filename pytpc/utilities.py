@@ -7,6 +7,7 @@ Some common functions that could be useful in many places.
 """
 
 import numpy as np
+from numpy import sin, cos
 from functools import wraps
 
 
@@ -95,6 +96,48 @@ def tilt_matrix(angle):
                     [0, np.cos(-angle), -np.sin(-angle)],
                     [0, np.sin(-angle), np.cos(-angle)]])
     return mat
+
+
+def euler_matrix(phi, theta, psi):
+
+    # mat = np.array([[cos(psi)*cos(phi) - cos(theta)*sin(phi)*sin(psi),
+    #                  cos(psi)*sin(phi) + cos(theta)*cos(phi)*sin(psi),
+    #                  sin(psi)*sin(theta)],
+    #                 [-sin(psi)*cos(phi) - cos(theta)*sin(phi)*cos(psi),
+    #                  -sin(psi)*sin(phi) + cos(theta)*cos(phi)*cos(psi),
+    #                  cos(psi)*sin(theta)],
+    #                 [sin(theta)*sin(phi),
+    #                  -sin(theta)*cos(phi),
+    #                  cos(theta)]])
+    # mat = np.array([[cos(theta)*cos(phi)*cos(psi) - sin(phi)*sin(psi),
+    #                  cos(theta)*cos(psi)*sin(phi) + cos(phi)*sin(psi),
+    #                  -(cos(psi)*sin(theta))],
+    #                 [-(cos(psi)*sin(phi)) - cos(theta)*cos(phi)*sin(psi),
+    #                  cos(phi)*cos(psi) - cos(theta)*sin(phi)*sin(psi),
+    #                  sin(theta)*sin(psi)],
+    #                 [cos(phi)*sin(theta),
+    #                  sin(theta)*sin(phi),
+    #                  cos(theta)]])
+    # mat = np.array([[cos(theta)*cos(phi)*cos(psi) - sin(phi)*sin(psi), -(cos(theta)*cos(psi)*sin(phi)) -
+    #                    cos(phi)*sin(psi), cos(psi)*sin(theta)], [cos(psi)*sin(phi) + cos(theta)*cos(phi)*sin(psi),
+    #                   cos(phi)*cos(psi) - cos(theta)*sin(phi)*sin(psi), sin(theta)*sin(psi)],
+    #                  [-(cos(phi)*sin(theta)), sin(theta)*sin(phi), cos(theta)]])
+
+    mat = np.array([[cos(theta)*cos(phi)*cos(psi) - sin(phi)*sin(psi), cos(theta)*cos(psi)*sin(phi) + cos(phi)*sin(psi),
+                      -(cos(psi)*sin(theta))], [-(cos(psi)*sin(phi)) - cos(theta)*cos(phi)*sin(psi),
+                      cos(phi)*cos(psi) - cos(theta)*sin(phi)*sin(psi), sin(theta)*sin(psi)],
+                     [cos(phi)*sin(theta), sin(theta)*sin(phi), cos(theta)]])
+
+
+    return mat
+
+
+def constrain_angle(x):
+    y = x % (2*np.pi)
+    if y < 0:
+        y += 2*np.pi
+
+    return y
 
 
 def create_fields(emag, bmag, tilt):

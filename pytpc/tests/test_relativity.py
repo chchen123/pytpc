@@ -6,6 +6,7 @@ import pytpc.relativity as rel
 import pytpc
 from math import sqrt
 from pytpc.constants import *
+from pytpc.utilities import constrain_angle
 import numpy
 
 
@@ -73,11 +74,29 @@ class TestElasticScatter_IdenticalParticles(unittest.TestCase):
             ejec, recoil = rel.elastic_scatter(self.proj, self.target, cm_angle, self.azi)
             self.assertAlmostEqual(ejec.polar, recoil.polar)
 
+    def test_angles_beam90_reacazi0(self):
+        for azi in numpy.linspace(0, 2*pi, 100):
+            proj = pytpc.Particle(4, 2, 2, polar=pi/2, azimuth=azi)
+            ejec, recoil = rel.elastic_scatter(proj, self.target, pi/2, 0)
+            self.assertAlmostEqual(ejec.azimuth, azi, places=3)
+            self.assertAlmostEqual(recoil.azimuth, azi, places=3)
+            self.assertAlmostEqual(abs(ejec.polar - recoil.polar), pi/2, places=2)
+
+    def test_angles_beam90_reacazi90(self):
+        for azi in numpy.linspace(0, 2*pi, 100):
+            proj = pytpc.Particle(4, 2, 2, polar=pi/2, azimuth=azi)
+            ejec, recoil = rel.elastic_scatter(proj, self.target, pi/2, pi/2)
+            self.assertAlmostEqual(ejec.polar, pi/2)
+            self.assertAlmostEqual(recoil.polar, pi/2)
+            self.assertAlmostEqual(abs(numpy.sin(ejec.azimuth - azi)), numpy.sin(pi/4), places=2)
+            self.assertAlmostEqual(abs(numpy.sin(recoil.azimuth - azi)), numpy.sin(pi/4), places=2)
+            # self.assertAlmostEqual(abs(ejec.polar - recoil.polar), pi/2, places=2)
+
     def test_azimuth(self):
         for azi in numpy.linspace(0, 2*pi, 20):
             ejec, recoil = rel.elastic_scatter(self.proj, self.target, self.cm_angle, azi)
             self.assertAlmostEqual(ejec.azimuth, azi)
-            self.assertAlmostEqual(recoil.azimuth, azi + pi)
+            self.assertAlmostEqual(recoil.azimuth, constrain_angle(azi + pi))
 
     def test_energy_small_angle(self):
         ejec, recoil = rel.elastic_scatter(self.proj, self.target, 0.01, self.azi)

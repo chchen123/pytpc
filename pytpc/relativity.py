@@ -7,6 +7,7 @@ This module contains functions to calculate quantities of interest in special re
 from __future__ import division, print_function
 import numpy
 from pytpc.constants import *
+from pytpc.utilities import euler_matrix, constrain_angle
 from math import sqrt, log, sinh, cosh, sin, cos, atan
 import copy
 
@@ -115,17 +116,35 @@ def elastic_scatter(proj, target, cm_angle, azi):
     pol4 = atan(ppcm * sin(cm_angle) / (sinh(chi) * E4cm + cosh(chi) * ppcm * cos(cm_angle)))  # recoil lab polar angle
 
     ejec.energy = T3
-    ejec.polar = pol3 + proj.polar
-    ejec.azimuth = proj.azimuth + azi
+    ejec.polar = pol3
+    ejec.azimuth = 0
     ejec.position = proj.position
 
     recoil.energy = T4
-    recoil.polar = abs(pol4 - proj.polar)
-    if pol4 > proj.polar:
-        recoil.azimuth = proj.azimuth + azi + pi
-    else:
-        recoil.azimuth = proj.azimuth + azi
+    recoil.polar = pol4
+    recoil.azimuth = pi
     recoil.position = proj.position
+
+    # These angles are relative to the projectile's original trajectory, and need to be rotated into the lab frame.
+    # This can be done with the Euler angle rotations.
+
+    eulermat = euler_matrix(phi=proj.azimuth, theta=proj.polar, psi=azi).T # the transpose is the inverse (ortho. mat.)
+    # eulermat = numpy.eye(3)
+
+    recoil.momentum = eulermat.dot(recoil.momentum)
+    ejec.momentum = eulermat.dot(ejec.momentum)
+
+    assert ejec.polar >= 0, 'ejectile polar angle < 0'
+    assert recoil.polar >= 0, 'recoil polar angle < 0'
+
+    recoil.azimuth = constrain_angle(recoil.azimuth)
+    ejec.azimuth = constrain_angle(ejec.azimuth)
+
+    assert 0 <= recoil.azimuth <= 2*pi, 'recoil azimuth out of bounds'
+    assert 0 <= ejec.azimuth <= 2*pi, 'ejectile azimuth out of bounds'
+
+    assert ejec.energy - T3 < 1e-2, 'ejectile energy was changed by rotation: {} -> {}'.format(T3, ejec.energy)
+    assert recoil.energy - T4 < 1e-2, 'recoil energy was changed by rotation: {} -> {}'.format(T4, recoil.energy)
 
     return ejec, recoil
 
