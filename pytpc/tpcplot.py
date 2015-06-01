@@ -62,7 +62,7 @@ def _generate_pad_collection(data, pads=None):
     return c
 
 
-def pad_plot(data, pads=None, scale='log'):
+def pad_plot(data, pads=None, scale='log', cmap_type='seq'):
     """ Plot the given data on the pads of the Micromegas.
 
     Parameters
@@ -88,8 +88,16 @@ def pad_plot(data, pads=None, scale='log'):
     else:
         raise ValueError('invalid scale. Must be in set {}'.format(('log', 'linear')))
 
-    sm = mpl.cm.ScalarMappable(cmap=pad_cm, norm=nm)
+    if cmap_type == 'div':
+        cmap = 'BrBG'
+    else:
+        cmap = pad_cm
+
+    sm = mpl.cm.ScalarMappable(cmap=cmap, norm=nm)
     sm.set_array(data)
+    if cmap_type == 'div':
+        extr = numpy.abs(data).max()
+        sm.set_clim(-extr, extr)
     colors = sm.to_rgba(data)
 
     if pads is None:
