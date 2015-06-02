@@ -72,7 +72,7 @@ class TestElasticScatter_IdenticalParticles(unittest.TestCase):
     def test_polar(self):
         for cm_angle in numpy.linspace(0.01, pi, 20, endpoint=False):
             ejec, recoil = rel.elastic_scatter(self.proj, self.target, cm_angle, self.azi)
-            self.assertAlmostEqual(ejec.polar, recoil.polar)
+            self.assertAlmostEqual(ejec.polar + recoil.polar, pi/2, delta=2.0)
 
     def test_angles_beam90_reacazi0(self):
         for azi in numpy.linspace(0, 2*pi, 100):

@@ -113,7 +113,7 @@ def elastic_scatter(proj, target, cm_angle, azi):
     E4cm = sqrt(ppcm**2 + m4**2)  # recoil COM total energy
 
     pol3 = atan(ppcm * sin(cm_angle) / (sinh(chi) * E3cm + cosh(chi) * ppcm * cos(cm_angle)))  # ejectile lab polar ang
-    pol4 = atan(ppcm * sin(cm_angle) / (sinh(chi) * E4cm + cosh(chi) * ppcm * cos(cm_angle)))  # recoil lab polar angle
+    pol4 = atan(ppcm * sin(cm_angle) / (sinh(chi) * E4cm - cosh(chi) * ppcm * cos(cm_angle)))  # recoil lab polar angle
 
     ejec.energy = T3
     ejec.polar = pol3
