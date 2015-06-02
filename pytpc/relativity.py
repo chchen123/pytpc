@@ -126,16 +126,18 @@ def elastic_scatter(proj, target, cm_angle, azi):
     recoil.position = proj.position
 
     # These angles are relative to the projectile's original trajectory, and need to be rotated into the lab frame.
-    # This can be done with the Euler angle rotations.
+    # This can be done with the Euler angle rotations. We need to use the transpose of the Euler matrix here.
+    # (I'm not sure why. It just seems to be what works...)
 
-    eulermat = euler_matrix(phi=proj.azimuth, theta=proj.polar, psi=azi).T # the transpose is the inverse (ortho. mat.)
-    # eulermat = numpy.eye(3)
+    eulermat = euler_matrix(phi=proj.azimuth, theta=proj.polar, psi=azi).T  # the transpose is the inverse (ortho. mat.)
 
     recoil.momentum = eulermat.dot(recoil.momentum)
     ejec.momentum = eulermat.dot(ejec.momentum)
 
     assert ejec.polar >= 0, 'ejectile polar angle < 0'
     assert recoil.polar >= 0, 'recoil polar angle < 0'
+
+    # The Euler angle rotation might have pushed the azimuthal angles outside [0, 2*pi), so fix them.
 
     recoil.azimuth = constrain_angle(recoil.azimuth)
     ejec.azimuth = constrain_angle(ejec.azimuth)

@@ -99,40 +99,63 @@ def tilt_matrix(angle):
 
 
 def euler_matrix(phi, theta, psi):
+    """Return the Euler matrix for a three-dimensional rotation through the given angles.
 
-    # mat = np.array([[cos(psi)*cos(phi) - cos(theta)*sin(phi)*sin(psi),
-    #                  cos(psi)*sin(phi) + cos(theta)*cos(phi)*sin(psi),
-    #                  sin(psi)*sin(theta)],
-    #                 [-sin(psi)*cos(phi) - cos(theta)*sin(phi)*cos(psi),
-    #                  -sin(psi)*sin(phi) + cos(theta)*cos(phi)*cos(psi),
-    #                  cos(psi)*sin(theta)],
-    #                 [sin(theta)*sin(phi),
-    #                  -sin(theta)*cos(phi),
-    #                  cos(theta)]])
-    # mat = np.array([[cos(theta)*cos(phi)*cos(psi) - sin(phi)*sin(psi),
-    #                  cos(theta)*cos(psi)*sin(phi) + cos(phi)*sin(psi),
-    #                  -(cos(psi)*sin(theta))],
-    #                 [-(cos(psi)*sin(phi)) - cos(theta)*cos(phi)*sin(psi),
-    #                  cos(phi)*cos(psi) - cos(theta)*sin(phi)*sin(psi),
-    #                  sin(theta)*sin(psi)],
-    #                 [cos(phi)*sin(theta),
-    #                  sin(theta)*sin(phi),
-    #                  cos(theta)]])
-    # mat = np.array([[cos(theta)*cos(phi)*cos(psi) - sin(phi)*sin(psi), -(cos(theta)*cos(psi)*sin(phi)) -
-    #                    cos(phi)*sin(psi), cos(psi)*sin(theta)], [cos(psi)*sin(phi) + cos(theta)*cos(phi)*sin(psi),
-    #                   cos(phi)*cos(psi) - cos(theta)*sin(phi)*sin(psi), sin(theta)*sin(psi)],
-    #                  [-(cos(phi)*sin(theta)), sin(theta)*sin(phi), cos(theta)]])
+    The particular rotation scheme used here is z-y-z, or the following operations:
 
-    mat = np.array([[cos(theta)*cos(phi)*cos(psi) - sin(phi)*sin(psi), cos(theta)*cos(psi)*sin(phi) + cos(phi)*sin(psi),
-                      -(cos(psi)*sin(theta))], [-(cos(psi)*sin(phi)) - cos(theta)*cos(phi)*sin(psi),
-                      cos(phi)*cos(psi) - cos(theta)*sin(phi)*sin(psi), sin(theta)*sin(psi)],
-                     [cos(phi)*sin(theta), sin(theta)*sin(phi), cos(theta)]])
+        1) A rotation of phi about the z axis
+        2) A rotation of theta about the new y axis
+        3) A rotation of psi about the new z axis
 
+    The source matrices for each operation use the convention found in Goldstein [1]_, which appears to be
+    a negative rotation (or perhaps a passive transformation?).
+
+    Parameters
+    ----------
+    phi : number
+        The angle for the first rotation, about z, in radians.
+    theta : number
+        The angle for the second rotation, about y, in radians.
+    psi : number
+        The angle for the third rotation, about z, in radians.
+
+    Returns
+    -------
+    mat : ndarray
+        The Euler angle rotation matrix.
+
+    References
+    ----------
+    .. [1] Goldstein, H., Poole, C., and Safko, J. (2002). *Classical mechanics*, 3rd ed.
+       Addison Wesley, San Francisco, CA. Pg. 153.
+    """
+
+    mat = np.array([[cos(theta)*cos(phi)*cos(psi) - sin(phi)*sin(psi),
+                     cos(theta)*cos(psi)*sin(phi) + cos(phi)*sin(psi),
+                     -(cos(psi)*sin(theta))],
+                    [-(cos(psi)*sin(phi)) - cos(theta)*cos(phi)*sin(psi),
+                     cos(phi)*cos(psi) - cos(theta)*sin(phi)*sin(psi),
+                     sin(theta)*sin(psi)],
+                    [cos(phi)*sin(theta), sin(theta)*sin(phi), cos(theta)]])
 
     return mat
 
 
 def constrain_angle(x):
+    """Constrain the given angle to lie between 0 and 2*pi.
+
+    Angles outside the bounds are rotated by 2*pi until they lie within the bounds.
+
+    Parameters
+    ----------
+    x : number
+        The angle to constrain, in radians.
+
+    Returns
+    -------
+    y : number
+        The constrained angle, which will lie between 0 and 2*pi.
+    """
     y = x % (2*np.pi)
     if y < 0:
         y += 2*np.pi
