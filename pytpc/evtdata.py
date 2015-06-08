@@ -433,6 +433,9 @@ class EventFile:
             print("The provided number is outside the range of event numbers.")
             return None
 
+    def __len__(self):
+        return len(self.lookup)
+
     def __iter__(self):
         """ Prepare the file object for iteration.
 
