@@ -209,8 +209,6 @@ class EventFile:
             The sample values, indexed by time bucket
         """
 
-        # TODO: Merge this into the unpack_sample method?
-
         tbs = (packed & 0xFF8000) >> 15
         samples = (packed & 0xFFF)
         parities = (packed & 0x1000) >> 12
@@ -218,11 +216,9 @@ class EventFile:
         # Change the parities from (0, 1, ...) to (1, -1, ...) and multiply
         samples *= (-2 * parities + 1)
 
-        unpacked = numpy.hstack((tbs, samples))
         result = numpy.zeros(512)
 
-        for item in unpacked:
-            result[item[0]] = item[1]
+        result[tbs] = samples
 
         return result
 
@@ -239,53 +235,49 @@ class EventFile:
 
         assert self.is_open
 
-        try:
-            # Read the event header
-            # This has the following structure:
-            #     (magic, size, ID, ts, nTraces)
-            hdr = struct.unpack('<BIIQH', self.fp.read(19))
+        # Read the event header
+        # This has the following structure:
+        #     (magic, size, ID, ts, nTraces)
+        hdr = struct.unpack('<BIIQH', self.fp.read(19))
 
-            if hdr[0] != 0xEE:
-                # This is not the beginning of the event. Seek back and fail.
-                self.fp.seek(-19, 1)
-                raise FilePosError(self.fp.name, "Event magic number was wrong.")
+        if hdr[0] != 0xEE:
+            # This is not the beginning of the event. Seek back and fail.
+            self.fp.seek(-19, 1)
+            raise FilePosError(self.fp.name, "Event magic number was wrong.")
 
-            event_size = hdr[1]
-            event_id = hdr[2]
-            event_ts = hdr[3]
-            num_traces = hdr[4]
+        event_size = hdr[1]
+        event_id = hdr[2]
+        event_ts = hdr[3]
+        num_traces = hdr[4]
 
-            new_evt = Event(evt_id=event_id, timestamp=event_ts)
-            new_evt.traces = numpy.zeros((num_traces,), dtype=new_evt.dt)
+        new_evt = Event(evt_id=event_id, timestamp=event_ts)
+        new_evt.traces = numpy.zeros((num_traces,), dtype=new_evt.dt)
 
-            # Read the traces
+        # Read the traces
 
-            for n in range(num_traces):
-                # Read the trace header. The structure of this is:
-                #    (size, cobo, asad, aget, ch, pad)
-                th = struct.unpack('<IBBBBH', self.fp.read(10))
+        for n in range(num_traces):
+            # Read the trace header. The structure of this is:
+            #    (size, cobo, asad, aget, ch, pad)
+            th = struct.unpack('<IBBBBH', self.fp.read(10))
 
-                tr = new_evt.traces[n]
+            tr = new_evt.traces[n]
 
-                tr['cobo'] = th[1]
-                tr['asad'] = th[2]
-                tr['aget'] = th[3]
-                tr['channel'] = th[4]
-                tr['pad'] = th[5]
+            tr['cobo'] = th[1]
+            tr['asad'] = th[2]
+            tr['aget'] = th[3]
+            tr['channel'] = th[4]
+            tr['pad'] = th[5]
 
-                # Now read the trace itself
-                num_samples = (th[0] - 10) // 3  # (total - header) / size of packed item
+            # Now read the trace itself
+            num_samples = (th[0] - 10) // 3  # (total - header) / size of packed item
 
-                packed = numpy.hstack((numpy.fromfile(self.fp, dtype='3u1', count=num_samples),
-                                       numpy.zeros((num_samples, 1), dtype='u1'))).view('<u4')
+            packed = numpy.hstack((numpy.fromfile(self.fp, dtype='3u1', count=num_samples),
+                                   numpy.zeros((num_samples, 1), dtype='u1'))).view('<u4')
 
-                unpacked = self.unpack_samples(packed)
-                tr['data'][:] = unpacked
+            tr['data'][:] = self.unpack_samples(packed)
 
-            return new_evt
+        return new_evt
 
-        except Error as er:
-            raise er
 
     def make_lookup_table(self):
         """ Indexes the open file and generates a lookup table.
