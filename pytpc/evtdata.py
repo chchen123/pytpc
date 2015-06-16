@@ -653,7 +653,7 @@ def make_event(pos, de, clock, vd, ioniz, proj_mass, shapetime, offset=0, pad_ro
         uncal = numpy.inner(rot_mat, uncal).T
 
     # Find the pad for each point
-    pca = numpy.round(numpy.array([find_pad_coords(p[0], p[1]) for p in uncal[:, 0:2]]))
+    pca = numpy.round(find_pad_coords(uncal[:, 0:2]))
     pnums = numpy.array([padcenter_dict.get(tuple(a), -1) for a in pca])
     unique_pads = set(pnums)
     unique_pads.discard(-1)

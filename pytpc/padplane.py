@@ -165,7 +165,7 @@ def _two_pt_line(x, x1, y1, x2, y2):
     return (y2-y1)/(x2-x1) * (x-x1) + y1
 
 
-def find_pad_coords(x, y):
+def find_pad_coords(coords):
     """Find the center of the nearest pad to the provided x and y coordinates.
 
     This works as follows:
@@ -182,10 +182,8 @@ def find_pad_coords(x, y):
 
     Parameters
     ----------
-    x : number
-        The horizontal coordinate
-    y : number
-        The vertical coordinate
+    coords: ndarray
+        The [x, y] coordinate pairs for each point
 
     Returns
     -------
@@ -194,46 +192,45 @@ def find_pad_coords(x, y):
 
     """
 
-    coords = np.array([x, y])
+    coords = np.asanyarray(coords)
 
-    # Which third? Rotate if necessary
-    angle = atan2(y, x)
-    if y < 0:
-        angle += 2*pi
+    # Find the angle to rotate through to bring all points to the first third.
+    # Then, rotate the points
+    angle = np.arctan2(coords[:, 1], coords[:, 0]) + (np.sign(coords[:, 1])-1)/2*-2*pi
+    rotangles = angle // (120*degrees) * (120*degrees) * -1
+    rotmats = np.array([[np.cos(rotangles), -np.sin(rotangles)],
+                        [np.sin(rotangles),  np.cos(rotangles)]])
+    rotmats = np.rollaxis(rotmats, -1)
+    rot = np.einsum('ijk,ik->ij', rotmats, coords)  # the rotated points
 
-    if 120*degrees <= angle < 240*degrees:
-        rot = np.dot(_rotneg120mat, coords)
-        finalrot = _rotpos120mat
-    elif angle >= 240*degrees:
-        rot = np.dot(_rotneg240mat, coords)
-        finalrot = _rotpos240mat
-    else:
-        rot = coords
-        finalrot = _idmat
+    # Skew the points to rectify the grid
+    rect = np.tensordot(_rightskewmat, rot, ([1], [1])).T
 
-    rect = np.dot(_rightskewmat, rot)
+    # Find which points are inside the region of small pads
+    isinner = np.all(abs(rect) < [inner_rad * tri_base, inner_rad * tri_height], -1)
 
-    # Inner or outer?
-    if abs(rect[0]) < inner_rad * tri_base and abs(rect[1]) < inner_rad * tri_height:
-        b = inner_tri_base
-        h = inner_tri_height
-        t = np.array([b, h])
-    else:
-        b = tri_base
-        h = tri_height
-        t = np.array([b, h])
+    # Get the height and base of the local pads for each point
+    t = np.zeros_like(coords)
+    t[isinner] = [inner_tri_base, inner_tri_height]
+    t[~isinner] = [tri_base, tri_height]
 
+    # Find the first two pad vertices for each point
     v1 = np.floor(rect / t) * t
     v2 = v1 + t
 
-    if rect[1] > _two_pt_line(rect[0], v1[0], v1[1], v2[0], v2[1]):
-        v3 = v1 + np.array([0, h])
-    else:
-        v3 = v1 + np.array([b, 0])
+    # The third vertex is either corner of the box. Depends on whether above or below dividing line.
+    isabove = rect[:, 1] > _two_pt_line(rect[:, 0], v1[:, 0], v1[:, 1], v2[:, 0], v2[:, 1])
+    v3 = np.zeros_like(coords)
+    v3[isabove] = v1[isabove] + np.vstack((np.zeros(len(coords)), t[:, 1])).T[isabove]
+    v3[~isabove] = v1[~isabove] + np.vstack((t[:, 0], np.zeros(len(isabove)))).T[~isabove]
 
-    res = np.dot(_leftskewmat, (v1+v2+v3)/3)
-    res = np.dot(finalrot, res)
-    return res
+    # Find the pad centers by averaging, then reskew the grid and rotate back
+    res = np.tensordot(_leftskewmat, (v1+v2+v3)/3, ([1], [1])).T
+    unrotmats = np.array([[np.cos(-rotangles), -np.sin(-rotangles)],
+                          [np.sin(-rotangles),  np.cos(-rotangles)]])
+    unrotmats = np.rollaxis(unrotmats, -1)
+    rotres = np.einsum('ijk,ik->ij', unrotmats, res)
+    return rotres
 
 
 # Now generate some parameters about the pads
