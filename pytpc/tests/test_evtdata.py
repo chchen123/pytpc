@@ -35,18 +35,23 @@ class TestCalibration(unittest.TestCase):
 
     def setUp(self):
         self.data = np.zeros((512, 4))
+        self.data[:, 0] = np.linspace(-200, 200, 512)
+        self.data[:, 1] = np.linspace(-200, 200, 512)
         self.data[:, 2] = np.arange(512)
+        self.data[:, 3] = np.linspace(0, 4096, 512)
         self.clock = 10
         self.vd = 5
 
     def test_calibrate_scalar(self):
         cal = pytpc.evtdata.calibrate(self.data, self.vd, self.clock)
-        exp = self.data * self.vd / self.clock * 10
+        exp = self.data.copy()
+        exp[:, 2] *= self.vd / self.clock * 10
         nptest.assert_allclose(cal, exp)
 
     def test_uncalibrate_scalar(self):
         uncal = pytpc.evtdata.uncalibrate(self.data, self.vd, self.clock)
-        exp = self.data / self.vd * self.clock / 10
+        exp = self.data.copy()
+        exp[:, 2] /= self.vd * self.clock / 10
         nptest.assert_allclose(uncal, exp)
 
     def test_inversion_scalar(self):
