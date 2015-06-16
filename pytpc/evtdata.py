@@ -39,6 +39,7 @@ from pytpc.tpcplot import generate_pad_plane
 from scipy.stats import threshold
 from scipy.ndimage.filters import gaussian_filter
 from pytpc.padplane import find_pad_coords, padcenter_dict
+from math import sin, cos
 
 
 class EventFile:
@@ -595,7 +596,7 @@ class Event:
         return xyzs
 
 
-def make_event(pos, de, clock, vd, ioniz, proj_mass, shapetime, offset=0):
+def make_event(pos, de, clock, vd, ioniz, proj_mass, shapetime, offset=0, pad_rot=None):
     """Generate an Event from simulated data.
 
     This will take the given position and energy loss information and project it onto the pad plane to create
@@ -640,8 +641,16 @@ def make_event(pos, de, clock, vd, ioniz, proj_mass, shapetime, offset=0):
     ne = numpy.round(de*1e6*proj_mass / ioniz)  # last factor after mass is gain
 
     # Uncalibrate the position data
-    uncal = uncalibrate(pos, vd, clock)
-    tbs = uncal[:, -1] + offset
+    uncal = uncalibrate(pos, vd, clock, offset)
+    tbs = uncal[:, -1]
+
+    # Rotate to deal with pad plane rotation
+    if pad_rot is not None:
+        assert uncal.shape[1] == 3
+        rot_mat = numpy.array([[cos(pad_rot), -sin(pad_rot), 0],
+                               [sin(pad_rot),  cos(pad_rot), 0],
+                               [0,             0,            1]])
+        uncal = numpy.inner(rot_mat, uncal).T
 
     # Find the pad for each point
     pca = numpy.round(numpy.array([find_pad_coords(p[0], p[1]) for p in uncal[:, 0:2]]))
@@ -706,7 +715,7 @@ def calibrate(data, drift_vel, clock):
     return new_data
 
 
-def uncalibrate(data, drift_vel, clock):
+def uncalibrate(data, drift_vel, clock, offset=0):
     """Uncalibrate the data using the drift velocity.
 
     With a scalar drift velocity, this will simply convert the z position coordinates into time buckets. With a vector
@@ -739,7 +748,7 @@ def uncalibrate(data, drift_vel, clock):
         new_data[:, 2] *= clock / (10 * drift_vel)  # 1 cm/(us.MHz) = 1 cm = 10 mm
     else:
         assert drift_vel.shape == (3,), 'vector drift velocity must have 3 dimensions'
-        tbs = data[:, 2] * clock / (10 * -drift_vel[2])  # 1 cm/(us.MHz) = 1 cm = 10 mm
+        tbs = data[:, 2] * clock / (10 * -drift_vel[2]) + offset  # 1 cm/(us.MHz) = 1 cm = 10 mm
         new_data[:, 0:3] -= numpy.outer(tbs, -drift_vel) / clock * 10
         new_data[:, 2] = tbs
 
