@@ -5,6 +5,8 @@ from pytpc.constants import *
 import pytpc.relativity as rel
 from numpy import log, exp
 from scipy.interpolate import InterpolatedUnivariateSpline
+import pandas as pd
+import sqlite3
 
 import os
 import json
@@ -92,18 +94,26 @@ class InterpolatedGas(Gas):
     def __init__(self, name, pressure):
 
         # TODO: Make this less of a kludge
-        filename = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'gases', name + '.json'))
-        try:
-            with open(filename) as f:
-                gas_dict = json.load(f)
+        gasdb_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'gases', 'gasdata.db'))
+        assert os.path.isfile(gasdb_path), 'Couldn\'t find the gas database'
+        gasdb = sqlite3.connect(gasdb_path)
+        gdb_curs = gasdb.cursor()
 
-        except FileNotFoundError:
-            raise ValueError('Gas data file not found. Is {} a valid gas name?'.format(name))
+        # Check if gas name is a valid table name
+        gases_avail = gdb_curs.execute('SELECT name FROM sqlite_master WHERE type="table"').fetchall()
+        if (name,) not in gases_avail:
+            raise ValueError('Data for gas not found in gas database. Is {} a valid gas name?'.format(name))
 
-        dedx = np.array(gas_dict['dedx'])
-        self.spline = InterpolatedUnivariateSpline(dedx[:, 0], dedx[:, 1])
+        gas_table = pd.read_sql('SELECT * FROM {}'.format(name), gasdb)
+        gas_mass = gdb_curs.execute('SELECT mass FROM masses WHERE name=? COLLATE nocase', (name,)).fetchone()[0]
 
-        Gas.__init__(self, gas_dict['molar_mass'], pressure)
+        del gdb_curs
+        gasdb.close()
+
+        self.spline = InterpolatedUnivariateSpline(gas_table['energy'], gas_table['dedx'])
+        self.range_spline = InterpolatedUnivariateSpline(gas_table['energy'], gas_table['range'])
+
+        Gas.__init__(self, gas_mass, pressure)
 
     def energy_loss(self, en, proj_mass, proj_charge):
         """Calculates the energy loss of a projectile in the gas using the interpolated spline.
@@ -128,6 +138,30 @@ class InterpolatedGas(Gas):
             raise NotImplementedError('Not implemented for particles other than alpha')
 
         return self.spline(en) * self.density * 100  # in MeV/m
+
+    def range(self, en, proj_mass, proj_charge):
+        """Calculates the range of a projectile in the gas using the interpolated spline.
+
+        Parameters
+        ----------
+        en : float
+            The projectile's kinetic energy in MeV
+        proj_mass : int
+            The mass number of the projectile
+        proj_charge : int
+            The charge number of the projectile
+
+        Returns
+        -------
+        float
+            The range of the particle in the gas, in m
+
+        """
+
+        if proj_mass != 4 or proj_charge != 2:
+            raise NotImplementedError('Not implemented for particles other than alpha')
+
+        return self.range_spline(en) / self.density / 100  # in m
 
 
 class GenericGas(Gas):
@@ -276,6 +310,38 @@ class InterpolatedGasMixture(Gas):
         # This is valid since each component has the correct partial pressure.
         de = sum([g.energy_loss(en, 4, 2) for g, prop in self.components])
         return de  # in MeV/m
+
+    def range(self, en, proj_mass, proj_charge):
+        """Calculates the range of a projectile in the gas using the interpolated spline.
+
+        Parameters
+        ----------
+        en : float
+            The projectile's kinetic energy in MeV
+        proj_mass : int
+            The mass number of the projectile
+        proj_charge : int
+            The charge number of the projectile
+
+        Returns
+        -------
+        float
+            The range of the particle in the gas, in m
+
+        Raises
+        ------
+        NotImplementedError
+            If the projectile charge or mass do not correspond to an alpha particle. This will eventually be changed
+            to allow different particles.
+
+        """
+
+        if proj_mass != 4 or proj_charge != 2:
+            raise NotImplementedError('Not implemented yet for particles other than alphas')
+
+        # The total range is the weighted sum of the range in each component.
+        range = sum([g.range(en, 4, 2) for g, prop in self.components]) / 4  # KLUDGE: massive approximation
+        return range  # in m
 
 
 class HeliumGas(GenericGas):
