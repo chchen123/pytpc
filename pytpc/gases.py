@@ -112,6 +112,7 @@ class InterpolatedGas(Gas):
 
         self.spline = InterpolatedUnivariateSpline(gas_table['energy'], gas_table['dedx'])
         self.range_spline = InterpolatedUnivariateSpline(gas_table['energy'], gas_table['range'])
+        self.inv_range_spline = InterpolatedUnivariateSpline(gas_table['range'], gas_table['energy'])
 
         Gas.__init__(self, gas_mass, pressure)
 
@@ -162,6 +163,30 @@ class InterpolatedGas(Gas):
             raise NotImplementedError('Not implemented for particles other than alpha')
 
         return self.range_spline(en) / self.density / 100  # in m
+
+    def inverse_range(self, range_, proj_mass, proj_charge):
+        """Calculates the energy of a projectile based on its range.
+
+        Parameters
+        ----------
+        range_ : float
+            The projectile's range in meters
+        proj_mass : int
+            The mass number of the projectile
+        proj_charge : int
+            The charge number of the projectile
+
+        Returns
+        -------
+        float
+            The initial energy of the particle, in MeV
+
+        """
+
+        if proj_mass != 4 or proj_charge != 2:
+            raise NotImplementedError('Not implemented for particles other than alpha')
+
+        return self.inv_range_spline(range_ * self.density * 100)  # in m
 
 
 class GenericGas(Gas):
@@ -278,6 +303,12 @@ class InterpolatedGasMixture(Gas):
 
         Gas.__init__(self, molar_mass, pressure)
 
+        # Now find the inverse range
+
+        ens = np.logspace(-3, 3, 500)
+        ranges = self.range(ens, 4, 2)
+        self.inv_range_spline = InterpolatedUnivariateSpline(ranges, ens)
+
     def energy_loss(self, en, proj_mass, proj_charge):
         """Calculates the energy loss of a projectile in the gas using the interpolated spline.
 
@@ -342,6 +373,31 @@ class InterpolatedGasMixture(Gas):
         # The total range is the weighted sum of the range in each component.
         range = sum([g.range(en, 4, 2) for g, prop in self.components]) / 4  # KLUDGE: massive approximation
         return range  # in m
+
+    def inverse_range(self, range_, proj_mass, proj_charge):
+        """Calculates the energy of a projectile based on its range.
+
+        Parameters
+        ----------
+        range_ : float
+            The projectile's range in meters
+        proj_mass : int
+            The mass number of the projectile
+        proj_charge : int
+            The charge number of the projectile
+
+        Returns
+        -------
+        float
+            The initial energy of the particle, in MeV
+
+        """
+
+        if proj_mass != 4 or proj_charge != 2:
+            raise NotImplementedError('Not implemented for particles other than alpha')
+
+        # For the mixture class, the inverse spline is already divided by the density, etc.
+        return self.inv_range_spline(range_)  # in m
 
 
 class HeliumGas(GenericGas):
