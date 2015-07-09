@@ -7,5 +7,8 @@
     <data-source name="SQLite - Gas Data" uuid="12103aad-f86d-45b9-afcb-cec295acc77f">
       <secret-storage>master_key</secret-storage>
     </data-source>
+    <data-source name="SQLite - simtest" uuid="ed0134a3-709e-44f1-8b34-1155fcbf1cbc">
+      <secret-storage>master_key</secret-storage>
+    </data-source>
   </component>
 </project>

@@ -49,4 +49,44 @@
       <column name="mass" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
     </table>
   </data-source>
+  <data-source name="SQLite - simtest" uuid="ed0134a3-709e-44f1-8b34-1155fcbf1cbc">
+    <database-info product="SQLite" version="3.8.9" jdbc-version="2.1" driver-name="SQLiteJDBC" driver-version="native"/>
+    <case-sensitivity plain-identifiers="mixed" quoted-identifiers="mixed"/>
+    <schema name="" catalog=""/>
+    <table name="Parameters" schema="" catalog="" type="TABLE">
+      <column name="index" sqlType="INTEGER" precision="2000000000" scale="10" nullable="true" jdbcType="4"/>
+      <column name="en" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="azi" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="pol" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="is_reac" sqlType="INTEGER" precision="2000000000" scale="10" nullable="true" jdbcType="4"/>
+      <column name="reac_en" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="reac_azi" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="cm_angle" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <index name="ix_Parameters_index" unique="true" columns="index"/>
+    </table>
+    <table name="Results" schema="" catalog="" type="TABLE">
+      <column name="evt_id" sqlType="INTEGER" precision="2000000000" scale="10" nullable="true" jdbcType="4"/>
+      <column name="dedx" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="total_de" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="br1_angle" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="br2_angle" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="beam_angle" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="forward_vert_en" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="back_vert_en" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="back_beam_en" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="br1_slope" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="br1_intercept" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="br2_slope" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="br2_intercept" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="br1_slope_cov" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="br1_intercept_cov" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="br1_chi2" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="br2_slope_cov" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="br2_intercept_cov" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="br2_chi2" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="beam_slope_cov" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="beam_intercept_cov" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="beam_chi2" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+    </table>
+  </data-source>
 </component>

@@ -112,7 +112,7 @@ class EventFile:
         try:
             self.fp = open(filename, 'rb')
             self.is_open = True
-            print("Opened file: " + filename)
+            # print("Opened file: " + filename)
 
             read_magic = struct.unpack('<I', self.fp.read(4))[0]
             if read_magic != self.magic:

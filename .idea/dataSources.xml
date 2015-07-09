@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="DataSourceManagerImpl" format="xml" hash="1597349813">
+  <component name="DataSourceManagerImpl" format="xml" hash="514490086">
     <data-source source="LOCAL" name="SQLite - rundata" uuid="5ecf1e5a-3e82-48f7-ba7b-ae83a3c0864b">
       <driver-ref>sqlite.xerial</driver-ref>
       <synchronize>true</synchronize>
@@ -14,6 +14,13 @@
       <synchronize>true</synchronize>
       <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
       <jdbc-url>jdbc:sqlite:$PROJECT_DIR$/data/gases/gasdata.db</jdbc-url>
+      <libraries />
+    </data-source>
+    <data-source source="LOCAL" name="SQLite - simtest" uuid="ed0134a3-709e-44f1-8b34-1155fcbf1cbc">
+      <driver-ref>sqlite.xerial</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
+      <jdbc-url>jdbc:sqlite:$PROJECT_DIR$/../alphas-dec14/simtest/test_nomag.db</jdbc-url>
       <libraries />
     </data-source>
   </component>
