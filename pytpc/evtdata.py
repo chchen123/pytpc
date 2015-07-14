@@ -449,6 +449,42 @@ class EventFile:
         else:
             raise StopIteration
 
+    def evtrange(self, start=0, stop=None, step=1):
+        """Iterate over the given range of events.
+
+        This method returns a generator object that returns the events from the file with the given range of event IDs.
+        This is a better approach for files with large events, as it only reads each event as needed.
+
+        Parameters
+        ----------
+        start : int, optional
+            The event to start at. Defaults to the beginning of the file.
+        stop : int, optional
+            One plus the index of the last event to read. (This follows the Python slicing convention of not including
+            the upper bound.) Defaults to the end of the file.
+        step : int, optional
+            The step between events. Defaults to 1.
+
+        Yields
+        ------
+        Event
+            An event from the file.
+
+        Raises
+        ------
+        IndexError
+            If `start` or `stop` was out-of-bounds.
+        """
+
+        if stop is None:
+            stop = len(self.lookup)
+
+        if start < 0 or stop > len(self.lookup):
+            raise IndexError("The given start and/or stop were out of bounds")
+
+        for i in range(start, stop, step):
+            yield self.read_event_by_number(i)
+
     def __getitem__(self, item):
         """ Implements subscripting of the event file, with slices.
         """
