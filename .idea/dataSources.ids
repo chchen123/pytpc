@@ -70,6 +70,8 @@
       <column name="total_de" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
       <column name="br1_angle" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
       <column name="br2_angle" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="true_br1_angle" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="true_br2_angle" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
       <column name="beam_angle" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
       <column name="forward_vert_en" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
       <column name="back_vert_en" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>

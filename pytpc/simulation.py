@@ -383,7 +383,7 @@ def track(particle, gas, ef, bf, final_energy=0.0):
     return tracks
 
 
-def simulate_elastic_scattering_track(proj, target, gas, ef, bf, interact_energy, cm_angle, azimuth):
+def simulate_elastic_scattering_track(proj, target, gas, ef, bf, interact_energy, cm_angle, azimuth, ret_angles=False):
     """Simulate an elastic scattering event with the given particles and parameters.
 
     The projectile will be tracked in the detector until it has total energy equal to `interact_energy`. Then, an
@@ -408,11 +408,15 @@ def simulate_elastic_scattering_track(proj, target, gas, ef, bf, interact_energy
         The center-of-momentum angle for the relativistic scattering calculation
     azimuth : number
         The final azimuthal angle of the ejectile particle
+    ret_angles : bool, optional
+        If True, return a tuple containing the true scattering angles of the two outgoing particles as the final result.
 
     Returns
     -------
-    pandas.DataFrame
+    fulltrack : pandas.DataFrame
         The concatenated outputs of the `track` function for each particle
+    true_angles : tuple(float)
+        The true scattering angles of the two outgoing particles. This is only returned if `ret_angles` is True.
 
     Raises
     ------
@@ -437,18 +441,25 @@ def simulate_elastic_scattering_track(proj, target, gas, ef, bf, interact_energy
     proj_track = track(proj, gas, ef, bf, interact_energy)
     if not(0 <= proj.position[2] <= 1) or sqrt(proj.position[0]**2 + proj.position[1]**2) > 0.275:
         # The particle left the chamber before interacting
-        return proj_track
+        fulltrack = proj_track
+        true_angles = (None, None)
+    else:
+        # The particle reacted inside the chamber, so track the products as well
+        reaction_time = proj_track.time.max()
 
-    reaction_time = proj_track.time.max()
+        ejec, recoil, true_angles = rel.elastic_scatter(proj, target, cm_angle, azimuth, ret_angles=True)
 
-    ejec, recoil = rel.elastic_scatter(proj, target, cm_angle, azimuth)
+        ejec_track = track(ejec, gas, ef, bf)
+        ejec_track.time += reaction_time
+        recoil_track = track(recoil, gas, ef, bf)
+        recoil_track.time += reaction_time
 
-    ejec_track = track(ejec, gas, ef, bf)
-    ejec_track.time += reaction_time
-    recoil_track = track(recoil, gas, ef, bf)
-    recoil_track.time += reaction_time
+        fulltrack = pd.concat((proj_track, ejec_track, recoil_track), ignore_index=True)
 
-    return pd.concat((proj_track, ejec_track, recoil_track), ignore_index=True)
+    if ret_angles:
+        return fulltrack, true_angles
+    else:
+        return fulltrack
 
 
 def drift_velocity_vector(vd, efield, bfield, tilt):

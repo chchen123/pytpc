@@ -63,7 +63,7 @@ def beta(en, mass):
     return b
 
 
-def elastic_scatter(proj, target, cm_angle, azi):
+def elastic_scatter(proj, target, cm_angle, azi, ret_angles=False):
     """Perform the special relativity calculation needed for elastic scattering.
 
     This takes two particles and scatters them elastically at the given center-of-mass angle and azimuthal angle.
@@ -83,6 +83,8 @@ def elastic_scatter(proj, target, cm_angle, azi):
     azi : number
         The final azimuthal angle for the scattered particles. The ejectile will be given this azimuthal angle, and
         the recoil particle will be given this angle + pi.
+    ret_angles : bool, optional
+        Whether to return a tuple of scattering angles as the third result.
 
     Returns
     -------
@@ -90,6 +92,9 @@ def elastic_scatter(proj, target, cm_angle, azi):
         The ejectile particle
     recoil : pytpc.simulation.Particle
         The recoil particle
+    (pol3, pol4) : tuple(float)
+        The true scattering angles. Only returned if `ret_angles` is True.
+
     """
 
     recoil = copy.copy(target)
@@ -148,6 +153,7 @@ def elastic_scatter(proj, target, cm_angle, azi):
     assert ejec.energy - T3 < 1e-2, 'ejectile energy was changed by rotation: {} -> {}'.format(T3, ejec.energy)
     assert recoil.energy - T4 < 1e-2, 'recoil energy was changed by rotation: {} -> {}'.format(T4, recoil.energy)
 
-    return ejec, recoil
-
-
+    if ret_angles:
+        return ejec, recoil, (pol3, pol4)
+    else:
+        return ejec, recoil
