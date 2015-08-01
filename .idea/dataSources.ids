@@ -36,13 +36,25 @@
       <column name="energy" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
       <column name="dedx" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
       <column name="range" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
-      <index name="ix_CO2_energy" unique="true" columns="energy"/>
+      <column name="proj_mass" sqlType="INTEGER" precision="2000000000" scale="10" nullable="true" jdbcType="4"/>
+      <column name="proj_charge" sqlType="INTEGER" precision="2000000000" scale="10" nullable="true" jdbcType="4"/>
+      <index name="ix_carbon_dioxide_energy" unique="true" columns="energy"/>
     </table>
     <table name="helium" schema="" catalog="" type="TABLE">
       <column name="energy" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
       <column name="dedx" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
       <column name="range" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
-      <index name="ix_Helium_energy" unique="true" columns="energy"/>
+      <column name="proj_mass" sqlType="INTEGER" precision="2000000000" scale="10" nullable="true" jdbcType="4"/>
+      <column name="proj_charge" sqlType="INTEGER" precision="2000000000" scale="10" nullable="true" jdbcType="4"/>
+      <index name="ix_helium_energy" unique="true" columns="energy"/>
+    </table>
+    <table name="isobutane" schema="" catalog="" type="TABLE">
+      <column name="energy" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="dedx" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="range" sqlType="REAL" precision="2000000000" scale="10" nullable="true" jdbcType="6"/>
+      <column name="proj_mass" sqlType="INTEGER" precision="2000000000" scale="10" nullable="true" jdbcType="4"/>
+      <column name="proj_charge" sqlType="INTEGER" precision="2000000000" scale="10" nullable="true" jdbcType="4"/>
+      <index name="ix_isobutane_energy" unique="true" columns="energy"/>
     </table>
     <table name="masses" schema="" catalog="" type="TABLE">
       <column name="name" sqlType="TEXT" precision="2000000000" scale="10" nullable="true" jdbcType="12"/>

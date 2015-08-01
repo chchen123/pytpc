@@ -9,7 +9,7 @@ import pandas as pd
 import sqlite3
 
 import os
-import json
+from functools import reduce
 
 
 class Gas(object):
@@ -96,23 +96,28 @@ class InterpolatedGas(Gas):
         # TODO: Make this less of a kludge
         gasdb_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'gases', 'gasdata.db'))
         assert os.path.isfile(gasdb_path), 'Couldn\'t find the gas database'
-        gasdb = sqlite3.connect(gasdb_path)
-        gdb_curs = gasdb.cursor()
+        with sqlite3.connect(gasdb_path) as gasdb:
+            gdb_curs = gasdb.cursor()
 
-        # Check if gas name is a valid table name
-        gases_avail = gdb_curs.execute('SELECT name FROM sqlite_master WHERE type="table"').fetchall()
-        if (name,) not in gases_avail:
-            raise ValueError('Data for gas not found in gas database. Is {} a valid gas name?'.format(name))
+            # Check if gas name is a valid table name
+            gases_avail = gdb_curs.execute('SELECT name FROM sqlite_master WHERE type="table"').fetchall()
+            if (name,) not in gases_avail:
+                raise ValueError('Data for gas not found in gas database. Is {} a valid gas name?'.format(name))
 
-        gas_table = pd.read_sql('SELECT * FROM {}'.format(name), gasdb)
-        gas_mass = gdb_curs.execute('SELECT mass FROM masses WHERE name=? COLLATE nocase', (name,)).fetchone()[0]
+            gas_table = pd.read_sql('SELECT * FROM {}'.format(name), gasdb)
+            gas_mass = gdb_curs.execute('SELECT mass FROM masses WHERE name=? COLLATE nocase', (name,)).fetchone()[0]
 
-        del gdb_curs
-        gasdb.close()
-
-        self.spline = InterpolatedUnivariateSpline(gas_table['energy'], gas_table['dedx'])
-        self.range_spline = InterpolatedUnivariateSpline(gas_table['energy'], gas_table['range'])
-        self.inv_range_spline = InterpolatedUnivariateSpline(gas_table['range'], gas_table['energy'])
+        self.name = name
+        self.dedx_splines = {}
+        self.range_splines = {}
+        self.inv_range_splines = {}
+        self.known_projectiles = set()
+        for i, idxs in gas_table.groupby(['proj_mass', 'proj_charge']).groups.items():
+            d = gas_table.loc[idxs]
+            self.known_projectiles.add(i)
+            self.dedx_splines[i] = InterpolatedUnivariateSpline(d['energy'], d['dedx'])
+            self.range_splines[i] = InterpolatedUnivariateSpline(d['energy'], d['range'])
+            self.inv_range_splines[i] = InterpolatedUnivariateSpline(d['range'], d['energy'])
 
         Gas.__init__(self, gas_mass, pressure)
 
@@ -135,10 +140,12 @@ class InterpolatedGas(Gas):
 
         """
 
-        if proj_mass != 4 or proj_charge != 2:
-            raise NotImplementedError('Not implemented for particles other than alpha')
+        try:
+            return self.dedx_splines[proj_mass, proj_charge](en) * self.density * 100  # in MeV/m
 
-        return self.spline(en) * self.density * 100  # in MeV/m
+        except KeyError:
+            raise NotImplementedError('Projectile {} not implemented for {} gas.'.format((proj_charge, proj_mass),
+                                                                                         self.name))
 
     def range(self, en, proj_mass, proj_charge):
         """Calculates the range of a projectile in the gas using the interpolated spline.
@@ -159,10 +166,12 @@ class InterpolatedGas(Gas):
 
         """
 
-        if proj_mass != 4 or proj_charge != 2:
-            raise NotImplementedError('Not implemented for particles other than alpha')
+        try:
+            return self.range_splines[proj_mass, proj_charge](en) / self.density / 100  # in m
 
-        return self.range_spline(en) / self.density / 100  # in m
+        except KeyError:
+            raise NotImplementedError('Projectile {} not implemented for {} gas.'.format((proj_charge, proj_mass),
+                                                                                         self.name))
 
     def inverse_range(self, range_, proj_mass, proj_charge):
         """Calculates the energy of a projectile based on its range.
@@ -183,10 +192,12 @@ class InterpolatedGas(Gas):
 
         """
 
-        if proj_mass != 4 or proj_charge != 2:
-            raise NotImplementedError('Not implemented for particles other than alpha')
+        try:
+            return self.inv_range_splines[proj_mass, proj_charge](range_ * self.density * 100)  # in m
 
-        return self.inv_range_spline(range_ * self.density * 100)  # in m
+        except KeyError:
+            raise NotImplementedError('Projectile {} not implemented for {} gas.'.format((proj_charge, proj_mass),
+                                                                                         self.name))
 
 
 class GenericGas(Gas):
@@ -303,11 +314,13 @@ class InterpolatedGasMixture(Gas):
 
         Gas.__init__(self, molar_mass, pressure)
 
-        # Now find the inverse range
-
+        # Now find the inverse range splines
+        self.inv_range_splines = {}
         ens = np.logspace(-3, 3, 500)
-        ranges = self.range(ens, 4, 2)
-        self.inv_range_spline = InterpolatedUnivariateSpline(ranges, ens)
+        self.known_projectiles = reduce(lambda a, b: a.intersection(b), [c[0].known_projectiles for c in self.components])
+        for m, c in self.known_projectiles:
+            ranges = self.range(ens, m, c)
+            self.inv_range_splines[m, c] = InterpolatedUnivariateSpline(ranges, ens)
 
     def energy_loss(self, en, proj_mass, proj_charge):
         """Calculates the energy loss of a projectile in the gas using the interpolated spline.
@@ -334,12 +347,9 @@ class InterpolatedGasMixture(Gas):
 
         """
 
-        if proj_mass != 4 or proj_charge != 2:
-            raise NotImplementedError('Not implemented yet for particles other than alphas')
-
         # The total energy loss is the sum of the energy lost to each component.
         # This is valid since each component has the correct partial pressure.
-        de = sum([g.energy_loss(en, 4, 2) for g, prop in self.components])
+        de = sum([g.energy_loss(en, proj_mass, proj_charge) for g, prop in self.components])
         return de  # in MeV/m
 
     def range(self, en, proj_mass, proj_charge):
@@ -367,11 +377,8 @@ class InterpolatedGasMixture(Gas):
 
         """
 
-        if proj_mass != 4 or proj_charge != 2:
-            raise NotImplementedError('Not implemented yet for particles other than alphas')
-
         # The total range is the weighted sum of the range in each component.
-        range = sum([g.range(en, 4, 2) for g, prop in self.components]) / 4  # KLUDGE: massive approximation
+        range = sum([g.range(en, proj_mass, proj_charge) for g, prop in self.components]) / 4  # massive approximation
         return range  # in m
 
     def inverse_range(self, range_, proj_mass, proj_charge):
@@ -393,11 +400,12 @@ class InterpolatedGasMixture(Gas):
 
         """
 
-        if proj_mass != 4 or proj_charge != 2:
-            raise NotImplementedError('Not implemented for particles other than alpha')
+        try:
+            # For the mixture class, the inverse spline is already divided by the density, etc.
+            return self.inv_range_splines[proj_mass, proj_charge](range_)  # in m
 
-        # For the mixture class, the inverse spline is already divided by the density, etc.
-        return self.inv_range_spline(range_)  # in m
+        except KeyError:
+            raise NotImplementedError('Projectile {} not implemented for this gas.'.format((proj_charge, proj_mass)))
 
 
 class HeliumGas(GenericGas):

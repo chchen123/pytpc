@@ -43,7 +43,7 @@ class TestInterpolatedGas(unittest.TestCase):
     def test_energy_loss(self):
         for en in range(0, 10):
             res = self.gas.energy_loss(en, 4, 2)
-            exp = self.gas.spline(en) * self.gas.density * 100
+            exp = self.gas.dedx_splines[4, 2](en) * self.gas.density * 100
             self.assertAlmostEqual(res, exp)
 
 
