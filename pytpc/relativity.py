@@ -63,7 +63,7 @@ def beta(en, mass):
     return b
 
 
-def elastic_scatter(proj, target, cm_angle, azi, ret_angles=False):
+def elastic_scatter(proj, target, cm_angle, azi, exc_en=0, ret_angles=False):
     """Perform the special relativity calculation needed for elastic scattering.
 
     This takes two particles and scatters them elastically at the given center-of-mass angle and azimuthal angle.
@@ -99,6 +99,10 @@ def elastic_scatter(proj, target, cm_angle, azi, ret_angles=False):
 
     recoil = copy.copy(target)
     ejec = copy.copy(proj)
+
+    if exc_en > 0:
+        ejec.excite(exc_en)
+
     m1 = target.mass
     m2 = proj.mass
     m3 = ejec.mass

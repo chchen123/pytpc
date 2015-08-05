@@ -40,9 +40,10 @@ class Particle(object):
         The polar angle of the particle's trajectory, in radians
     """
 
-    def __init__(self, mass_num, charge_num, energy_per_particle=0, position=(0, 0, 0), azimuth=0, polar=0):
+    def __init__(self, mass_num, charge_num, energy_per_particle=0, position=(0, 0, 0), azimuth=0, polar=0, en_level=0):
         self.mass_num = mass_num
-        self._mass = mass_num * p_mc2
+        self._en_level = en_level
+        self._mass = mass_num * p_mc2 + en_level
         self.charge_num = charge_num
         self.charge = charge_num * e_chg
         self.position = np.array(position)
@@ -53,6 +54,19 @@ class Particle(object):
                                                       cos(polar)])
         self._polar = polar
         self._azimuth = azimuth
+
+    def excite(self, level):
+        """Raise the energy level of the particle, increasing its internal energy and reducing its kinetic energy.
+
+        Parameters
+        ----------
+        level : float
+            This energy, in MeV, will be subtracted from the kinetic energy and added to the rest energy.
+
+        """
+        self._en_level = level
+        self.energy -= level
+        self._mass = self.mass_num * p_mc2 + level
 
     @property
     def momentum(self):
@@ -383,7 +397,8 @@ def track(particle, gas, ef, bf, final_energy=0.0):
     return tracks
 
 
-def simulate_elastic_scattering_track(proj, target, gas, ef, bf, interact_energy, cm_angle, azimuth, ret_angles=False):
+def simulate_elastic_scattering_track(proj, target, gas, ef, bf, interact_energy, cm_angle, azimuth, ret_angles=False,
+                                      exc_en=0):
     """Simulate an elastic scattering event with the given particles and parameters.
 
     The projectile will be tracked in the detector until it has total energy equal to `interact_energy`. Then, an
@@ -447,7 +462,7 @@ def simulate_elastic_scattering_track(proj, target, gas, ef, bf, interact_energy
         # The particle reacted inside the chamber, so track the products as well
         reaction_time = proj_track.time.max()
 
-        ejec, recoil, true_angles = rel.elastic_scatter(proj, target, cm_angle, azimuth, ret_angles=True)
+        ejec, recoil, true_angles = rel.elastic_scatter(proj, target, cm_angle, azimuth, exc_en, ret_angles=True)
 
         ejec_track = track(ejec, gas, ef, bf)
         ejec_track.time += reaction_time
