@@ -11,18 +11,19 @@ class GRAWFile(object):
 
     def __init__(self, filename):
 
-        # self.lookup = []
+        self.lookup = []
+        self.evtids = None
         """A lookup table for the events in the file. This is simply an array of file offsets."""
 
-        # self.current_event = 0  #: The index of the current event
+        self.current_event = 0  #: The index of the current event
 
         if filename is not None:
             self.open(filename)
-            # ltfilename = os.path.splitext(filename)[0] + '.lookup'
-            # if os.path.exists(ltfilename):
-                # self.load_lookup_table(ltfilename)
-            # else:
-                # self.make_lookup_table()
+            ltfilename = os.path.splitext(filename)[0] + '.lookup'
+            if os.path.exists(ltfilename):
+                self.load_lookup_table(ltfilename)
+            else:
+                self.make_lookup_table()
             self.is_open = True
 
         else:
@@ -33,13 +34,9 @@ class GRAWFile(object):
 
     def open(self, filename):
 
-        try:
-            self.fp = open(filename, 'rb')
-            self.is_open = True
-            # print("Opened file: " + filename)
-
-        except IOError:
-            raise
+        self.fp = open(filename, 'rb')
+        self.is_open = True
+        # print("Opened file: " + filename)
 
         return
 
@@ -52,6 +49,54 @@ class GRAWFile(object):
 
         return
 
+    def make_lookup_table(self):
+
+        self.lookup = []
+        self.evtids = []
+        self.fp.seek(0)
+
+        metatype = self.fp.read(1)
+        self.fp.seek(0)
+        while True:
+            pos = self.fp.tell()
+
+            mt = self.fp.read(1)
+            if mt == b'':
+                break
+            elif mt != metatype:
+                raise IOError('Bad metatype: file out of position?')
+            else:
+                self.lookup.append(pos)
+                size = self._bsmerge(self.fp.read(3)) * 256
+                self.fp.seek(pos + 22)
+                evtid = struct.unpack('>L', self.fp.read(4))[0]
+                self.evtids.append(evtid)
+                self.fp.seek(pos + size)
+
+        self.fp.seek(0)
+        self.evtids = np.array(self.evtids)
+
+    def load_lookup_table(self, filename):
+        """Read a lookup table from a file.
+
+        The file should contain the (integer) file offsets, with one on each line.
+
+        Parameters
+        ----------
+        filename : string
+            The path to the file.
+        """
+
+        self.lookup = []
+
+        try:
+            file = open(filename, 'r')
+            for line in file:
+                self.lookup.append(int(line.rstrip()))
+        except FileNotFoundError:
+            print("File name was not valid")
+            return
+
     @staticmethod
     def _bsmerge(a):
         res = 0
@@ -63,7 +108,7 @@ class GRAWFile(object):
         hdr_start = self.fp.tell()
         hdr_raw = struct.unpack('>5BHB2HL6BL2BHB32B4HL4H', self.fp.read(83))
         header = {'metatype': hdr_raw[0],
-                  'frame_size': self._bsmerge(hdr_raw[1:4]),
+                  'frame_size': self._bsmerge(hdr_raw[1:4]) * 256,
                   'data_source': hdr_raw[4],
                   'frame_type': hdr_raw[5],
                   'revision': hdr_raw[6],
@@ -125,4 +170,23 @@ class GRAWFile(object):
         else:
             raise IOError('Invalid frame type: %d' % header['frame_type'])
 
+        if self.fp.tell() != hdr_start + header['frame_size']:
+            print('Frame had zero padding at end')
+            self.fp.seek(hdr_start + header['frame_size'])
+
         return res
+
+    def __getitem__(self, item):
+
+        if not isinstance(item, int):
+            raise TypeError('Can only index file with an int')
+
+        if item < 0 or item > len(self.lookup):
+            raise IndexError("The index is out of bounds")
+        else:
+            self.current_event = item
+            self.fp.seek(self.lookup[item])
+            return self._read()
+
+    def __len__(self):
+        return len(self.lookup)
