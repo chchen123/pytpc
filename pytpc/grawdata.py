@@ -5,20 +5,24 @@ import struct
 import numpy as np
 
 class GRAWFile(object):
+
+    full_readout_frame_type = 2
+    partial_readout_frame_type = 1
+
     def __init__(self, filename):
 
-        self.lookup = []
+        # self.lookup = []
         """A lookup table for the events in the file. This is simply an array of file offsets."""
 
-        self.current_event = 0  #: The index of the current event
+        # self.current_event = 0  #: The index of the current event
 
         if filename is not None:
             self.open(filename)
-            ltfilename = os.path.splitext(filename)[0] + '.lookup'
-            if os.path.exists(ltfilename):
-                self.load_lookup_table(ltfilename)
-            else:
-                self.make_lookup_table()
+            # ltfilename = os.path.splitext(filename)[0] + '.lookup'
+            # if os.path.exists(ltfilename):
+                # self.load_lookup_table(ltfilename)
+            # else:
+                # self.make_lookup_table()
             self.is_open = True
 
         else:
@@ -72,10 +76,53 @@ class GRAWFile(object):
                   'asad': hdr_raw[18],
                   'offset': hdr_raw[19],
                   'status': hdr_raw[20]}
-        self.fp.seek(hdr_start + header['header_size'] * 128)
+        self.fp.seek(hdr_start + header['header_size'] * 256)
 
-class GRAWFrame(object):
+        data_begin = hdr_start + header['header_size'] * 256
+        data_end = data_begin + header['num_items'] * header['item_size']
 
-    def __init__(self, header, data):
-        self.header = header
-        self.data = data
+        datatype = np.dtype([('cobo', 'u1'), ('asad', 'u1'), ('aget', 'u1'), ('channel', 'u1'),
+                             ('pad', 'u2'), ('data', '512i2')])
+
+        if header['frame_type'] == GRAWFile.partial_readout_frame_type:
+            raw = np.fromfile(self.fp, dtype='>I4', count=header['num_items'])
+            agets = (raw & 0xC0000000)>>30
+            channels = (raw & 0x3F800000)>>23
+            tbs = (raw & 0x007FC000)>>14
+            samples = (raw & 0x00000FFF)
+
+            ach = np.vstack((agets, channels)).T
+            pairs = ach[np.unique(ach)]
+
+            res = np.zeros(len(pairs), dtype=datatype)
+
+            for i, (aget, ch) in enumerate(pairs):
+                idx = np.where(np.logical_and(agets == aget, channels == ch))
+                t = tbs[idx]
+                s = samples[idx]
+
+                assert len(t) == len(s), 'samples and tbs don\'t have same lengths'
+                assert tbs.max() <= len(s), 'max tb outside range of sample array length'
+
+                res[i] = header['cobo'], header['asad'], aget, ch, 0, s[t]
+
+        elif header['frame_type'] == GRAWFile.full_readout_frame_type:
+            raw = np.fromfile(self.fp, dtype='>I2', count=header['num_items'])
+            agets = (raw & 0xC000)>>14
+            samples = (raw & 0x0FFF)
+
+            res = np.zeros(68*4, dtype=datatype)
+
+            for aget in agets[np.unique(agets)]:
+                s = samples[np.where(agets == aget)].reshape((512, 68)).T
+                idx = slice(aget*68, aget*(68+1))
+                res[idx]['cobo'] = header['cobo']
+                res[idx]['asad'] = header['asad']
+                res[idx]['aget'] = aget
+                res[idx]['channel'] = np.arange(68)
+                res[idx]['data'] = s
+
+        else:
+            raise IOError('Invalid frame type: %d' % header['frame_type'])
+
+        return res
