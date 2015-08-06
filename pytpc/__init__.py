@@ -7,6 +7,7 @@ import pytpc.evtdata
 import pytpc.tpcplot
 import pytpc.gases
 import pytpc.runtables
+import pytpc.grawdata
 
 from pytpc.tracking import find_tracks, Tracker
 from pytpc.simulation import Particle, track

@@ -3,6 +3,7 @@ from __future__ import division, print_function
 import os
 import struct
 import numpy as np
+import pytpc.evtdata
 
 class GRAWFile(object):
 
@@ -178,9 +179,6 @@ class GRAWFile(object):
 
     def __getitem__(self, item):
 
-        if not isinstance(item, int):
-            raise TypeError('Can only index file with an int')
-
         if item < 0 or item > len(self.lookup):
             raise IndexError("The index is out of bounds")
         else:
@@ -190,3 +188,26 @@ class GRAWFile(object):
 
     def __len__(self):
         return len(self.lookup)
+
+    def _frame_generator(self, a):
+
+        for i in a:
+            yield self[i]
+
+    def get_frames_for_event(self, evtid):
+        assert len(self.lookup) == len(self.evtids)
+
+        idx = np.where(self.evtids == evtid)[0]
+        return self._frame_generator(idx)
+
+
+def merge_frames(files, evtid):
+
+    frames = []
+    for f in files:
+        this_frames = list(f.get_frames_for_event(evtid))
+        frames += this_frames
+    evt = pytpc.evtdata.Event(evtid)
+    evt.traces = np.concatenate(frames)
+
+    return evt
