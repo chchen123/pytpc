@@ -105,7 +105,7 @@ class GRAWFile(object):
             res += x << 8*(len(a) - i - 1)
         return res
 
-    def _read(self):
+    def _read(self, return_header=False):
         hdr_start = self.fp.tell()
         hdr_raw = struct.unpack('>5BHB2HL6BL2BHB32B4HL4H', self.fp.read(83))
         header = {'metatype': hdr_raw[0],
@@ -124,9 +124,6 @@ class GRAWFile(object):
                   'status': hdr_raw[20]}
         self.fp.seek(hdr_start + header['header_size'] * 256)
 
-        data_begin = hdr_start + header['header_size'] * 256
-        data_end = data_begin + header['num_items'] * header['item_size']
-
         datatype = np.dtype([('cobo', 'u1'), ('asad', 'u1'), ('aget', 'u1'), ('channel', 'u1'),
                              ('pad', 'u2'), ('data', '512i2')])
 
@@ -138,7 +135,7 @@ class GRAWFile(object):
             samples = (raw & 0x00000FFF)
 
             ach = np.vstack((agets, channels)).T
-            pairs = ach[np.unique(ach)]
+            pairs = {tuple(a) for a in ach}
 
             res = np.zeros(len(pairs), dtype=datatype)
 
@@ -175,7 +172,10 @@ class GRAWFile(object):
             print('Frame had zero padding at end')
             self.fp.seek(hdr_start + header['frame_size'])
 
-        return res
+        if return_header:
+            return res, header
+        else:
+            return res
 
     def __getitem__(self, item):
 
@@ -188,6 +188,12 @@ class GRAWFile(object):
 
     def __len__(self):
         return len(self.lookup)
+
+    def __str__(self):
+        return 'GRAW file with path %s' % os.path.basename(self.fp.name)
+
+    def __repr__(self):
+        return 'GRAWFile(%s)' % os.path.basename(self.fp.name)
 
     def _frame_generator(self, a):
 
@@ -205,8 +211,11 @@ def merge_frames(files, evtid):
 
     frames = []
     for f in files:
+        # print('Reading from', f)
         this_frames = list(f.get_frames_for_event(evtid))
+        # print('  found', len(this_frames), 'frames')
         frames += this_frames
+        # print('  len(frames) is now', len(frames))
     evt = pytpc.evtdata.Event(evtid)
     evt.traces = np.concatenate(frames)
 
