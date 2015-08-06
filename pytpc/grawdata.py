@@ -1,17 +1,23 @@
 from __future__ import division, print_function
-
 import os
 import struct
 import numpy as np
 import pytpc.evtdata
 
-class GRAWFile(object):
 
+class GRAWFile(object):
+    """An object representing an unmerged GRAW file from the DAQ.
+
+    Parameters
+    ----------
+    filename : string
+        The path to the file
+
+    """
     full_readout_frame_type = 2
     partial_readout_frame_type = 1
 
     def __init__(self, filename):
-
         self.lookup = []
         self.evtids = None
         """A lookup table for the events in the file. This is simply an array of file offsets."""
@@ -34,24 +40,34 @@ class GRAWFile(object):
         return
 
     def open(self, filename):
+        """Open the given file.
 
+        When a file is open, the attribute `is_open` should be True.
+
+        Parameters
+        ----------
+        filename : string
+            The file to open
+        """
         self.fp = open(filename, 'rb')
         self.is_open = True
-        # print("Opened file: " + filename)
-
         return
 
     def close(self):
         """Close an open file"""
-
         if self.is_open:
             self.fp.close()
             self.is_open = False
-
         return
 
     def make_lookup_table(self):
+        """Make the lookup table for the file by indexing its contents.
 
+        This finds the offset at which each frame begins in the file. These are stored in
+        the attribute `lookup`.
+
+        Another list, `evtids`, is also filled. This contains the event ID for each frame.
+        """
         self.lookup = []
         self.evtids = []
         self.fp.seek(0)
@@ -60,7 +76,6 @@ class GRAWFile(object):
         self.fp.seek(0)
         while True:
             pos = self.fp.tell()
-
             mt = self.fp.read(1)
             if mt == b'':
                 break
@@ -87,9 +102,7 @@ class GRAWFile(object):
         filename : string
             The path to the file.
         """
-
         self.lookup = []
-
         try:
             file = open(filename, 'r')
             for line in file:
@@ -100,12 +113,45 @@ class GRAWFile(object):
 
     @staticmethod
     def _bsmerge(a):
+        """Byte-swap and concatenate the bytes in the given iterable.
+
+        Parameters
+        ----------
+        a : iterable of bytes
+            The bytes
+
+        Returns
+        -------
+        res : integer
+            The byte-swapped number
+        """
         res = 0
         for i, x in enumerate(a):
             res += x << 8*(len(a) - i - 1)
         return res
 
     def _read(self, return_header=False):
+        """Read the frame beginning at the current location of the file cursor.
+
+        This should probably not be used directly. Subscript the file instead.
+
+        Parameters
+        ----------
+        return_header : bool
+            If true, return the header as well
+
+        Results
+        -------
+        res : ndarray
+            The data in the frame
+        header : dict
+            The header information. Returned only if `return_header` is True.
+
+        Raises
+        ------
+        IOError
+            If the frame type given in the header is not recognized.
+        """
         hdr_start = self.fp.tell()
         hdr_raw = struct.unpack('>5BHB2HL6BL2BHB32B4HL4H', self.fp.read(83))
         header = {'metatype': hdr_raw[0],
@@ -178,7 +224,6 @@ class GRAWFile(object):
             return res
 
     def __getitem__(self, item):
-
         if item < 0 or item > len(self.lookup):
             raise IndexError("The index is out of bounds")
         else:
@@ -196,11 +241,25 @@ class GRAWFile(object):
         return 'GRAWFile(%s)' % os.path.basename(self.fp.name)
 
     def _frame_generator(self, a):
-
+        """Return a generator that produces each frame identified by ID in `a`."""
         for i in a:
             yield self[i]
 
     def get_frames_for_event(self, evtid):
+        """Get the frames for the given event ID.
+
+        Each frame with the given event ID is returned by the resulting generator.
+
+        Parameters
+        ----------
+        evtid : integer
+            The event ID to get frames for
+
+        Returns
+        -------
+        generator
+            The frames, as a generator
+        """
         assert len(self.lookup) == len(self.evtids)
 
         idx = np.where(self.evtids == evtid)[0]
@@ -208,7 +267,22 @@ class GRAWFile(object):
 
 
 def merge_frames(files, evtid):
+    """Merge the frames for the given event ID from each file into an Event.
 
+    The frames from each file are collected using `GRAWFile.get_frames_for_event`, and are then
+    merged together and put into a `pytpc.evtdata.Event` object for further processing.
+
+    Parameters
+    ----------
+    evtid : integer
+        The event ID
+
+    Returns
+    -------
+    evt : pytpc.evtdata.Event
+        An event object. This is the same type that would be returned when reading an event
+        from a merged event file.
+    """
     frames = []
     for f in files:
         # print('Reading from', f)
