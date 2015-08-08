@@ -12,14 +12,18 @@ class GRAWFile(object):
     ----------
     filename : string
         The path to the file
+    max_len : number
+        The maximum number of events to read from the file. Set this to a reasonable value to make the files open
+        more quickly.
 
     """
     full_readout_frame_type = 2
     partial_readout_frame_type = 1
 
-    def __init__(self, filename):
+    def __init__(self, filename, max_len=None):
         self.lookup = []
         self.evtids = None
+        self.max_len = max_len
         """A lookup table for the events in the file. This is simply an array of file offsets."""
 
         self.current_event = 0  #: The index of the current event
@@ -88,6 +92,9 @@ class GRAWFile(object):
                 evtid = struct.unpack('>L', self.fp.read(4))[0]
                 self.evtids.append(evtid)
                 self.fp.seek(pos + size)
+
+                if self.max_len is not None and len(self.lookup) >= self.max_len:
+                    break
 
         self.fp.seek(0)
         self.evtids = np.array(self.evtids)
