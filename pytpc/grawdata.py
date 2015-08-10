@@ -181,7 +181,7 @@ class GRAWFile(object):
                              ('pad', 'u2'), ('data', '512i2')])
 
         if header['frame_type'] == GRAWFile.partial_readout_frame_type:
-            raw = np.fromfile(self.fp, dtype='>I4', count=header['num_items'])
+            raw = np.fromfile(self.fp, dtype='>u4', count=header['num_items'])
             agets = (raw & 0xC0000000)>>30
             channels = (raw & 0x3F800000)>>23
             tbs = (raw & 0x007FC000)>>14
@@ -203,20 +203,20 @@ class GRAWFile(object):
                 res[i] = header['cobo'], header['asad'], aget, ch, 0, s[t]
 
         elif header['frame_type'] == GRAWFile.full_readout_frame_type:
-            raw = np.fromfile(self.fp, dtype='>I2', count=header['num_items'])
+            raw = np.fromfile(self.fp, dtype='>u2', count=header['num_items'])
             agets = (raw & 0xC000)>>14
             samples = (raw & 0x0FFF)
 
             res = np.zeros(68*4, dtype=datatype)
 
-            for aget in agets[np.unique(agets)]:
+            for aget in np.unique(agets):
                 s = samples[np.where(agets == aget)].reshape((512, 68)).T
-                idx = slice(aget*68, aget*(68+1))
-                res[idx]['cobo'] = header['cobo']
-                res[idx]['asad'] = header['asad']
-                res[idx]['aget'] = aget
-                res[idx]['channel'] = np.arange(68)
-                res[idx]['data'] = s
+                idx = slice(aget*68, (aget+1)*68)
+                res['cobo'][idx] = header['cobo']
+                res['asad'][idx] = header['asad']
+                res['aget'][idx] = aget
+                res['channel'][idx] = np.arange(68)
+                res['data'][idx] = s
 
         else:
             raise IOError('Invalid frame type: %d' % header['frame_type'])
