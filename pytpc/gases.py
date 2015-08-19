@@ -11,6 +11,8 @@ import sqlite3
 import os
 from functools import reduce
 
+import pkg_resources
+
 
 class Gas(object):
     """Base class that describes a gas in the detector.
@@ -93,8 +95,7 @@ class InterpolatedGas(Gas):
 
     def __init__(self, name, pressure):
 
-        # TODO: Make this less of a kludge
-        gasdb_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'gases', 'gasdata.db'))
+        gasdb_path = pkg_resources.resource_filename('pytpc', os.path.join('data', 'gases', 'gasdata.db'))
         assert os.path.isfile(gasdb_path), 'Couldn\'t find the gas database'
         with sqlite3.connect(gasdb_path) as gasdb:
             gdb_curs = gasdb.cursor()
