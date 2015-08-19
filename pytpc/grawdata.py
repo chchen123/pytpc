@@ -4,7 +4,9 @@ import struct
 import numpy as np
 import pytpc.evtdata
 import pytpc.datafile
+import logging
 
+logger = logging.getLogger(__name__)
 
 class GRAWFile(pytpc.datafile.DataFile):
     """An object representing an unmerged GRAW file from the DAQ.
@@ -143,6 +145,22 @@ class GRAWFile(pytpc.datafile.DataFile):
         return self.fp.read(frame_size)
 
     @staticmethod
+    def _unpack_data_partial_readout(raw):
+        agets = (raw & 0xC0000000)>>30
+        channels = (raw & 0x3F800000)>>23
+        tbs = (raw & 0x007FC000)>>14
+        samples = (raw & 0x00000FFF)
+
+        return agets, channels, tbs, samples
+
+    @staticmethod
+    def _unpack_data_full_readout(raw):
+        agets = (raw & 0xC000)>>14
+        samples = (raw & 0x0FFF)
+
+        return agets, samples
+
+    @staticmethod
     def _parse(rawframe, return_header=False):
 
         hdr_raw = struct.unpack('>5BHB2HL6BL2BHB32B4HL4H', rawframe[:83])
@@ -161,17 +179,28 @@ class GRAWFile(pytpc.datafile.DataFile):
                   'offset': hdr_raw[19],
                   'status': hdr_raw[20]}
 
+        logger.debug('Frame header: metatype %d, type %d, revision %d, with %d items',
+                     header['metatype'], header['frame_type'], header['revision'], header['num_items'])
+
         datatype = np.dtype([('cobo', 'u1'), ('asad', 'u1'), ('aget', 'u1'), ('channel', 'u1'),
                              ('pad', 'u2'), ('data', '512i2')])
 
         datamin = header['header_size'] * 256
 
+        log_frameid = '{evt_id}:{cobo}/{asad}'.format(**header)
+
         if header['frame_type'] == GRAWFile.partial_readout_frame_type:
             raw = np.frombuffer(rawframe[datamin:], dtype='>u4', count=header['num_items'])
-            agets = (raw & 0xC0000000)>>30
-            channels = (raw & 0x3F800000)>>23
-            tbs = (raw & 0x007FC000)>>14
-            samples = (raw & 0x00000FFF)
+            agets, channels, tbs, samples = GRAWFile._unpack_data_partial_readout(raw)
+
+            if agets.min() < 0 or agets.max() > 3:
+                logger.warn('(%s) Invalid AGET indices present: min=%d, max=%d', log_frameid, agets.min(), agets.max())
+            if channels.min() < 0 or channels.max() > 67:
+                logger.warn('(%s) Invalid channels present: min=%d, max=%d', log_frameid, channels.min(), channels.max())
+            if tbs.min() < 0 or tbs.max() > 511:
+                logger.warn('(%s) Invalid time buckets present: min=%d, max=%d', log_frameid, tbs.min(), tbs.max())
+            if samples.min() < 0 or samples.max() > 4095:
+                logger.warn('(%s) Invalid samples present: min=%d, max=%d', log_frameid, samples.min(), samples.max())
 
             ach = np.column_stack((agets, channels))
             pairs = np.unique(ach.view(dtype=[('f0', 'u4'), ('f1', 'u4')])).view(dtype='u4').reshape(-1, 2)
@@ -184,14 +213,25 @@ class GRAWFile(pytpc.datafile.DataFile):
                 s = samples[idx]
 
                 assert len(t) == len(s), 'samples and tbs don\'t have same lengths'
-                assert tbs.max() <= len(s), 'max tb outside range of sample array length'
 
-                res[i] = header['cobo'], header['asad'], aget, ch, 0, s[t]
+                res['cobo'][i] = header['cobo']
+                res['asad'][i] = header['asad']
+                res['aget'][i] = aget
+                res['channel'][i] = ch
+                try:
+                    res['data'][i, t] = s
+                except IndexError:
+                    logger.error('(%s) Indexing samples array failed. len(s)=%d, min(t)=%d, max(t)=%d',
+                                 log_frameid, len(s), t.min(), t.max())
 
         elif header['frame_type'] == GRAWFile.full_readout_frame_type:
             raw = np.frombuffer(rawframe[datamin:], dtype='>u2', count=header['num_items'])
-            agets = (raw & 0xC000)>>14
-            samples = (raw & 0x0FFF)
+            agets, samples = GRAWFile._unpack_data_full_readout(raw)
+
+            if agets.min() < 0 or agets.max() > 3:
+                logger.warn('(%s) Invalid AGET indices present: min=%d, max=%d', log_frameid, agets.min(), agets.max())
+            if samples.min() < 0 or samples.max() > 4095:
+                logger.warn('(%s) Invalid samples present: min=%d, max=%d', log_frameid, samples.min(), samples.max())
 
             res = np.zeros(68*4, dtype=datatype)
 
