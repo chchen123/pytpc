@@ -16,7 +16,22 @@ The following packages are required to use pytpc:
 
 These should be installed automatically if you use the setup.py script.
 
-The code itself was written and tested with Python 3.3, but it *should* also work with Python 2.6+. 
+The code itself was written and tested with Python 3.4. I don't believe it will work with Python 2.7, but anything
+is possible.
+
+## Recommended installation procedure
+
+The easiest way to install the code is by satisfying the dependencies with Conda. Download and install `conda` from
+http://continuum.io/downloads (make sure you get the Python 3 version). Then install the dependencies with
+
+```bash
+conda install numpy scipy scikit-learn matplotlib seaborn
+```
+
+Next, if you're installing pytpc from the source code, run
+```bash
+python setup.py install
+```
 
 ## Documentation
 
