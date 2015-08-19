@@ -32,17 +32,18 @@ Examples
 
 from __future__ import division, print_function
 import struct
-import numpy
+import numpy as np
 import os.path
 import warnings
 from pytpc.tpcplot import generate_pad_plane
+import pytpc.datafile
 from scipy.stats import threshold
 from scipy.ndimage.filters import gaussian_filter
 from pytpc.padplane import find_pad_coords, padcenter_dict
 from math import sin, cos
 
 
-class EventFile:
+class EventFile (pytpc.datafile.DataFile):
     """Represents a merged GET event file.
 
     This class provides an interface to merged event files from the GET electronics. It is capable of opening
@@ -73,62 +74,18 @@ class EventFile:
         The file object itself
     """
 
-    def __init__(self, filename=None):
+    def __init__(self, filename=None, open_mode='r'):
+
+        super().__init__(filename, open_mode)
 
         self.magic = 0x6e7ef11e  # The file's magic number
 
-        self.lookup = []
-        """A lookup table for the events in the file. This is simply an array of file offsets."""
-
-        self.current_event = 0  #: The index of the current event
-
-        if filename is not None:
-            self.open(filename)
-            ltfilename = os.path.splitext(filename)[0] + '.lookup'
-            if os.path.exists(ltfilename):
-                self.load_lookup_table(ltfilename)
-            else:
-                self.make_lookup_table()
-            self.is_open = True
-
-        else:
-            self.fp = None
-            self.is_open = False
-
-        return
-
-    def open(self, filename):
-        """ Opens the specified file.
-
-        The file's first 4 bytes are compared to the magic value ``0x6e7ef11e`` to check that the file is of the
-        correct type.
-
-        Parameters
-        ----------
-        filename : string
-            The name of the file to open
-        """
-
-        try:
-            self.fp = open(filename, 'rb')
-            self.is_open = True
-            # print("Opened file: " + filename)
-
+        if 'r' in open_mode:
             read_magic = struct.unpack('<I', self.fp.read(4))[0]
             if read_magic != self.magic:
-                print("Bad file. Magic number is wrong.")
-
-        except IOError:
-            raise
-
-        return
-
-    def close(self):
-        """Close an open file"""
-
-        if self.is_open:
-            self.fp.close()
-            self.is_open = False
+                raise IOError("Bad file. Magic number is wrong.")
+        elif 'w' in open_mode:
+            self.fp.write(self.magic.to_bytes(4, byteorder='little'))
 
         return
 
@@ -165,6 +122,14 @@ class EventFile:
             narrowed = val
 
         joined = (tb << 15) | narrowed | parity
+        return joined
+
+    @staticmethod
+    def pack_samples(tb, val):
+
+        parities = np.where(val < 0, 1, 0)
+        narrowed = np.clip(abs(val), 0, 4095)
+        joined = (tb << 15) | (parities << 12) | narrowed
         return joined
 
     @staticmethod
@@ -217,7 +182,7 @@ class EventFile:
         # Change the parities from (0, 1, ...) to (1, -1, ...) and multiply
         samples *= (-2 * parities + 1)
 
-        result = numpy.zeros(512)
+        result = np.zeros(512)
 
         result[tbs] = samples
 
@@ -252,7 +217,7 @@ class EventFile:
         num_traces = hdr[4]
 
         new_evt = Event(evt_id=event_id, timestamp=event_ts)
-        new_evt.traces = numpy.zeros((num_traces,), dtype=new_evt.dt)
+        new_evt.traces = np.zeros((num_traces,), dtype=new_evt.dt)
 
         # Read the traces
 
@@ -272,13 +237,31 @@ class EventFile:
             # Now read the trace itself
             num_samples = (th[0] - 10) // 3  # (total - header) / size of packed item
 
-            packed = numpy.hstack((numpy.fromfile(self.fp, dtype='3u1', count=num_samples),
-                                   numpy.zeros((num_samples, 1), dtype='u1'))).view('<u4')
+            packed = np.hstack((np.fromfile(self.fp, dtype='3u1', count=num_samples),
+                                np.zeros((num_samples, 1), dtype='u1'))).view('<u4')
 
             tr['data'][:] = self.unpack_samples(packed)
 
         return new_evt
 
+    def write(self, evt):
+        evt_magic = 0xee
+        size = 19 + len(evt.traces) * 10 + np.count_nonzero(evt.traces['data']) * 3
+        evtid = evt.evt_id
+        timestamp = evt.timestamp
+        num_traces = len(evt.traces)
+
+        evt_hdr = struct.pack('<BIIQH', evt_magic, size, evtid, timestamp, num_traces)
+        self.fp.write(evt_hdr)
+
+        for tr in evt.traces:
+            tr_size = np.count_nonzero(tr['data']) * 3 + 10
+            th = struct.pack('<IBBBBH', tr_size, tr['cobo'], tr['asad'], tr['aget'], tr['channel'], tr['pad'])
+            self.fp.write(th)
+            nztbs = np.nonzero(tr['data'])[0]
+            nzvals = tr['data'][nztbs]
+            packed = self.pack_samples(nztbs, nzvals)
+            packed.view('<8u1')[:, :3].tofile(self.fp)
 
     def make_lookup_table(self):
         """ Indexes the open file and generates a lookup table.
@@ -325,192 +308,11 @@ class EventFile:
 
         return self.lookup
 
-    def load_lookup_table(self, filename):
-        """Read a lookup table from a file.
-
-        The file should contain the (integer) file offsets, with one on each line.
-
-        Parameters
-        ----------
-        filename : string
-            The path to the file.
-        """
-
-        self.lookup = []
-
-        try:
-            file = open(filename, 'r')
-            for line in file:
-                self.lookup.append(int(line.rstrip()))
-        except FileNotFoundError:
-            print("File name was not valid")
-            return
-
-    def read_next(self):
-        """Read the next event in the file.
-
-        This function reads the next event from the file and increments the self.current_event value. For example,
-        if the current_event is 4, then current_event will be set to 5, and event 5 will be read and returned.
-
-        Returns
-        -------
-        Event
-            The next event in the file
-        """
-
-        if self.current_event + 1 < len(self.lookup):
-            self.current_event += 1
-            self.fp.seek(self.lookup[self.current_event])
-            return self._read()
-        else:
-            print("At last event")
-            return None
-
-    def read_current(self):
-        """Read the event currently pointed to by the current_event marker.
-
-        This function reads the current event from the file. For example, if the current_event is 4, then event 4
-        will be read and returned.
-
-        Returns
-        -------
-        Event
-            The current event
-        """
-
-        self.fp.seek(self.lookup[self.current_event])
-        return self._read()
-
-    def read_previous(self):
-        """Read the previous event from the file.
-
-        This function reads the previous event from the file and decrements the self.current_event value. For example,
-        if the current_event is 4, then current_event will be set to 3, and event 3 will be read and returned.
-
-        Returns
-        -------
-        Event
-            The previous event from the file
-        """
-
-        if self.current_event - 1 >= 0:
-            self.current_event -= 1
-            self.fp.seek(self.lookup[self.current_event])
-            return self._read()
-        else:
-            print("At first event")
-            return None
-
-    def read_event_by_number(self, num):
-        """Reads a specific event from the file, based on its event number.
-
-        This function uses the lookup table to find the requested event in the file, and then reads and returns that
-        event. The current_event index is updated to the event number that was requested.
-
-        Parameters
-        ----------
-        num : int
-            The event number to read. This should be an index in the bounds of :attr:`lookup`
-
-        Returns
-        -------
-        Event
-            The requested event from the file
-        """
-
-        if 0 <= num < len(self.lookup):
-            self.current_event = num
-            self.fp.seek(self.lookup[num])
-            return self._read()
-        else:
-            print("The provided number is outside the range of event numbers.")
-            return None
-
-    def __len__(self):
-        return len(self.lookup)
-
-    def __iter__(self):
-        """ Prepare the file object for iteration.
-
-        This sets the current event to 0 and rewinds the file pointer back to the beginning.
-        """
-        self.fp.seek(self.lookup[0])
-        self.current_event = 0
-        return self
-
-    def __next__(self):
-        """ Get the next event when iterating.
-        """
-
-        if self.current_event < len(self.lookup):
-            evt = self.read_current()
-            self.current_event += 1
-            return evt
-        else:
-            raise StopIteration
-
-    def evtrange(self, start=0, stop=None, step=1):
-        """Iterate over the given range of events.
-
-        This method returns a generator object that returns the events from the file with the given range of event IDs.
-        This is a better approach for files with large events, as it only reads each event as needed.
-
-        Parameters
-        ----------
-        start : int, optional
-            The event to start at. Defaults to the beginning of the file.
-        stop : int, optional
-            One plus the index of the last event to read. (This follows the Python slicing convention of not including
-            the upper bound.) Defaults to the end of the file.
-        step : int, optional
-            The step between events. Defaults to 1.
-
-        Yields
-        ------
-        Event
-            An event from the file.
-
-        Raises
-        ------
-        IndexError
-            If `start` or `stop` was out-of-bounds.
-        """
-
-        if stop is None:
-            stop = len(self.lookup)
-
-        if start < 0 or stop > len(self.lookup):
-            raise IndexError("The given start and/or stop were out of bounds")
-
-        for i in range(start, stop, step):
-            yield self.read_event_by_number(i)
-
-    def __getitem__(self, item):
-        """ Implements subscripting of the event file, with slices.
-        """
-
-        if isinstance(item, slice):
-            start, stop, step = item.indices(len(self.lookup))
-            evts = []
-            for i in range(start, stop, step):
-                e = self.read_event_by_number(i)
-                evts.append(e)
-            return evts
-
-        elif isinstance(item, int):
-            if item < 0 or item > len(self.lookup):
-                raise IndexError("The index is out of bounds")
-            else:
-                return self.read_event_by_number(item)
-
-        else:
-            raise IndexError("index must be int or slice")
-
 
 class Event:
     """Represents an event from an event file.
 
-    The event is represented as a numpy array with a complex dtype.
+    The event is represented as a np array with a complex dtype.
 
     Parameters
     ----------
@@ -525,7 +327,7 @@ class Event:
         The event ID
     timestamp : int
         The event timestamp
-    dt : numpy.dtype
+    dt : np.dtype
         The datatype used for the ndarray storing the traces. This defines fields `cobo`, `asad`, `aget`, `channel`,
         `pad`, and `data`. The `data` is an array of samples indexed by time bucket.
     traces : ndarray
@@ -538,7 +340,7 @@ class Event:
         assert (evt_id >= 0)
         assert (timestamp >= 0)
 
-        self.dt = numpy.dtype([('cobo', 'u1'), ('asad', 'u1'), ('aget', 'u1'), ('channel', 'u1'),
+        self.dt = np.dtype([('cobo', 'u1'), ('asad', 'u1'), ('aget', 'u1'), ('channel', 'u1'),
                                ('pad', 'u2'), ('data', '512i2')])
         """The data type of the numpy array"""
 
@@ -548,7 +350,7 @@ class Event:
         self.timestamp = timestamp
         """The event timestamp"""
 
-        self.traces = numpy.zeros((0,), dtype=self.dt)
+        self.traces = np.zeros((0,), dtype=self.dt)
         """The event data. The dtype is :attr:`dt`."""
 
         return
@@ -572,7 +374,7 @@ class Event:
         hits = self.traces['data'].sum(1)
         pads = self.traces['pad']
 
-        flat_hits = numpy.zeros(10240)
+        flat_hits = np.zeros(10240)
         for (p, h) in zip(pads, hits):
             flat_hits[p] = h
 
@@ -598,7 +400,7 @@ class Event:
 
         Returns
         -------
-        xyzs : numpy.ndarray
+        xyzs : np.ndarray
             A 4D array of points including (x, y, tb or z, activation)
 
         See also
@@ -607,7 +409,7 @@ class Event:
         """
 
         if peaks_only:
-            traces_copy = numpy.copy(self.traces)
+            traces_copy = np.copy(self.traces)
             for i, tr in enumerate(traces_copy):
                 traces_copy[i]['data'][:] = threshold(tr['data'], threshmin=tr['data'].max(), newval=0)
             nz = traces_copy['data'].nonzero()
@@ -620,11 +422,11 @@ class Event:
 
         pcenters = pads.mean(1)
 
-        xys = numpy.array([pcenters[self.traces[i]['pad']] for i in nz[0]])
+        xys = np.array([pcenters[self.traces[i]['pad']] for i in nz[0]])
         zs = nz[1].reshape(nz[1].shape[0], 1)
         cs = self.traces['data'][nz].reshape(nz[0].shape[0], 1)
 
-        xyzs = numpy.hstack((xys, zs, cs))
+        xyzs = np.hstack((xys, zs, cs))
 
         if drift_vel is not None and clock is not None:
             xyzs = calibrate(xyzs, drift_vel, clock)
@@ -674,7 +476,7 @@ def make_event(pos, de, clock, vd, ioniz, proj_mass, shapetime, offset=0, pad_ro
     """
 
     # Find energy deposition for each point
-    ne = numpy.round(de*1e6*proj_mass / ioniz)  # last factor after mass is gain
+    ne = np.round(de*1e6*proj_mass / ioniz)  # last factor after mass is gain
 
     # Uncalibrate the position data
     uncal = uncalibrate(pos, vd, clock, offset)
@@ -683,14 +485,14 @@ def make_event(pos, de, clock, vd, ioniz, proj_mass, shapetime, offset=0, pad_ro
     # Rotate to deal with pad plane rotation
     if pad_rot is not None:
         assert uncal.shape[1] == 3
-        rot_mat = numpy.array([[cos(pad_rot), -sin(pad_rot), 0],
+        rot_mat = np.array([[cos(pad_rot), -sin(pad_rot), 0],
                                [sin(pad_rot),  cos(pad_rot), 0],
                                [0,             0,            1]])
-        uncal = numpy.inner(rot_mat, uncal).T
+        uncal = np.inner(rot_mat, uncal).T
 
     # Find the pad for each point
-    pca = numpy.round(find_pad_coords(uncal[:, 0:2]))
-    pnums = numpy.array([padcenter_dict.get(tuple(a), -1) for a in pca])
+    pca = np.round(find_pad_coords(uncal[:, 0:2]))
+    pnums = np.array([padcenter_dict.get(tuple(a), -1) for a in pca])
     unique_pads = set(pnums)
     unique_pads.discard(-1)
 
@@ -698,10 +500,10 @@ def make_event(pos, de, clock, vd, ioniz, proj_mass, shapetime, offset=0, pad_ro
 
     # Build the event
     evt = Event()
-    evt.traces = numpy.zeros(len(unique_pads), dtype=evt.dt)
+    evt.traces = np.zeros(len(unique_pads), dtype=evt.dt)
     for i, p in enumerate(unique_pads):
-        idxs = numpy.where(pnums == p)
-        tr = numpy.zeros(512)
+        idxs = np.where(pnums == p)
+        tr = np.zeros(512)
         for t, v in zip(tbs[idxs], ne[idxs]):
             if 0 <= t <= 511:
                 tr[t] += v
@@ -741,12 +543,12 @@ def calibrate(data, drift_vel, clock):
     """
     new_data = data.copy()
 
-    if numpy.isscalar(drift_vel):
+    if np.isscalar(drift_vel):
         new_data[:, 2] *= drift_vel / clock * 10  # 1 cm/(us.MHz) = 1 cm = 10 mm
     else:
         assert drift_vel.shape == (3,), 'vector drift velocity must have 3 dimensions'
         new_data[:, 2] = 0.0  # This prevents adding the time buckets to the last dimension
-        new_data[:, 0:3] += numpy.outer(data[:, 2], -drift_vel) / clock * 10
+        new_data[:, 0:3] += np.outer(data[:, 2], -drift_vel) / clock * 10
 
     return new_data
 
@@ -780,12 +582,12 @@ def uncalibrate(data, drift_vel, clock, offset=0):
     """
     new_data = data.copy()
 
-    if numpy.isscalar(drift_vel):
+    if np.isscalar(drift_vel):
         new_data[:, 2] *= clock / (10 * drift_vel)  # 1 cm/(us.MHz) = 1 cm = 10 mm
     else:
         assert drift_vel.shape == (3,), 'vector drift velocity must have 3 dimensions'
         tbs = data[:, 2] * clock / (10 * -drift_vel[2]) + offset  # 1 cm/(us.MHz) = 1 cm = 10 mm
-        new_data[:, 0:3] -= numpy.outer(tbs, -drift_vel) / clock * 10
+        new_data[:, 0:3] -= np.outer(tbs, -drift_vel) / clock * 10
         new_data[:, 2] = tbs
 
     return new_data
@@ -808,12 +610,12 @@ def load_pedestals(filename):
     """
 
     f = open(filename, 'r')
-    peds = numpy.zeros((10, 4, 4, 68, 512))
+    peds = np.zeros((10, 4, 4, 68, 512))
 
     for line in f:
         subs = line[:-1].split(',')  # throw out the newline and split at commas
         vals = [int(float(x)) for x in subs]
-        peds[(vals[0], vals[1], vals[2], vals[3])] = vals[4] * numpy.ones(512)
+        peds[(vals[0], vals[1], vals[2], vals[3])] = vals[4] * np.ones(512)
 
     return peds
 
