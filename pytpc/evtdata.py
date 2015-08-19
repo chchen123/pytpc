@@ -81,6 +81,7 @@ class EventFile (pytpc.datafile.DataFile):
         self.magic = 0x6e7ef11e  # The file's magic number
 
         if 'r' in open_mode:
+            self.fp.seek(0)
             read_magic = struct.unpack('<I', self.fp.read(4))[0]
             if read_magic != self.magic:
                 raise IOError("Bad file. Magic number is wrong.")
