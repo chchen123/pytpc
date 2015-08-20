@@ -22,7 +22,7 @@ class DataFile(object):
         if filename is not None:
             self.open(filename, open_mode)
             if 'r' in open_mode:
-                ltfilename = os.path.splitext(filename)[0] + '.lookup'
+                ltfilename = filename + '.lookup'
                 if os.path.exists(ltfilename):
                     self.load_lookup_table(ltfilename)
                 else:

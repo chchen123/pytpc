@@ -299,7 +299,7 @@ class EventFile (pytpc.datafile.DataFile):
         self.fp.seek(4)
         self.current_event = 0
 
-        ltfilename = os.path.splitext(self.fp.name)[0] + '.lookup'
+        ltfilename = self.fp.name + '.lookup'
 
         if not os.path.exists(ltfilename):
             ltfile = open(ltfilename, 'w')
