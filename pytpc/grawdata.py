@@ -67,7 +67,7 @@ class GRAWFile(pytpc.datafile.DataFile):
         self.fp.seek(0)
         self.evtids = np.array(self.evtids)
 
-        ltfilename = os.path.splitext(self.fp.name)[0] + '.lookup'
+        ltfilename = self.fp.name + '.lookup'
 
         if not os.path.exists(ltfilename):
             ltfile = open(ltfilename, 'w')
