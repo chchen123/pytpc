@@ -76,9 +76,10 @@ class EventFile (pytpc.datafile.DataFile):
 
     def __init__(self, filename=None, open_mode='r'):
 
-        super().__init__(filename, open_mode)
-
+        self.evtids = None
         self.magic = 0x6e7ef11e  # The file's magic number
+
+        super().__init__(filename, open_mode)
 
         if 'r' in open_mode:
             self.fp.seek(0)
@@ -282,19 +283,23 @@ class EventFile (pytpc.datafile.DataFile):
         self.fp.seek(4)
 
         self.lookup = []
+        self.evtids = []
 
         while True:
             magic = self.fp.read(1)
             if magic == b'\xEE':
                 pos = self.fp.tell() - 1
+                offset, evtid = struct.unpack('<II', self.fp.read(8))
                 self.lookup.append(pos)
-                offset = struct.unpack('<I', self.fp.read(4))[0]
+                self.evtids.append(evtid)
                 self.fp.seek(pos + offset)
             elif magic == b'':
                 break
             else:
                 print("Bad magic number")
                 return None
+
+        self.evtids = np.array(self.evtids)
 
         self.fp.seek(4)
         self.current_event = 0
@@ -303,11 +308,43 @@ class EventFile (pytpc.datafile.DataFile):
 
         if not os.path.exists(ltfilename):
             ltfile = open(ltfilename, 'w')
-            for entry in self.lookup:
-                ltfile.write(str(entry) + '\n')
+            for i, e in zip(self.lookup, self.evtids):
+                ltfile.write(str(i) + ',' + str(e) + '\n')
             ltfile.close()
 
         return self.lookup
+
+    def get_by_event_id(self, evtid):
+        """Get the event with the specified event ID from the file.
+
+        This is useful if the events in the file are not in order, or if the event numbering did not begin at 0.
+
+        Parameters
+        ----------
+        evtid : integer
+            The event ID to look for.
+
+        Returns
+        -------
+        evt : Event
+            The event
+
+        Raises
+        ------
+        KeyError
+            If there is no event in the file with the given event ID.
+        ValueError
+            If the event ID is not unique in the file. (This shouldn't happen, and may indicate corrupt data.)
+        """
+        idx = np.where(self.evtids == evtid)[0]
+        if len(idx) == 1:
+            assert len(self.lookup) == len(self.evtids), 'length of lookup tables does not match'
+            lookup_evt_num = self.lookup[idx[0]]
+            return self.read_event_by_number(lookup_evt_num)
+        elif len(idx) == 0:
+            raise KeyError('No event with this ID')
+        else:
+            raise ValueError('More than one event had this ID! (This may indicate corrupt data.)')
 
 
 class Event:
@@ -342,7 +379,7 @@ class Event:
         assert (timestamp >= 0)
 
         self.dt = np.dtype([('cobo', 'u1'), ('asad', 'u1'), ('aget', 'u1'), ('channel', 'u1'),
-                               ('pad', 'u2'), ('data', '512i2')])
+                            ('pad', 'u2'), ('data', '512i2')])
         """The data type of the numpy array"""
 
         self.evt_id = evt_id
@@ -487,8 +524,8 @@ def make_event(pos, de, clock, vd, ioniz, proj_mass, shapetime, offset=0, pad_ro
     if pad_rot is not None:
         assert uncal.shape[1] == 3
         rot_mat = np.array([[cos(pad_rot), -sin(pad_rot), 0],
-                               [sin(pad_rot),  cos(pad_rot), 0],
-                               [0,             0,            1]])
+                            [sin(pad_rot),  cos(pad_rot), 0],
+                            [0,             0,            1]])
         uncal = np.inner(rot_mat, uncal).T
 
     # Find the pad for each point
