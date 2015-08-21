@@ -339,8 +339,7 @@ class EventFile (pytpc.datafile.DataFile):
         idx = np.where(self.evtids == evtid)[0]
         if len(idx) == 1:
             assert len(self.lookup) == len(self.evtids), 'length of lookup tables does not match'
-            lookup_evt_num = self.lookup[idx[0]]
-            return self.read_event_by_number(lookup_evt_num)
+            return self.read_event_by_number(idx[0])
         elif len(idx) == 0:
             raise KeyError('No event with this ID')
         else:
