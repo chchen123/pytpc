@@ -8,6 +8,7 @@ This module provides a base class for interacting with data files.
 
 from __future__ import division, print_function
 import os.path
+import numpy as np
 
 
 class DataFile(object):
@@ -15,7 +16,7 @@ class DataFile(object):
     def __init__(self, filename=None, open_mode='r'):
 
         self.lookup = []
-        """A lookup table for the events in the file. This is simply an array of file offsets."""
+        self.evtids = []
 
         self.current_event = 0  #: The index of the current event
 
@@ -79,14 +80,19 @@ class DataFile(object):
         """
 
         self.lookup = []
+        self.evtids = []
 
         try:
             file = open(filename, 'r')
             for line in file:
-                self.lookup.append(int(line.rstrip()))
+                l, e = [int(a) for a in line.strip().split(',')]
+                self.lookup.append(l)
+                self.evtids.append(e)
         except FileNotFoundError:
             print("File name was not valid")
             return
+
+        self.evtids = np.array(self.evtids)
 
     def read_event_by_number(self, num):
         """Reads a specific event from the file, based on its event number.

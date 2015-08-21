@@ -8,6 +8,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class GRAWFile(pytpc.datafile.DataFile):
     """An object representing an unmerged GRAW file from the DAQ.
 
@@ -75,23 +76,6 @@ class GRAWFile(pytpc.datafile.DataFile):
                 ltfile.write(str(i) + ',' + str(e) + '\n')
             ltfile.close()
 
-    def load_lookup_table(self, filename):
-
-        self.lookup = []
-        self.evtids = []
-
-        try:
-            file = open(filename, 'r')
-            for line in file:
-                l, e = [int(a) for a in line.strip().split(',')]
-                self.lookup.append(l)
-                self.evtids.append(e)
-        except FileNotFoundError:
-            print("File name was not valid")
-            return
-
-        self.evtids = np.array(self.evtids)
-
     @staticmethod
     def _bsmerge(a):
         """Byte-swap and concatenate the bytes in the given iterable.
@@ -146,16 +130,16 @@ class GRAWFile(pytpc.datafile.DataFile):
 
     @staticmethod
     def _unpack_data_partial_readout(raw):
-        agets = (raw & 0xC0000000)>>30
-        channels = (raw & 0x3F800000)>>23
-        tbs = (raw & 0x007FC000)>>14
+        agets = (raw & 0xC0000000) >> 30
+        channels = (raw & 0x3F800000) >> 23
+        tbs = (raw & 0x007FC000) >> 14
         samples = (raw & 0x00000FFF)
 
         return agets, channels, tbs, samples
 
     @staticmethod
     def _unpack_data_full_readout(raw):
-        agets = (raw & 0xC000)>>14
+        agets = (raw & 0xC000) >> 14
         samples = (raw & 0x0FFF)
 
         return agets, samples
@@ -196,7 +180,8 @@ class GRAWFile(pytpc.datafile.DataFile):
             if agets.min() < 0 or agets.max() > 3:
                 logger.warn('(%s) Invalid AGET indices present: min=%d, max=%d', log_frameid, agets.min(), agets.max())
             if channels.min() < 0 or channels.max() > 67:
-                logger.warn('(%s) Invalid channels present: min=%d, max=%d', log_frameid, channels.min(), channels.max())
+                logger.warn('(%s) Invalid channels present: min=%d, max=%d', log_frameid, channels.min(),
+                            channels.max())
             if tbs.min() < 0 or tbs.max() > 511:
                 logger.warn('(%s) Invalid time buckets present: min=%d, max=%d', log_frameid, tbs.min(), tbs.max())
             if samples.min() < 0 or samples.max() > 4095:
