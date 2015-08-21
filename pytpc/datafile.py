@@ -116,8 +116,7 @@ class DataFile(object):
             self.fp.seek(self.lookup[num])
             return self._read()
         else:
-            print("The provided number is outside the range of event numbers.")
-            return None
+            raise IndexError('The given event position was outside the range of the file')
 
     def __len__(self):
         return len(self.lookup)
