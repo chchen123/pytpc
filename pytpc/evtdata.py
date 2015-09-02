@@ -460,10 +460,10 @@ class Event:
         pcenters = pads.mean(1)
 
         xys = pcenters[self.traces[nz[0]]['pad']]
-        zs = nz[1].reshape(nz[1].shape[0], 1)
-        cs = self.traces['data'][nz].reshape(nz[0].shape[0], 1)
+        zs = nz[1]
+        cs = self.traces['data'][nz]
 
-        xyzs = np.hstack((xys, zs, cs))
+        xyzs = np.column_stack((xys, zs, cs))
 
         if drift_vel is not None and clock is not None:
             xyzs = calibrate(xyzs, drift_vel, clock)
