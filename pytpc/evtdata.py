@@ -459,7 +459,7 @@ class Event:
 
         pcenters = pads.mean(1)
 
-        xys = np.array([pcenters[self.traces[i]['pad']] for i in nz[0]])
+        xys = pcenters[self.traces[nz[0]]['pad']]
         zs = nz[1].reshape(nz[1].shape[0], 1)
         cs = self.traces['data'][nz].reshape(nz[0].shape[0], 1)
 
