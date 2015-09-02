@@ -417,7 +417,7 @@ class Event:
 
         return flat_hits
 
-    def xyzs(self, drift_vel=None, clock=None, pads=None, peaks_only=False):
+    def xyzs(self, drift_vel=None, clock=None, pads=None, peaks_only=False, return_pads=False):
         """Find the scatter points of the event in space.
 
         If a drift velocity and write clock frequency are provided, then the result gives the z dimension in
@@ -434,11 +434,14 @@ class Event:
             An array of pad vertices. If provided, these pads will be used instead of the default pad plane.
         peaks_only : bool, optional
             If True, only the peak of each activation curve will be used.
+        return_pads: bool, optional
+            If True, also return the pad numbers in the output array. They will be in the last column.
 
         Returns
         -------
         xyzs : np.ndarray
-            A 4D array of points including (x, y, tb or z, activation)
+            A 4D array of points including (x, y, tb or z, activation). If `return_pads` is True, there will also
+            be a fifth column containing the pad numbers.
 
         See also
         --------
@@ -463,7 +466,11 @@ class Event:
         zs = nz[1]
         cs = self.traces['data'][nz]
 
-        xyzs = np.column_stack((xys, zs, cs))
+        if return_pads:
+            padnums = self.traces[nz[0]]['pad']
+            xyzs = np.column_stack((xys, zs, cs, padnums))
+        else:
+            xyzs = np.column_stack((xys, zs, cs))
 
         if drift_vel is not None and clock is not None:
             xyzs = calibrate(xyzs, drift_vel, clock)
