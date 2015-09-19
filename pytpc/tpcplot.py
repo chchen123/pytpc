@@ -62,7 +62,7 @@ def _generate_pad_collection(data, pads=None):
     return c
 
 
-def pad_plot(data, pads=None, scale='log', cmap_type='seq'):
+def pad_plot(data, pads=None, scale='log', cmap=pad_cm, cmin=None, cmax=None):
     """ Plot the given data on the pads of the Micromegas.
 
     Parameters
@@ -72,11 +72,20 @@ def pad_plot(data, pads=None, scale='log', cmap_type='seq'):
     pads : array-like, optional
         The vertices of the pads. If this is not provided, the default pad plane will be generated using
         `generate_pad_plane`. This can be used for a rotated pad plane, for example.
+    scale : string, optional
+        Scale for color map. 'log' for log scale, or 'linear' for linear.
+    cmap : string or Matplotlib color map, optional
+        Matplotlib color map or name of a color map
+    cmin, cmax: float, optional
+        The min and max values for the color scale. If omitted, Matplotlib will choose its default values.
 
     Returns
     -------
-    fig : matplotlib figure
+    fig : Figure
         The generated figure
+    sm : matplotlib.cm.ScalarMappable
+        The color mapping object used in the plot. This can be used to generate a colorbar with
+        `plt.colorbar(sm)`.
     """
 
     data = numpy.asanyarray(data)
@@ -88,16 +97,9 @@ def pad_plot(data, pads=None, scale='log', cmap_type='seq'):
     else:
         raise ValueError('invalid scale. Must be in set {}'.format(('log', 'linear')))
 
-    if cmap_type == 'div':
-        cmap = 'BrBG'
-    else:
-        cmap = pad_cm
-
     sm = mpl.cm.ScalarMappable(cmap=cmap, norm=nm)
     sm.set_array(data)
-    if cmap_type == 'div':
-        extr = numpy.abs(data).max()
-        sm.set_clim(-extr, extr)
+    sm.set_clim(cmin, cmax)
     colors = sm.to_rgba(data)
 
     if pads is None:
@@ -124,10 +126,7 @@ def pad_plot(data, pads=None, scale='log', cmap_type='seq'):
 
     plt.axis('equal')
 
-    cbar = fig.colorbar(sm)
-    cbar.set_label('Activation')
-
-    return fig
+    return fig, sm
 
 
 def chamber_plot(data, hits=None, pads=None, zscale='time'):
