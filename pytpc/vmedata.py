@@ -39,10 +39,16 @@ class VMEFile(object):
             self.fp.seek(16, 1)  # skip next 16 bytes
             raw2 = np.fromfile(self.fp, dtype='<I', count=512)
 
-            adc_data = np.zeros((3, 512), dtype='u4')
+            offsets = np.zeros((3, 512), dtype='int')
+            offsets[0] = np.where((raw1 & 0x10000000) >> 28, 0, 4096)
+            offsets[1] = np.where((raw1 & 0x1000) >> 12, 0, 4096)
+            offsets[2] = np.where((raw2 & 0x10000000) >> 28, 0, 4096)
+
+            adc_data = np.zeros((3, 512), dtype='int')
             adc_data[0] = (raw1 & 0x0fff0000) >> 16
             adc_data[1] = (raw1 & 0x0fff)
             adc_data[2] = (raw2 & 0x0fff0000) >> 16
+            adc_data -= offsets
 
             self.adc_events_seen += 1
             true_evtnum = evtnum - self.scaler_events_seen  # evt num is incremented even for a scaler buffer
