@@ -14,7 +14,10 @@ class VMEFile(object):
     def _read(self):
         # Find the next event
         while True:
-            magic = struct.unpack('<H', self.fp.read(2))[0]
+            raw_magic = self.fp.read(2)
+            if raw_magic == b'':
+                raise EOFError('Reached end of VME file')
+            magic = struct.unpack('<H', raw_magic)[0]
             if magic == 0xe238:
                 break
 
@@ -25,7 +28,7 @@ class VMEFile(object):
         if evthdr == 0x2025:
             # This is a scalar event
             self.scaler_events_seen += 1
-            return None
+            return {'type': 'scaler'}
         elif evthdr == 0x17fb:
             # evtlen = evthdr & 0xfff
             evtnum, timestamp, coinreg = struct.unpack('<III', self.fp.read(12))
@@ -44,10 +47,24 @@ class VMEFile(object):
             self.adc_events_seen += 1
             true_evtnum = evtnum - self.scaler_events_seen  # evt num is incremented even for a scaler buffer
 
-            evtdict = {'evt_num': true_evtnum,
+            evtdict = {'type': 'adc',
+                       'evt_num': true_evtnum,
                        'timestamp': timestamp,
                        'coin_reg': coinreg,
                        'adc_data': adc_data}
             return evtdict
         else:
             raise IOError('Invalid header:', hex(evthdr))
+
+    def __iter__(self):
+        self.fp.seek(0)
+        self.scaler_events_seen = 0
+        self.adc_events_seen = 0
+        return self
+
+    def __next__(self):
+        try:
+            evt = self._read()
+            return evt
+        except EOFError as e:
+            raise StopIteration from e
