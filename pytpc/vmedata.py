@@ -62,8 +62,11 @@ class VMEFile(object):
         return self
 
     def __next__(self):
-        try:
-            evt = self._read()
-            return evt
-        except EOFError as e:
-            raise StopIteration from e
+        while True:
+            try:
+                evt = self._read()
+                return evt
+            except EOFError as e:
+                raise StopIteration from e
+            except IOError:
+                continue
