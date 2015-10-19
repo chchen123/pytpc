@@ -30,6 +30,24 @@ class TestEvent(unittest.TestCase):
         nptest.assert_equal(hits, exp)
 
 
+class TestUnpacking(unittest.TestCase):
+    """Tests the packing/unpacking of samples"""
+
+    def test_roundtrip_int32(self):
+        tbs = np.arange(512)
+        samples = np.linspace(-4095, 4095, 512, dtype='int32')
+        packed = pytpc.evtdata.EventFile.pack_samples(tbs, samples).astype('uint32')
+        unpacked_samples = pytpc.evtdata.EventFile.unpack_samples(packed)
+        nptest.assert_equal(samples, unpacked_samples)
+
+    def test_roundtrip_uint32(self):
+        tbs = np.arange(512)
+        samples = np.linspace(0, 4095, 512, dtype='uint32')
+        packed = pytpc.evtdata.EventFile.pack_samples(tbs, samples).astype('uint32')
+        unpacked_samples = pytpc.evtdata.EventFile.unpack_samples(packed)
+        nptest.assert_equal(samples, unpacked_samples)
+
+
 class TestCalibration(unittest.TestCase):
     """Tests for calibrate and uncalibrate_z"""
 

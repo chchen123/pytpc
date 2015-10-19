@@ -178,7 +178,7 @@ class EventFile (pytpc.datafile.DataFile):
         """
 
         tbs = (packed & 0xFF8000) >> 15
-        samples = (packed & 0xFFF)
+        samples = (packed & 0xFFF).astype('int16')
         parities = (packed & 0x1000) >> 12
 
         # Change the parities from (0, 1, ...) to (1, -1, ...) and multiply

@@ -45,7 +45,7 @@ class Particle(object):
         self._mass = mass_num * p_mc2
         self.charge_num = charge_num
         self.charge = charge_num * e_chg
-        self.position = np.array(position)
+        self.position = np.array(position, dtype='float64')
         self._energy = energy_per_particle * self.mass_num
         self._mom_mag = sqrt((self._energy + self.mass)**2 - self.mass**2)
         self._momentum = self._mom_mag * np.array([cos(azimuth) * sin(polar),
