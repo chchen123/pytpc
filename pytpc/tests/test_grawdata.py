@@ -14,5 +14,3 @@ class TestDataUnpacking(unittest.TestCase):
         self.assertEqual(ch, 67, msg='invalid channel')  # This is intentional since this is the width of 7 bits
         self.assertEqual(tb, 511, msg='invalid tb')
         self.assertEqual(samp, 4095, msg='invalid sample')
-
-    
