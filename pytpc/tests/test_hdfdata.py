@@ -1,6 +1,9 @@
 import unittest
 import numpy as np
 import numpy.testing as nptest
+import tempfile
+import os
+import h5py
 
 import pytpc.hdfdata as hdfdata
 from pytpc.evtdata import Event
@@ -8,21 +11,27 @@ from pytpc.evtdata import Event
 from itertools import cycle
 
 
+def make_test_data():
+    evt_id = 42
+    timestamp = 1234567890
+    junk_evt = Event()
+    dt = junk_evt.dt
+    traces = np.zeros(64, dtype=dt)
+
+    traces['cobo'] = 0
+    traces['asad'] = 1
+    traces['aget'] = 2
+    traces['channel'] = np.arange(64)
+    traces['pad'] = np.arange(64)
+    traces['data'] = np.fromiter(cycle(range(4906)), dtype='uint16', count=64*512).reshape(64, 512)
+
+    return evt_id, timestamp, traces
+
+
 class TestDataPacking(unittest.TestCase):
 
     def setUp(self):
-        self.evt_id = 42
-        self.timestamp = 1234567890
-        junk_evt = Event()
-        dt = junk_evt.dt
-        self.traces = np.zeros(64, dtype=dt)
-
-        self.traces['cobo'] = 0
-        self.traces['asad'] = 1
-        self.traces['aget'] = 2
-        self.traces['channel'] = np.arange(64)
-        self.traces['pad'] = np.arange(64)
-        self.traces['data'] = np.fromiter(cycle(range(4906)), dtype='uint16', count=64*512).reshape(64, 512)
+        self.evt_id, self.timestamp, self.traces = make_test_data()
 
     def test_packing(self):
         evt = Event(self.evt_id, self.timestamp)
@@ -61,3 +70,61 @@ class TestDataPacking(unittest.TestCase):
         self.assertEqual(evt.evt_id, new_evt.evt_id)
         self.assertEqual(evt.timestamp, new_evt.timestamp)
         nptest.assert_equal(evt.traces, new_evt.traces)
+
+
+class TestIO(unittest.TestCase):
+
+    def setUp(self):
+        evt_id, timestamp, traces = make_test_data()
+        self.evt = Event(evt_id, timestamp)
+        self.evt.traces = traces
+
+    def test_write(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filename = os.path.join(tmpdir, 'test.h5')
+            with hdfdata.HDFDataFile(filename, 'w') as hfile:
+                group_name = hfile.get_group_name
+                hfile.write_get_event(self.evt)
+
+            with h5py.File(filename, 'r') as h5file:
+                self.assertIn(group_name, h5file)
+                gp = h5file[group_name]
+                self.assertIn(str(self.evt.evt_id), gp)
+                ds = gp[str(self.evt.evt_id)]
+
+                self.assertTupleEqual(ds.shape, (self.evt.traces.shape[0], 512+5))
+
+                self.assertEqual(ds.compression, 'gzip')
+                self.assertTrue(ds.shuffle)
+
+                self.assertEqual(ds.attrs['evt_id'], self.evt.evt_id)
+                self.assertEqual(ds.attrs['timestamp'], self.evt.timestamp)
+
+    def test_roundtrip(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filename = os.path.join(tmpdir, 'test.h5')
+            with hdfdata.HDFDataFile(filename, 'w') as hfile:
+                hfile.write_get_event(self.evt)
+
+            with hdfdata.HDFDataFile(filename, 'r') as hfile:
+                read_evt = hfile.read_get_event(self.evt.evt_id)
+
+            self.assertEqual(read_evt.evt_id, self.evt.evt_id)
+            self.assertEqual(read_evt.timestamp, self.evt.timestamp)
+            nptest.assert_equal(read_evt.traces, self.evt.traces)
+
+
+class TestContextManager(unittest.TestCase):
+
+    def setUp(self):
+        evt_id, timestamp, traces = make_test_data()
+        self.evt = Event(evt_id, timestamp)
+        self.evt.traces = traces
+
+    def test_context_manager_closes_file(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filename = os.path.join(tmpdir, 'test.h5')
+            with hdfdata.HDFDataFile(filename, 'w') as hfile:
+                hfile.write_get_event(self.evt)
+
+            self.assertRaises(Exception, hfile.read_get_event, self.evt.evt_id)
