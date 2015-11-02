@@ -14,5 +14,6 @@ from pytpc.tracking import find_tracks, Tracker
 from pytpc.simulation import Particle, track
 from pytpc.gases import Gas
 from pytpc.evtdata import EventFile, Event
+from pytpc.hdfdata import HDFDataFile
 from pytpc.tpcplot import chamber_plot, pad_plot
 from pytpc.padplane import generate_pad_plane
