@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='pytpc',
-    version='0.6',
+    version='0.7',
     description='Tools for analyzing TPC events in Python',
     author='Joshua Bradt',
     author_email='bradt@nscl.msu.edu',

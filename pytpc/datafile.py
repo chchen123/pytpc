@@ -195,6 +195,12 @@ class DataFile(object):
             else:
                 return self.read_event_by_number(item)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
 
 class Error(Exception):
     """Base class for custom exceptions."""
