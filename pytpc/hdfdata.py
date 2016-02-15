@@ -110,7 +110,14 @@ class HDFDataFile(object):
             the columns (cobo, asad, aget, channel, pad, tb1, tb2, tb3, ..., tb511).
         """
         t = evt.traces
-        return np.column_stack((t['cobo'], t['asad'], t['aget'], t['channel'], t['pad'], t['data']))
+        packed = np.zeros((len(t), 517), dtype='int16')
+        packed[:, 0] = t['cobo']
+        packed[:, 1] = t['asad']
+        packed[:, 2] = t['aget']
+        packed[:, 3] = t['channel']
+        packed[:, 4] = t['pad']
+        packed[:, 5:] = t['data']
+        return packed
 
     def read_get_event(self, i):
         """Read the event identified by `i` from the file.
