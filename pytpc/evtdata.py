@@ -558,7 +558,7 @@ def make_event(pos, de, clock, vd, ioniz, proj_mass, shapetime, offset=0, pad_ro
     return evt
 
 
-def calibrate(data, drift_vel, clock, tilt=0):
+def calibrate(data, drift_vel, clock):
     """Calibrate the data using the drift velocity.
 
     With a scalar drift velocity, this will simply convert the time buckets into position coordinates. With a vector
@@ -591,13 +591,13 @@ def calibrate(data, drift_vel, clock, tilt=0):
         new_data[:, 2] *= drift_vel / clock * 10  # 1 cm/(us.MHz) = 1 cm = 10 mm
     else:
         assert drift_vel.shape == (3,), 'vector drift velocity must have 3 dimensions'
-        new_data[:, 2] = data[:, 1] * np.sin(tilt)
+        new_data[:, 2] = 0.0  # This prevents adding the time buckets to the last dimension
         new_data[:, 0:3] += np.outer(data[:, 2], -drift_vel) / clock * 10
 
     return new_data
 
 
-def uncalibrate(data, drift_vel, clock, tilt=0, offset=0):
+def uncalibrate(data, drift_vel, clock, offset=0):
     """Uncalibrate the data using the drift velocity.
 
     With a scalar drift velocity, this will simply convert the z position coordinates into time buckets. With a vector
@@ -630,8 +630,7 @@ def uncalibrate(data, drift_vel, clock, tilt=0, offset=0):
         new_data[:, 2] *= clock / (10 * drift_vel)  # 1 cm/(us.MHz) = 1 cm = 10 mm
     else:
         assert drift_vel.shape == (3,), 'vector drift velocity must have 3 dimensions'
-        sint = np.sin(tilt)
-        tbs = (data[:, 2] - sint * data[:, 1]) * clock / (10 * (-drift_vel[2] + sint * drift_vel[1])) + offset
+        tbs = data[:, 2] * clock / (10 * -drift_vel[2]) + offset  # 1 cm/(us.MHz) = 1 cm = 10 mm
         new_data[:, 0:3] -= np.outer(tbs, -drift_vel) / clock * 10
         new_data[:, 2] = tbs
 
