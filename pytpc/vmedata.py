@@ -32,10 +32,11 @@ class VMEFile(object):
             # evtlen = evthdr & 0xfff
             evtnum, timestamp, coinreg = struct.unpack('<III', self.fp.read(12))
 
-            self.fp.seek(16, 1)  # skip next 16 bytes
+            # Registers are evt config reg., address counter, evt counter, addr of end of event
+            reg1 = np.fromfile(self.fp, dtype='<I', count=4)
             raw1 = np.fromfile(self.fp, dtype='<I', count=512)
 
-            self.fp.seek(16, 1)  # skip next 16 bytes
+            reg2 = np.fromfile(self.fp, dtype='<I', count=4)
             raw2 = np.fromfile(self.fp, dtype='<I', count=512)
 
             adc_data = np.zeros((3, 512), dtype='int32')
@@ -46,10 +47,15 @@ class VMEFile(object):
             self.adc_events_seen += 1
             true_evtnum = evtnum - self.scaler_events_seen  # evt num is incremented even for a scaler buffer
 
+            last_tb1 = reg1[3] & 0x1ffff
+            last_tb2 = reg2[3] & 0x1ffff
+            assert last_tb1 == last_tb2, 'last TBs did not match'
+
             evtdict = {'type': 'adc',
                        'evt_num': true_evtnum,
                        'timestamp': timestamp,
                        'coin_reg': coinreg,
+                       'last_tb': last_tb1,
                        'adc_data': adc_data}
             return evtdict
         else:
