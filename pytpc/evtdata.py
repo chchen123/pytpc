@@ -450,8 +450,14 @@ class Event:
 
         if peaks_only:
             traces_copy = np.copy(self.traces)
-            for i, tr in enumerate(traces_copy):
-                traces_copy[i]['data'][:] = threshold(tr['data'], threshmin=tr['data'].max(), newval=0)
+            traces_copy2 = np.copy(self.traces)
+            for i, tr in enumerate(traces_copy2):
+                mbin = np.argmax(traces_copy2[i]['data'][:]) # bin with max peak
+                base = np.mean(traces_copy2['data'][i][mbin-15:mbin-10]) # base level of signal
+                traces_copy[i]['data'][:] = traces_copy2[i]['data'][:] - base 
+                traces_copy[i]['data'][:] = threshold(traces_copy[i]['data'], threshmin=traces_copy[i]['data'].max(), newval=0)
+                #traces_copy[i]['data'][:] = threshold(tr['data'], threshmin=tr['data'].max(), newval=0)
+                np.nonzero(traces_copy[i]['data'][:])
             nz = traces_copy['data'].nonzero()
 
         else:
