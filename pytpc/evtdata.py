@@ -417,7 +417,8 @@ class Event:
 
         return flat_hits
 
-    def xyzs(self, drift_vel=None, clock=None, pads=None, peaks_only=False, return_pads=False):
+    def xyzs(self, drift_vel=None, clock=None, pads=None, peaks_only=False, return_pads=False,
+             cg_times=False, cg_level=0.7):
         """Find the scatter points of the event in space.
 
         If a drift velocity and write clock frequency are provided, then the result gives the z dimension in
@@ -434,8 +435,13 @@ class Event:
             An array of pad vertices. If provided, these pads will be used instead of the default pad plane.
         peaks_only : bool, optional
             If True, only the peak of each activation curve will be used.
-        return_pads: bool, optional
+        return_pads : bool, optional
             If True, also return the pad numbers in the output array. They will be in the last column.
+        cg_times : bool, optional
+            If True, use the center of gravity of each peak as the z position. This requires `peaks_only == True`.
+        cg_level : number, optional
+            A threshold level to use when finding the center of gravity. All points above this signal threshold
+            are included in the averaging to find the center of gravity. This only has an effect if `cg_times` is True.
 
         Returns
         -------
@@ -448,29 +454,45 @@ class Event:
         pytpc.simulation.drift_velocity_vector
         """
 
-        if peaks_only:
-            traces_copy = np.copy(self.traces)
-            for i, tr in enumerate(self.traces):
-                mbin = np.argmax(tr['data'][:])  # bin with max peak
-                base = np.mean(tr['data'][mbin-15:mbin-10])  # base level of signal
-                traces_copy[i]['data'][:] = tr['data'][:] - base
-                traces_copy[i]['data'][:] = threshold(traces_copy[i]['data'], threshmin=traces_copy[i]['data'].max(), newval=0)
-            nz = traces_copy['data'].nonzero()
-
-        else:
-            nz = self.traces['data'].nonzero()
-
         if pads is None:
-            pads = generate_pad_plane()
+            pads = pytpc.generate_pad_plane()
 
         pcenters = pads.mean(1)
 
-        xys = pcenters[self.traces[nz[0]]['pad']]
-        zs = nz[1]
-        cs = self.traces['data'][nz]
+        trdata = self.traces['data']
+
+        if peaks_only:
+            maxlocs = np.argmax(trdata, axis=1)
+            # The two arrays from np.indices are:
+            #    [[0, 0, ..., 0], [1, 1, ..., 1], ..., [4, 4, ..., 4]] (shape N by 5)
+            #    [[0, 1, ..., N], [0, 1, ..., N], ..., [0, 1, ..., N]] (shape 5 by N)
+            # The first one is used to select the elements of the array (along the TB dimension) for finding
+            # the base values. The second one is used in indexing along the pad num dimension to find the base values.
+            base_grid0, base_grid1 = np.indices((5, len(trdata)))
+            # The next step gives indices in range [max-15, max-10] for each row
+            base_idx = np.clip(base_grid0 + maxlocs - 15, a_min=0, a_max=511).T
+            bases = trdata[base_grid1.T, base_idx].mean(1)
+            cs = trdata.max(axis=1) - bases
+
+            xys = pcenters[self.traces['pad']]
+
+            if cg_times:
+                trdata_copy = (trdata.astype('float64').T - bases).T
+                mask = (trdata_copy.T < cg_level * trdata_copy.max(axis=1)).T
+                trdata_copy[np.where(mask)] = 0
+                grid = np.indices(trdata_copy.shape, dtype='float64')[1]
+                zs = np.sum(trdata_copy * grid, axis=-1) / trdata_copy.sum(axis=-1)
+            else:
+                zs = maxlocs
+
+        else:
+            nz = np.nonzero(trdata)
+            xys = pcenters[self.traces[nz[0]]['pad']]
+            cs = self.traces['data'][nz]
+            zs = nz[1]
 
         if return_pads:
-            padnums = self.traces[nz[0]]['pad']
+            padnums = self.traces['pad']
             xyzs = np.column_stack((xys, zs, cs, padnums))
         else:
             xyzs = np.column_stack((xys, zs, cs))
