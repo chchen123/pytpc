@@ -2,14 +2,13 @@ from setuptools import setup
 
 setup(
     name='pytpc',
-    version='0.7.3',
+    version='0.8.0',
     description='Tools for analyzing TPC events in Python',
     author='Joshua Bradt',
     author_email='bradt@nscl.msu.edu',
     url='https://github.com/attpc/pytpc',
     packages=['pytpc'],
-    install_requires=['scikit-learn',
-                      'seaborn',
+    install_requires=['seaborn',
                       'matplotlib',
                       'scipy',
                       'numpy',

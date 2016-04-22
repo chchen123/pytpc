@@ -6,7 +6,6 @@ This module contains code to track a particle in data.
 
 from __future__ import division, print_function
 import numpy as np
-from sklearn.cluster import DBSCAN
 from functools import lru_cache
 
 from pytpc.constants import *
@@ -58,35 +57,6 @@ def find_adj(p, depth=0):
             adj |= find_adj(a, depth-1)
 
     return adj
-
-
-def find_tracks(data, eps=20, min_samples=20):
-    """Applies the DBSCAN algorithm from scikit-learn to find tracks in the data.
-
-    Parameters
-    ----------
-    data : array-like
-        An array of (x, y, z, hits) data points
-    eps : number, optional
-        The minimum distance between adjacent points in a cluster
-    min_samples : number, optional
-        The min number of points in a cluster
-
-    Returns
-    -------
-    tracks : list
-        A list of tracks. Each track is an ndarray of points.
-
-    """
-    xyz = data[:, 0:3]
-    dbs = DBSCAN(eps=eps, min_samples=min_samples)
-    dbs.fit(xyz)
-
-    tracks = []
-    for track in (np.where(dbs.labels_ == n)[0] for n in np.unique(dbs.labels_) if n != -1):
-        tracks.append(data[track])
-
-    return tracks
 
 
 class Tracker(object):
