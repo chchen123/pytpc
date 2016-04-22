@@ -10,7 +10,7 @@ import pytpc.runtables
 import pytpc.grawdata
 import pytpc.hdfdata
 
-from pytpc.tracking import find_tracks, Tracker
+from pytpc.tracking import Tracker
 from pytpc.simulation import Particle, track
 from pytpc.gases import Gas
 from pytpc.evtdata import EventFile, Event
