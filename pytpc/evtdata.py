@@ -35,9 +35,7 @@ import struct
 import numpy as np
 import os.path
 import warnings
-from pytpc.tpcplot import generate_pad_plane
 import pytpc.datafile
-from scipy.stats import threshold
 from scipy.ndimage.filters import gaussian_filter
 from pytpc.padplane import find_pad_coords, padcenter_dict
 from math import sin, cos
