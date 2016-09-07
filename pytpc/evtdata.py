@@ -37,8 +37,131 @@ import os.path
 import warnings
 import pytpc.datafile
 from scipy.ndimage.filters import gaussian_filter
+from scipy.fftpack import fft, ifft, fftshift, ifftshift
 from pytpc.padplane import find_pad_coords, padcenter_dict
 from math import sin, cos
+
+
+def fftbaseline(trace, factor=20):
+    """Finds the baseline of a trace using the Fourier transform and a low-pass filter.
+
+    This works as follows:
+    1) Clip the trace by setting all values above 1.5 sigma to the mean value of the trace. This helps prevent the
+       transform from being affected by the peaks themselves.
+    2) Apply the Fourier transform.
+    3) Multiply the result by the window function sinc(x / a) where `a` is the `factor` provided as an argument.
+    4) Invert the Fourier transform and return the result.
+
+    By the convolution theorem, this is identical to convolving `trace` with a rectangular window since the Fourier
+    transform of a rectangular window is the sinc function.
+
+    Parameters
+    ----------
+    trace : ndarray
+        The data to process. It must have a length of 512.
+    factor : number, optional
+        The divisor `a` in the window function `sinc(x / a)`. The default is 20, which seems to work well.
+
+    Returns
+    -------
+    ndarray
+        The calculated baseline.
+    """
+    clipped = trace.copy()
+    mask = clipped > clipped.std() * 1.5
+    clipped[mask] = clipped[~mask].mean()
+
+    trans = fftshift(fft(clipped))
+
+    xs = np.arange(-256, 256)
+    filt = np.sinc(xs / factor)
+    untrans = ifft(ifftshift(trans * filt))
+
+    return untrans.real
+
+
+def fix_baselines(data, fft_baseline_factor=20):
+    """Apply the baseline correction from `fftbaseline` to all traces in the array `data`.
+
+    Parameters
+    ----------
+    data : ndarray
+        The data from the event. For an event `evt`, this would be `evt.traces['data']`. The datatype should be `int16`,
+        and the dimensions should be (N, 512), where `N` is the number of traces in the event.
+
+    Returns
+    -------
+    ndarray
+        The data after baseline correction. The datatype will still be `int16`, and the dimensions should be unchanged.
+    """
+    data = data.copy()
+    for i in range(data.shape[0]):
+        baseline = fftbaseline(data[i], fft_baseline_factor)
+        data[i] -= np.round(baseline).astype('int16')
+
+    return data
+
+
+def _get_data_chunk(data, chunk_start, chunk_width):
+    """Gets a chunk of the data.
+
+    Parameters
+    ----------
+    data : ndarray
+        The data to be sliced, as a 2D array.
+    chunk_start : ndarray or int
+        The first time bucket to include for each row. This should be an array of dimension 1 or a scalar.
+    chunk_width : int
+        The number of time buckets to include in the chunk.
+
+    Returns
+    -------
+    chunk : ndarray
+        The sliced data, as a 2D array with dimensions (N, chunk_width) where N was the number of rows in `data`.
+    idx : ndarray
+        The time bucket indices of the elements of `chunk`.
+    """
+    # The two arrays from np.indices are:
+    #    [[0, 0, ..., 0], [1, 1, ..., 1], ..., [W, W, ..., W]] (shape N by W)
+    #    [[0, 1, ..., N], [0, 1, ..., N], ..., [0, 1, ..., N]] (shape W by N)
+    # where N is the number of traces in `data`, and W is `chunk_width`.
+    # The first array is used to select the elements of `data` (along the TB dimension) for finding
+    # the chunk values. The second one is used in indexing along the pad num dimension to find the chunk values.
+    grid0, grid1 = np.indices((chunk_width, len(data)))
+    # The next step gives indices in range [chunk_start, chunk_start + chunk_width - 1] for each row
+    idx = np.clip(grid0 + chunk_start, a_min=0, a_max=511).T  # BUG: Duplicates bins near edge
+    chunk = data[grid1.T, idx]
+
+    return chunk, idx
+
+
+def find_cg_times(data, cg_range, cg_level):
+    """Find the peak time using its center of gravity.
+
+    Parameters
+    ----------
+    data : ndarray
+        The trace data, as a 2D array.
+    cg_range : int
+        The number of time buckets on each side of the peak to include in the calculation.
+    cg_level : float
+        The peak threshold level, as a fraction of the peak maximum value. Data lower than this will be zeroed out.
+
+    Returns
+    -------
+    ndarray
+        The center of gravity location of each peak.
+    """
+    data = data.astype('float64')
+
+    maxlocs = np.argmax(data, axis=1)
+
+    level_mask = (data.T < cg_level * data.max(axis=1)).T
+    data[np.where(level_mask)] = 0
+
+    peak_data, range_idx = _get_data_chunk(data, chunk_start=(maxlocs - cg_range), chunk_width=(2 * cg_range))
+
+    return np.sum(peak_data * range_idx, axis=-1) / peak_data.sum(axis=-1)
 
 
 class EventFile (pytpc.datafile.DataFile):
@@ -416,7 +539,7 @@ class Event:
         return flat_hits
 
     def xyzs(self, drift_vel=None, clock=None, pads=None, peaks_only=False, return_pads=False,
-             cg_times=False, cg_level=0.7):
+             cg_times=False, cg_level=0.7, cg_range=20, baseline_correction=False, fft_baseline_factor=20):
         """Find the scatter points of the event in space.
 
         If a drift velocity and write clock frequency are provided, then the result gives the z dimension in
@@ -440,6 +563,13 @@ class Event:
         cg_level : number, optional
             A threshold level to use when finding the center of gravity. All points above this signal threshold
             are included in the averaging to find the center of gravity. This only has an effect if `cg_times` is True.
+        cg_range : int, optional
+            The number of time buckets on each side of the maximum to consider when calculating the center of
+            gravity of the peak. The default value is 20.
+        fix_baselines : bool, optional
+            If true, apply Fourier transform–based baseline correction before finding peaks.
+        fft_baseline_factor : number, optional
+            The scaling factor for the Fourier transform window function. (See the function `fftbaseline` in this file).
 
         Returns
         -------
@@ -457,29 +587,22 @@ class Event:
 
         pcenters = pads.mean(1)
 
-        trdata = self.traces['data']
+        if baseline_correction:
+            trdata = fix_baselines(self.traces['data'], fft_baseline_factor)  # returns a copy
+        else:
+            trdata = self.traces['data']  # no copy
 
         if peaks_only:
             maxlocs = np.argmax(trdata, axis=1)
-            # The two arrays from np.indices are:
-            #    [[0, 0, ..., 0], [1, 1, ..., 1], ..., [4, 4, ..., 4]] (shape N by 5)
-            #    [[0, 1, ..., N], [0, 1, ..., N], ..., [0, 1, ..., N]] (shape 5 by N)
-            # The first one is used to select the elements of the array (along the TB dimension) for finding
-            # the base values. The second one is used in indexing along the pad num dimension to find the base values.
-            base_grid0, base_grid1 = np.indices((5, len(trdata)))
-            # The next step gives indices in range [max-15, max-10] for each row
-            base_idx = np.clip(base_grid0 + maxlocs - 15, a_min=0, a_max=511).T
-            bases = trdata[base_grid1.T, base_idx].mean(1)
+
+            base_data, _ = _get_data_chunk(trdata, chunk_start=(maxlocs - 15), chunk_width=5)
+            bases = base_data.mean(1)
             cs = trdata.max(axis=1) - bases
 
             xys = pcenters[self.traces['pad']]
 
             if cg_times:
-                trdata_copy = (trdata.astype('float64').T - bases).T
-                mask = (trdata_copy.T < cg_level * trdata_copy.max(axis=1)).T
-                trdata_copy[np.where(mask)] = 0
-                grid = np.indices(trdata_copy.shape, dtype='float64')[1]
-                zs = np.sum(trdata_copy * grid, axis=-1) / trdata_copy.sum(axis=-1)
+                zs = find_cg_times(trdata, cg_range=cg_range, cg_level=cg_level)
             else:
                 zs = maxlocs
 
