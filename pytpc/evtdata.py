@@ -37,12 +37,20 @@ import os.path
 import warnings
 import pytpc.datafile
 from scipy.ndimage.filters import gaussian_filter
-from scipy.fftpack import fft, ifft, fftshift, ifftshift
+
+try:
+    from pyfftw.interfaces.scipy_fftpack import fft, ifft, fft2, ifft2
+except ImportError:
+    warnings.warn('Using SciPy FFT instead of PyFFTW. May be slightly slower.', warnings.ImportWarning)
+    from scipy.fftpack import fft, ifft, fft2, ifft2
+
+from scipy.fftpack import ifftshift
+
 from pytpc.padplane import find_pad_coords, padcenter_dict
 from math import sin, cos
 
 
-def fftbaseline(trace, factor=20):
+def fftbaseline(data, factor=20):
     """Finds the baseline of a trace using the Fourier transform and a low-pass filter.
 
     This works as follows:
@@ -67,15 +75,33 @@ def fftbaseline(trace, factor=20):
     ndarray
         The calculated baseline.
     """
-    clipped = trace.copy()
-    mask = clipped > clipped.std() * 1.5
-    clipped[mask] = clipped[~mask].mean()
+    clipped = data.copy()
+    stds = np.std(clipped, axis=-1)
 
-    trans = fftshift(fft(clipped))
+    if data.ndim == 2:
+        for j, row in enumerate(clipped):
+            mask = row > stds[j] * 1.5
+            clipped[j, mask] = clipped[j, ~mask].mean()
+    elif data.ndim == 1:
+        mask = row > stds * 1.5
+        clipped[mask] = clipped[~mask].mean()
+    else:
+        raise ValueError('Only supports 1D or 2D arrays')
 
     xs = np.arange(-256, 256)
-    filt = np.sinc(xs / factor)
-    untrans = ifft(ifftshift(trans * filt))
+    filt = ifftshift(np.sinc(xs / factor))  # shift the filter into the FFT shape
+
+    if data.ndim == 1:
+        fft_func = fft
+        ifft_func = ifft
+        fft_kwargs = {}
+    elif data.ndim == 2:
+        fft_func = fft2
+        ifft_func = ifft2
+        fft_kwargs = {'axes': (-1,)}
+
+    trans = fft_func(clipped, **fft_kwargs)
+    untrans = ifft_func(trans * filt, **fft_kwargs)
 
     return untrans.real
 
@@ -94,12 +120,9 @@ def fix_baselines(data, fft_baseline_factor=20):
     ndarray
         The data after baseline correction. The datatype will still be `int16`, and the dimensions should be unchanged.
     """
-    data = data.copy()
-    for i in range(data.shape[0]):
-        baseline = fftbaseline(data[i], fft_baseline_factor)
-        data[i] -= np.round(baseline).astype('int16')
+    baselines = fftbaseline(data, fft_baseline_factor)
 
-    return data
+    return data - baselines
 
 
 def _get_data_chunk(data, chunk_start, chunk_width):
