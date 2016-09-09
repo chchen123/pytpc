@@ -182,6 +182,11 @@ class HDFDataFile(object):
         ds.attrs['timestamp'] = ts
         self.fp.flush()
 
+    def evtids(self):
+        """Returns an iterator over the set of event IDs in the file, as integers.
+        """
+        return (int(key) for key in self.fp[self.get_group_name])
+
     def __len__(self):
         return len(self.fp[self.get_group_name])
 
@@ -192,7 +197,7 @@ class HDFDataFile(object):
         self.close()
 
     def __iter__(self):
-        return (self.read_get_event(n) for n in self.fp[self.get_group_name].keys())
+        return (self.read_get_event(n) for n in self.fp[self.get_group_name])
 
     def __getitem__(self, i):
         return self.read_get_event(i)
