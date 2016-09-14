@@ -238,3 +238,11 @@ class SQLWriter(object):
 
         curs.execute(insert_sql, res)
         self.conn.commit()
+
+
+def find_run_number(filename):
+    m = re.search('run_(\d+).*', os.path.basename(filename))
+    if m:
+        return int(m.group(1))
+    else:
+        raise ValueError('Count not extract run number from filename: {}'.format(filename))

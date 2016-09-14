@@ -27,6 +27,7 @@ setup(
     url='https://github.com/attpc/pytpc',
     packages=['pytpc', 'pytpc.fitting'],
     ext_modules=cythonize(exts),
+    scripts=['bin/runfit'],
     install_requires=['scipy',
                       'numpy',
                       'h5py',

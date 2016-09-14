@@ -1,0 +1,134 @@
+#!/usr/bin/env python3
+
+import pandas as pd
+
+import sys
+import os
+import argparse
+import h5py
+import numpy as np
+from pytpc.fitting import MCFitter, Annealer, BadEventError
+from pytpc.utilities import SQLWriter, find_run_number
+from pytpc.cleaning import find_center_hough
+
+import yaml
+
+import logging
+logger = logging.getLogger(__name__)
+handler = logging.StreamHandler()
+formatter = logging.Formatter('[%(levelname)s:%(name)s] %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
+
+def apply_clean_cut(raw_xyz_full, qthresh=0.5, nthresh=10, tbthresh=505):
+    qcut = raw_xyz_full[:, -1] <= qthresh
+    ncut = raw_xyz_full[:, -2] >= nthresh
+    tbcut = raw_xyz_full[:, 2] <= tbthresh
+    cut = qcut & ncut & tbcut
+    return raw_xyz_full[cut, :5]
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Fit data using Monte Carlo optimization')
+    parser.add_argument('--config', '-c', help='Path to config file, in YAML format', required=True)
+    parser.add_argument('--config-patch', '-p', help='Configuration patches', action='append')
+    parser.add_argument('--evtlist', '-e', help='Path to HDF5 file with results from the circle fit', required=True)
+    parser.add_argument('--algorithm', '-a', help='Algorithm to use', type=str,
+                        choices=['mc', 'annealer'], default='mc')
+    parser.add_argument('--verbose', '-v', action='count',
+                        help='Print more information')
+    parser.add_argument('input_file', help='The input HDF5 file containing the peaks')
+    parser.add_argument('db_path', help='Path to the output database file')
+    args = parser.parse_args()
+
+    if args.verbose == 1:
+        logger.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(logging.INFO)
+
+    return args
+
+
+def main():
+    args = parse_args()
+
+    logger.info('Parsing config file')
+
+    with open(os.path.abspath(args.config)) as f:
+        config = yaml.load(f)
+
+    if args.config_patch is not None:
+        for path in args.config_patch:
+            full_path = os.path.abspath(path)
+            with open(full_path, 'r') as f:
+                patch = yaml.load(f)
+            config.update(patch)
+            logger.info('Patched config with %s', os.path.basename(path))
+
+    algo_dict = {'mc': MCFitter,
+                 'annealer': Annealer}
+
+    fitter_class = algo_dict[args.algorithm]
+    fitter = fitter_class(config)
+
+    run_num = find_run_number(args.input_file)
+
+    writer = SQLWriter(args.db_path)
+    mcmin_res_name = 'mcmin_results'
+    mcmin_res_columns = [['evt_id', 'INTEGER PRIMARY KEY']] + fitter.output_columns
+    writer.create_table(mcmin_res_name, mcmin_res_columns)
+
+    good_evts = pd.read_hdf(args.evtlist, 'evt_list')
+    run_mask = good_evts.run_num == run_num
+    nevts = len(good_evts[run_mask])
+    logger.info('Loaded VME results. VME had %d valid events in this run.', nevts)
+
+    with h5py.File(args.input_file, 'r') as input_file:
+        gp = input_file['clean']
+
+        for i, evt_id in enumerate(good_evts[run_mask].evt_id.values):
+            if i % 100 == 0:
+                logger.info('At event %d / %d', i, nevts)
+
+            try:
+                dataset = gp[str(evt_id)]
+                raw_xyz_full = dataset[:]
+                cx, cy = dataset.attrs['center'][:2]
+            except Exception:
+                logger.exception('Failed to read peaks / center for event %d', evt_id)
+                continue
+
+            try:
+                raw_xyz = apply_clean_cut(raw_xyz_full, qthresh=0.5, nthresh=10, tbthresh=505)
+                if len(raw_xyz) < 50:
+                    raise BadEventError("Too few points after cleaning")
+
+                center_data = raw_xyz[np.argsort(raw_xyz[:, 2])][-len(raw_xyz) // 2:]
+                cx, cy = find_center_hough(center_data)
+
+                res = fitter.process_event(raw_xyz, cx, cy, preprocess_kwargs={'rotate_pads': False})
+                res['evt_id'] = int(evt_id)
+            except BadEventError as e:
+                logger.info('Event %d was bad: %s', int(evt_id), e)
+            except Exception:
+                logger.exception('Processing failed for event %d', evt_id)
+            else:
+                try:
+                    writer.write(mcmin_res_name, res)
+                except Exception:
+                    logger.exception('Writing failed for event %d', evt_id)
+
+
+if __name__ == '__main__':
+    import signal
+
+    def handle_signal(signum, stack_frame):
+        logger.critical('Received signal %d. Quitting.', signum)
+        sys.stdout.flush()
+        sys.exit(1)
+
+    signal.signal(signal.SIGTERM, handle_signal)
+    signal.signal(signal.SIGQUIT, handle_signal)
+
+    main()
