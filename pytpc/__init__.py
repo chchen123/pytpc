@@ -4,6 +4,7 @@ import pytpc.evtdata
 import pytpc.gases
 import pytpc.grawdata
 import pytpc.hdfdata
+import pytpc.fitting
 
 from pytpc.evtdata import EventFile, Event
 from pytpc.hdfdata import HDFDataFile
