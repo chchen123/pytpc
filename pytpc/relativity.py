@@ -5,8 +5,8 @@ This module contains functions to calculate quantities of interest in special re
 """
 
 from __future__ import division, print_function
-import numpy
-from pytpc.constants import *
+import numpy as np
+from pytpc.constants import pi, c_lgt
 from pytpc.utilities import euler_matrix, constrain_angle
 from math import sqrt, log, sinh, cosh, sin, cos, atan
 import copy
@@ -27,10 +27,10 @@ def gamma(v):
     ValueError
         If the magnitude of `v` is greater than the speed of light.
     """
-    vmag = numpy.linalg.norm(v)
+    vmag = np.linalg.norm(v)
     if vmag >= c_lgt:
         raise ValueError('Velocity was {}, which exceeds c.'.format(vmag))
-    return 1/sqrt(1-vmag**2/c_lgt**2)
+    return 1 / sqrt(1 - vmag**2 / c_lgt**2)
 
 
 def beta(en, mass):
@@ -54,7 +54,7 @@ def beta(en, mass):
         raise ValueError('mass and energy must be positive')
 
     try:
-        b = (sqrt(en)*sqrt(en + 2*mass)) / (en + mass)
+        b = (sqrt(en) * sqrt(en + 2 * mass)) / (en + mass)
     except ZeroDivisionError:
         raise ValueError('mass and energy cannot both be zero')
 
@@ -106,7 +106,7 @@ def elastic_scatter(proj, target, cm_angle, azi, ret_angles=False):
     T1 = proj.energy  # Note: This is the kinetic energy only
 
     s = ((m1 + m2)**2 + 2 * m1 * T1)  # The Lorentz invariant. We don't need c's since the mass & mom are in MeV
-    pcm  = sqrt(((s - m1**2 - m2**2)**2 - 4 * m1**2 * m2**2) / (4 * s))  # COM momentum of the reactants
+    pcm = sqrt(((s - m1**2 - m2**2)**2 - 4 * m1**2 * m2**2) / (4 * s))  # COM momentum of the reactants
     ppcm = sqrt(((s - m3**2 - m4**2)**2 - 4 * m3**2 * m4**2) / (4 * s))  # COM momentum of the products
 
     chi = log((sqrt(pcm**2 + m1**2) + pcm) / m1)  # rapidity of the COM frame
@@ -147,8 +147,8 @@ def elastic_scatter(proj, target, cm_angle, azi, ret_angles=False):
     recoil.azimuth = constrain_angle(recoil.azimuth)
     ejec.azimuth = constrain_angle(ejec.azimuth)
 
-    assert 0 <= recoil.azimuth <= 2*pi, 'recoil azimuth out of bounds'
-    assert 0 <= ejec.azimuth <= 2*pi, 'ejectile azimuth out of bounds'
+    assert 0 <= recoil.azimuth <= 2 * pi, 'recoil azimuth out of bounds'
+    assert 0 <= ejec.azimuth <= 2 * pi, 'ejectile azimuth out of bounds'
 
     assert ejec.energy - T3 < 1e-2, 'ejectile energy was changed by rotation: {} -> {}'.format(T3, ejec.energy)
     assert recoil.energy - T4 < 1e-2, 'recoil energy was changed by rotation: {} -> {}'.format(T4, recoil.energy)
