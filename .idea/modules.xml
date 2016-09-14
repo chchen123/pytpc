@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<project version="4">
-  <component name="ProjectModuleManager">
-    <modules>
-      <module fileurl="file://$PROJECT_DIR$/../alphas-dec14/.idea/alphas-dec14.iml" filepath="$PROJECT_DIR$/../alphas-dec14/.idea/alphas-dec14.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/pytpc.iml" filepath="$PROJECT_DIR$/.idea/pytpc.iml" />
-    </modules>
-  </component>
-</project>
