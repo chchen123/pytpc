@@ -25,15 +25,15 @@ class TrackerMixin(MixinBase):
         self.beam_mass = config['beam_mass']
         self.beam_charge = config['beam_charge']
 
-        self.tracker = Tracker(mass_num=self.mass_num,
-                               charge_num=self.charge_num,
-                               beam_enu0=self.beam_enu0,
-                               beam_mass=self.beam_mass,
-                               beam_charge=self.beam_charge,
-                               gas=self.gas,
-                               efield=self.efield,
-                               bfield=self.bfield,
-                               max_en=100)
+        self.tracker = Tracker(self.mass_num,
+                               self.charge_num,
+                               self.beam_enu0,
+                               self.beam_mass,
+                               self.beam_charge,
+                               self.gas,
+                               self.efield,
+                               self.bfield,
+                               100)
 
         super().__init__(config)
 
@@ -172,7 +172,7 @@ class LinearPrefitMixin(MixinBase):
 
 
 class PreprocessMixin(MixinBase):
-    
+
     def __init__(self, config):
         self.micromegas_tb = config['micromegas_tb']
         super().__init__(config)

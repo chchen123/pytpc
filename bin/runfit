@@ -9,7 +9,7 @@ import h5py
 import numpy as np
 from pytpc.fitting import MCFitter, Annealer, BadEventError
 from pytpc.utilities import SQLWriter, find_run_number
-from pytpc.cleaning import find_center_hough
+from pytpc.cleaning import find_center_hough, apply_clean_cut
 
 import yaml
 
@@ -19,14 +19,6 @@ handler = logging.StreamHandler()
 formatter = logging.Formatter('[%(levelname)s:%(name)s] %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
-
-
-def apply_clean_cut(raw_xyz_full, qthresh=0.5, nthresh=10, tbthresh=505):
-    qcut = raw_xyz_full[:, -1] <= qthresh
-    ncut = raw_xyz_full[:, -2] >= nthresh
-    tbcut = raw_xyz_full[:, 2] <= tbthresh
-    cut = qcut & ncut & tbcut
-    return raw_xyz_full[cut, :5]
 
 
 def parse_args():
