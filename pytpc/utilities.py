@@ -191,3 +191,11 @@ def create_fields(emag, bmag, tilt):
     bf = trans.dot(bf_orig)
 
     return ef, bf
+
+
+def find_vertex_energy(beam_intercept, beam_enu0, beam_mass, beam_chg, gas):
+    ei = beam_enu0 * beam_mass
+    ri = gas.range(ei, beam_mass, beam_chg)  # this is in meters
+    rf = ri - (1.0 - beam_intercept)
+    ef = gas.inverse_range(rf, beam_mass, beam_chg)
+    return ef

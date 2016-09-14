@@ -15,27 +15,28 @@ ext_kwargs = dict(include_dirs=[np.get_include()],
                   extra_compile_args=extra_args,
                   extra_link_args=extra_args)
 
-exts = [Extension('atmc.mcopt_wrapper', ['atmc/mcopt_wrapper.pyx'], **ext_kwargs),
-        Extension('atmc.armadillo', ['atmc/armadillo.pyx'], **ext_kwargs)]
+exts = [Extension('pytpc.fitting.mcopt_wrapper', ['pytpc/fitting/mcopt_wrapper.pyx'], **ext_kwargs),
+        Extension('pytpc.fitting.armadillo', ['pytpc/fitting/armadillo.pyx'], **ext_kwargs)]
 
 setup(
     name='pytpc',
     version='1.0.0',
-    description='Tools for analyzing TPC events in Python',
+    description='Tools for analyzing AT-TPC events in Python',
     author='Joshua Bradt',
     author_email='bradt@nscl.msu.edu',
     url='https://github.com/attpc/pytpc',
     packages=['pytpc'],
+    ext_modules=cythonize(exts),
     install_requires=['scipy',
                       'numpy',
                       'h5py',
                       'tables'],
-    package_data={'pytpc': ['data/gases/*', 'data/raw/*']},
+    package_data={'pytpc': ['data/gases/*', 'data/raw/*', '*.pxd']},
     extras_require={
         'docs': ['sphinx_bootstrap_theme>=0.4.5', 'sphinx>=1.2'],
         'plots': ['matplotlib', 'seaborn'],
     },
-    )
+)
 
 # setup(name='atmc',
 #       version='2.1.0',

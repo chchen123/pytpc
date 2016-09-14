@@ -18,7 +18,7 @@ cdef class Gas:
 
 cdef class Tracker:
     cdef mcopt.Tracker *thisptr
-    cdef Gas pyGas
+    cdef Gas gas
 
 
 cdef class PadPlane:

@@ -7,6 +7,7 @@ import numpy as np
 cimport numpy as np
 from cython.operator cimport dereference as deref, preincrement as preinc
 from libc.stdio cimport printf
+from ..utilities import find_vertex_energy
 
 
 cdef cppvec[double] np2cppvec(np.ndarray[np.double_t, ndim=1] v):
@@ -48,28 +49,43 @@ cdef class Tracker:
 
     Parameters
     ----------
-    massNum, chargeNum : int
-        The mass and charge numbers of the projectile.
-    gas : Gas object
-        The gas data object. (Note that this is *NOT* a pytpc.Gas object.)
-    efield, bfield : array-like
-        The electric and magnetic fields, in SI units.
+    mass_num, charge_num : int
+        The mass and charge number of the tracked particle.
+    beam_enu0 : float
+        The initial energy per nucleon of the beam projectile.
+    beam_mass, beam_charge : int
+        The mass and charge numbers of the beam projectile.
+    pygas : pytpc gas class
+        The detector gas.
+    efield, bfield : ndarray
+        The electric and magnetic fields in SI units.
+    max_en : int, optional
+        The maximum allowable particle energy in MeV. This is used to make the energy lookup
+        table for the tracker.
 
     Raises
     ------
     ValueError
         If the dimensions of an input array were invalid.
     """
-    def __cinit__(self, int massNum, int chargeNum, Gas gas,
-                  np.ndarray[np.double_t, ndim=1] efield, np.ndarray[np.double_t, ndim=1] bfield):
-        self.pyGas = gas
+    def __cinit__(self, int massNum, int chargeNum, double beam_enu0, int beam_mass, int beam_charge, pygas,
+                  np.ndarray[np.double_t, ndim=1] efield, np.ndarray[np.double_t, ndim=1] bfield,
+                  int max_en=100):
+
+        ens = np.arange(0, max_en*1000, dtype='int')
+        eloss = pygas.energy_loss(ens / 1000, massNum, chargeNum)
+
+        zs = np.arange(0, 1000, dtype='int')
+        en_vs_z = find_vertex_energy(zs / 1000., beam_enu0, beam_mass, beam_charge, pygas)
+
+        self.gas = Gas(eloss, en_vs_z)
 
         cdef arma.vec *efieldVec
         cdef arma.vec *bfieldVec
         try:
             efieldVec = arma.np2vec(efield)
             bfieldVec = arma.np2vec(bfield)
-            self.thisptr = new mcopt.Tracker(massNum, chargeNum, self.pyGas.thisptr, deref(efieldVec), deref(bfieldVec))
+            self.thisptr = new mcopt.Tracker(massNum, chargeNum, self.gas.thisptr, deref(efieldVec), deref(bfieldVec))
         finally:
             del efieldVec, bfieldVec
 
