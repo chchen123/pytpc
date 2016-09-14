@@ -9,6 +9,10 @@ Some common functions that could be useful in many places.
 import numpy as np
 from numpy import sin, cos
 from functools import wraps
+import sqlite3
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def numpyize(func):
@@ -199,3 +203,38 @@ def find_vertex_energy(beam_intercept, beam_enu0, beam_mass, beam_chg, gas):
     rf = ri - (1.0 - beam_intercept)
     ef = gas.inverse_range(rf, beam_mass, beam_chg)
     return ef
+
+
+class SQLWriter(object):
+    def __init__(self, dbpath):
+        self.dbpath = dbpath
+        self.conn = sqlite3.connect(self.dbpath)
+        self._tables = {}
+
+    def create_table(self, name, columns):
+        curs = self.conn.cursor()
+
+        get_name_sql = 'SELECT name FROM sqlite_master WHERE type="table" AND name="{}"'.format(name)
+
+        if curs.execute(get_name_sql).fetchone():
+            logger.warning('An old table called %s was present in the DB. It will be dropped.', name)
+            curs.execute('DROP TABLE {}'.format(name))
+
+        self._tables[name] = columns
+
+        create_table_sql = "CREATE TABLE {name} ({items})".format(name=name,
+                                                                  items=', '.join([' '.join(r) for r in columns]))
+
+        curs.execute(create_table_sql)
+        self.conn.commit()
+
+    def write(self, name, res):
+        curs = self.conn.cursor()
+        columns = self._tables[name]
+
+        insert_sql = 'INSERT INTO {name} VALUES ({items})'.format(name=name,
+                                                                  items=', '.join([':{}'.format(r[0])
+                                                                                   for r in columns]))
+
+        curs.execute(insert_sql, res)
+        self.conn.commit()

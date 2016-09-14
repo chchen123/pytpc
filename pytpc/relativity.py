@@ -157,3 +157,22 @@ def elastic_scatter(proj, target, cm_angle, azi, ret_angles=False):
         return ejec, recoil, (pol3, pol4)
     else:
         return ejec, recoil
+
+
+def find_proton_params(th3, m1, m2, m3, m4, T):
+    s = (m1 + m2)**2 + 2 * m2 * T
+    pcm = np.sqrt(((s - m1**2 - m2**2)**2 - 4 * m1**2 * m2**2) / (4 * s))
+    ppcm = np.sqrt(((s - m3**2 - m4**2)**2 - 4 * m3**2 * m4**2) / (4 * s))
+    chi = np.log((pcm + np.sqrt(m2**2 + pcm**2)) / m2)
+    E3cm = np.sqrt(ppcm**2 + m3**2)
+#     print(np.sqrt(s), E3cm - m3)
+
+    coshx = np.cosh(chi)
+    sinhx = np.sinh(chi)
+
+    root = np.sqrt(coshx**2 * (E3cm**2 + m3**2 * (-coshx**2 + np.cos(th3)**2 * sinhx**2)))
+    denom = ppcm * (coshx**2 - np.cos(th3)**2 * sinhx**2)
+    sinthcm = np.sin(th3) * (E3cm * np.cos(th3) * sinhx + root) / denom
+    p3 = ppcm * sinthcm / np.sin(th3)
+    E3 = np.sqrt(p3**2 + m3**2)
+    return sinthcm, E3

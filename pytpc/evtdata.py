@@ -33,6 +33,7 @@ Examples
 from __future__ import division, print_function
 import struct
 import numpy as np
+import pandas as pd
 import os.path
 import warnings
 import pytpc.datafile
@@ -879,3 +880,39 @@ class FilePosError(Error):
         self.filename = filename  #: The name of the file where the error occurred
         self.details = details    #: Details of the error
         self.message = "FilePosError in " + filename + ": " + details  # An error message for printing
+
+
+class PreprocessMixin(object):
+    def preprocess(self, raw_xyz, center=None, rotate_pads=False, last_tb=None):
+        raw_xyz = raw_xyz.copy()
+
+        if last_tb is not None:
+            raw_xyz = raw_xyz[raw_xyz[:, 2] < 505]  # get rid of noise at end
+
+        if rotate_pads:
+            raw_xyz[:, 0], raw_xyz[:, 1] = self.padrotmat @ raw_xyz[:, :2].T
+            if center is not None:
+                center = self.padrotmat @ center
+
+        # Correct for shift in z due to trigger delay
+        raw_xyz[:, 2] -= self.micromegas_tb
+
+        # Correct for Lorentz angle and find z dimension
+        # xyz = pd.DataFrame(pytpc.evtdata.calibrate(raw_xyz, self.vd, self.clock), columns=('x', 'y', 'z', 'a', 'pad'))
+        xyz = pd.DataFrame(pytpc.evtdata.calibrate(raw_xyz[np.where(~np.in1d(raw_xyz[:, -1], self.beampads))],
+                                                   self.vd, self.clock), columns=('x', 'y', 'z', 'a', 'pad'))
+
+        # Find the untilted coordinates
+        tmat = pytpc.utilities.tilt_matrix(-self.tilt)
+        xyz['u'], xyz['v'], xyz['w'] = np.inner(tmat, xyz[['x', 'y', 'z']])
+        xyz['v'] += np.tan(self.tilt) * 1000.  # Corrects for rotating around umegas instead of cathode
+
+        if center is not None:
+            center_uvw = pytpc.evtdata.calibrate(np.array([[center[0], center[1], 0]]), self.vd, self.clock).ravel()
+            center_uvw = tmat @ center_uvw
+            center_uvw[1] += np.tan(self.tilt) * 1000.  # Corrects for rotating around umegas instead of cathode
+
+            return xyz, center_uvw[:2]
+
+        else:
+            return xyz
