@@ -42,7 +42,6 @@ from scipy.ndimage.filters import gaussian_filter
 try:
     from pyfftw.interfaces.scipy_fftpack import fft, ifft, fft2, ifft2
 except ImportError:
-    warnings.warn('Using SciPy FFT instead of PyFFTW. May be slightly slower.')
     from scipy.fftpack import fft, ifft, fft2, ifft2
 
 from scipy.fftpack import ifftshift
