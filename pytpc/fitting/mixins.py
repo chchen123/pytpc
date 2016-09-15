@@ -10,11 +10,23 @@ import h5py
 
 
 class MixinBase(object):
+    """A base class that discards all arguments sent to its initializer.
+
+    The mixins in this file take arguments in their initializers, and they pass these on to the next class in the
+    MRO using `super`. However, `object.__init__` does not take any arguments, so if one of these `super` calls
+    reaches `object`, it will cause an error. Therefore the mixins inherit from this class instead.
+
+    """
     def __init__(self, *args, **kwargs):
         pass
 
 
 class TrackerMixin(MixinBase):
+    """Provides a particle tracker to the inheriting class.
+
+    This adds a particle tracker as `self.tracker` with associated attributes.
+
+    """
     def __init__(self, config):
         self.gas = InterpolatedGas(config['gas_name'], config['gas_pressure'])
         self._efield = np.array(config['efield'])
@@ -63,6 +75,11 @@ class TrackerMixin(MixinBase):
 
 
 class EventGeneratorMixin(MixinBase):
+    """Provides an event generator to the inheriting class.
+
+    This adds an EventGenerator object as `self.evtgen`, with some other associated attributes.
+
+    """
     def __init__(self, config):
         self._vd = np.array(config['vd'])
         self.mass_num = config['mass_num']
@@ -104,25 +121,80 @@ class EventGeneratorMixin(MixinBase):
 
 
 def odrline(beta, x):
+    """Function of a line for the ODR fitter."""
     return beta[0] * x + beta[1]
 
 
 def line(x, a, b):
+    """Function of a line."""
     return a * x + b
 
 
 def find_linear_chi2(x, y, params):
+    """Calculate chi2 for the linear prefit.
+
+    Parameters
+    ----------
+    x, y : number or array-like
+        The x and y coordinate values.
+    params : iterable
+        The parameters (a, b) to the `line` function, as returned from the fitter.
+
+    """
     return np.sum((y - line(x, *params))**2) / (len(x) - 3)
 
 
 def constrain_angle(ang):
+    """Makes all values in `ang` be between 0 and 2π.
+
+    Any values outside the [0, 2π) domain are reduced by a factor of 2π until they lie within the domain.
+
+    Parameters
+    ----------
+    ang : array-like
+        A set of angles to be constrained.
+
+    Returns
+    -------
+    ndarray
+        The angles from `ang` constrained to be between 0 and 2π.
+    """
     x = ang % (2 * pi)
     x[x < 0] += 2 * pi
     return x
 
 
 class LinearPrefitMixin(MixinBase):
+    """Provides methods to perform a linear fit to the data to find an initial guess for the Monte Carlo parameters.
+
+    Two methods are provided:
+    1) `linear_prefit` -- This calculates r-phi and performs the linear fit.
+    2) `guess_parameters` -- This uses the results of the linear fit to guess the starting point for the Monte Carlo.
+
+    """
     def linear_prefit(self, xyz, cx, cy):
+        """Performs the linear prefit.
+
+        The linear fit is performed using the SciPy ODR library, which does orthogonal distance regression. This means
+        that the minimized quantity is the orthogonal distance between the line and each data point, rather than the
+        distance along one of the coordinate directions.
+
+        Parameters
+        ----------
+        xyz : pandas.DataFrame
+            The data to be fit. This must have columns (u, v, w) corresponding to the (x, y, z) positions in the
+            *beam* reference frame. (I.e. after calibration and untilting.) This data is not copied, so some new
+            columns will be added.
+        cx, cy : number
+            The position of the center of curvature, perhaps from a Hough space calculation.
+
+        Returns
+        -------
+        res : dict
+            The results of the fit. The dictionary has entries giving the fit parameters, chi^2, radius of curvature,
+            B-rho, energy from radius of curvature, and center of curvature.
+
+        """
         # Recenter the data on the center of curvature and find cylindrical coordinates in this system
         xyz['cx'] = xyz.u - cx
         xyz['cy'] = xyz.v - cy
@@ -162,6 +234,21 @@ class LinearPrefitMixin(MixinBase):
         return res
 
     def guess_parameters(self, prefit_res):
+        """Guess initial Monte Carlo parameters from the linear prefit results.
+
+        This takes the dictionary from `linear_prefit` and creates a set of parameters to seed the Monte Carlo.
+
+        Parameters
+        ----------
+        prefit_res : dict
+            The output from `linear_prefit`.
+
+        Returns
+        -------
+        ndarray
+            The initial parameters (x0, y0, z0, enu0, azi0, pol0).
+
+        """
         x0 = 0
         y0 = 0
         z0 = (prefit_res['lin_beam_int'] / 1000)
@@ -172,16 +259,43 @@ class LinearPrefitMixin(MixinBase):
 
 
 class PreprocessMixin(MixinBase):
+    """Provides preprocessing (calibration) functions to its child class.
+    """
 
     def __init__(self, config):
         self.micromegas_tb = config['micromegas_tb']
         super().__init__(config)
 
     def preprocess(self, raw_xyz, center=None, rotate_pads=False, last_tb=None):
+        """Preprocesses data by calibrating it and un-tilting it.
+
+        Parameters
+        ----------
+        raw_xyz : array-like
+            The raw data. The array is assumed to be 2D with columns (x, y, z, a, pad) where `a` is the peak amplitude.
+        center : list-like, optional
+            The center of curvature. If provided, this will also be calibrated, and the calibrated value will be
+            returned.
+        rotate_pads : bool, optional
+            If true, the points will be rotated about the z axis by the angle `self.pad_rot_angle`. This corresponds to
+            the pad plane rotation. (Note that this may not be necessary depending on where `raw_xyz` was read from.)
+        last_tb : int, optional
+            The last time bucket to consider. If provided, all time buckets after this one will be zeroed. This
+            can help with noise at the end of the event.
+
+        Returns
+        -------
+        xyz : pandas.DataFrame
+            The calibrated, un-tilted data. The DataFrame has columns `(u, v, w, a, pad)` (and others) giving
+            the calibrated positions.
+        center_uvw : ndarray, optional
+            The calibrated center. This is only returned if the parameter `center` was not `None`.
+
+        """
         raw_xyz = raw_xyz.copy()
 
         if last_tb is not None:
-            raw_xyz = raw_xyz[raw_xyz[:, 2] < 505]  # get rid of noise at end
+            raw_xyz = raw_xyz[raw_xyz[:, 2] < last_tb]  # get rid of noise at end
 
         if rotate_pads:
             raw_xyz[:, 0], raw_xyz[:, 1] = self.padrotmat @ raw_xyz[:, :2].T
