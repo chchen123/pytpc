@@ -86,7 +86,8 @@ class EventGeneratorMixin(MixinBase):
         self.pad_rot_angle = config['pad_rot_angle'] * degrees
         self.padrotmat = rot_matrix(self.pad_rot_angle)
         self.ioniz = config['ioniz']
-        self.gain = config['micromegas_gain']
+        self.micromegas_gain = float(config['micromegas_gain'])
+        self.electronics_gain = float(config['electronics_gain'])
         self.clock = config['clock']
         self.shape = float(config['shape'])
         self._tilt = config['tilt'] * degrees
@@ -96,7 +97,8 @@ class EventGeneratorMixin(MixinBase):
             lut = hf['LUT'][:]
         self.padplane = PadPlane(lut, -0.280, 0.0001, -0.280, 0.0001, self.pad_rot_angle)
         self.evtgen = EventGenerator(self.padplane, self.vd, self.clock, self.shape, self.mass_num,
-                                     self.ioniz, self.gain, self.tilt, self.diff_sigma)
+                                     self.ioniz, self.micromegas_gain, self.electronics_gain,
+                                     self.tilt, self.diff_sigma)
 
         super().__init__(config)
 

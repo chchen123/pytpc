@@ -249,17 +249,23 @@ cdef class EventGenerator:
         The particle's mass number.
     ioniz : float
         The mean ionization potential of the gas, in eV.
-    gain : int
-        The gain to apply to the event.
+    micromegas_gain : double
+        The gain in the micromegas.
+    electronics_gain : double
+        The gain of the electronics (the value of the capacitor on the amplifier).
+    tilt : double
+        The tilt angle, in radians.
+    diff_sigma : double
+        The size of the lateral straggling distribution.
     """
     def __cinit__(self, PadPlane pads, np.ndarray[np.double_t, ndim=1] vd, double clock, double shape,
-                  unsigned massNum, double ioniz, double gain, double tilt, double diff_sigma):
+                  unsigned massNum, double ioniz, double micromegas_gain, double electronics_gain, double tilt, double diff_sigma):
         self.pyPadPlane = pads
         cdef arma.vec *vdVec
         try:
             vdVec = arma.np2vec(vd)
             self.thisptr = new mcopt.EventGenerator(self.pyPadPlane.thisptr, deref(vdVec), clock * 1e6, shape, massNum,
-                                                    ioniz, gain, tilt, diff_sigma)
+                                                    ioniz, micromegas_gain, electronics_gain, tilt, diff_sigma)
         finally:
             del vdVec
 
@@ -283,12 +289,20 @@ cdef class EventGenerator:
         self.thisptr.ioniz = newval
 
     @property
-    def gain(self):
+    def micromegas_gain(self):
         """The micromegas gain."""
-        return self.thisptr.gain
-    @gain.setter
-    def gain(self, double newval):
-        self.thisptr.gain = newval
+        return self.thisptr.micromegasGain
+    @micromegas_gain.setter
+    def micromegas_gain(self, double newval):
+        self.thisptr.micromegasGain = newval
+
+    @property
+    def electronics_gain(self):
+        return self.thisptr.electronicsGain
+
+    @electronics_gain.setter
+    def electronics_gain(self, newval):
+        self.thisptr.electronicsGain = newval
 
     @property
     def tilt(self):
@@ -301,19 +315,19 @@ cdef class EventGenerator:
     @property
     def clock(self):
         """The CoBo write clock frequency, in MHz."""
-        return self.thisptr.getClock() * 1e-6
+        return self.thisptr.clock * 1e-6
     @clock.setter
     def clock(self, double newval):
-         self.thisptr.setClock(newval * 1e6)
+         self.thisptr.clock = newval * 1e6
 
     @property
     def shape(self):
         """The shaping time in the electronics, in seconds."""
-        return self.thisptr.getShape()
+        return self.thisptr.shape
 
     @shape.setter
     def shape(self, double newval):
-        self.thisptr.setShape(newval)
+        self.thisptr.shape = newval
 
     @property
     def vd(self):

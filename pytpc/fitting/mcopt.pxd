@@ -43,25 +43,23 @@ cdef extern from "mcopt/mcopt.h" namespace "mcopt":
 
     cdef cppclass EventGenerator:
         EventGenerator(const PadPlane* pads, const arma.vec& vd, const double clock, const double shape,
-                       const unsigned massNum, const double ioniz, const double gain, const double tilt,
-                       const double diffSigma) except+
+                       const unsigned massNum, const double ioniz, const double micromegasGain,
+                       const double electronicsGain, const double tilt, const double diffSigma) except+
 
         cppmap[pad_t, arma.vec] makeEvent(const arma.mat& pos, const arma.vec& en) except+
         arma.mat makePeaksTableFromSimulation(const arma.mat& pos, const arma.vec& en) except+
         arma.vec makeMeshSignal(const arma.mat& pos, const arma.vec& en) except+
         arma.vec makeHitPattern(const arma.mat& pos, const arma.vec& en) except+
 
-        double getClock()
-        void setClock(const double c)
-        double getShape()
-        void setShape(const double s)
-
         arma.vec vd
         unsigned massNum
         double ioniz
-        double gain
+        double micromegasGain
+        double electronicsGain
         double tilt
         double diffSigma
+        double clock
+        double shape
 
 
     cdef cppclass MCminimizeResult:
