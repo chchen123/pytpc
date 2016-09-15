@@ -10,6 +10,10 @@ import numpy as np
 from numpy import sin, cos
 from functools import wraps
 import sqlite3
+from xml.etree import ElementTree
+from itertools import product
+import os
+import re
 import logging
 
 logger = logging.getLogger(__name__)
@@ -246,3 +250,66 @@ def find_run_number(filename):
         return int(m.group(1))
     else:
         raise ValueError('Count not extract run number from filename: {}'.format(filename))
+
+
+def find_exclusion_region(xcfg, lookup):
+    """Read the low-gain and trigger exclusion regions from a GET config file.
+
+    The excluded pads are identified by having the `TriggerInhibition` key set to `inhibit_trigger`. The
+    low-gain pads are found by assuming that any pad with an individually set gain is a low-gain pad. No effort is
+    made to check if this is actually a lower gain than the global one.
+
+    Parameters
+    ----------
+    xcfg : str or file-like
+        The path to the config file, or a file-like object with the contents of the config file.
+    lookup : dict
+        The pad number lookup table, as a dictionary mapping tuples (cobo, asad, aget, channel) -> pad number.
+
+    Returns
+    -------
+    excl_pads : list
+        The set of excluded pad numbers.
+    low_gain_pads : list
+        The set of low-gain pad numbers (see above for definition of "low-gain").
+
+    """
+    tree = ElementTree.parse(xcfg)
+    root = tree.getroot()
+
+    excl_pads = []
+    low_gain_pads = []
+    for cobo, asad, aget, ch in product(range(10), range(4), range(4), range(68)):
+        path = "./Node[@id='CoBo']/Instance[@id='{}']/AsAd[@id='{}']/Aget[@id='{}']/channel[@id='{}']"
+        node = root.find(path.format(cobo, asad, aget, ch))
+        if node is not None:
+            trig = node.find("TriggerInhibition")
+            if trig is not None and trig.text == 'inhibit_trigger':
+                excl_pads.append(lookup[(cobo, asad, aget, ch)])
+            gain = node.find("Gain")
+            if gain is not None:
+                low_gain_pads.append(lookup[(cobo, asad, aget, ch)])
+
+    return sorted(excl_pads), sorted(low_gain_pads)
+
+
+def read_lookup_table(path):
+    """Reads the lookup table from the CSV file given by `path`.
+
+    Parameters
+    ----------
+    path : str
+        The path to the lookup table.
+
+    Returns
+    -------
+    lookup : dict
+        A dictionary with tuple keys `(cobo, asad, aget, channel)` and int values `pad_number`.
+
+    """
+    lookup = {}
+    with open(path) as f:
+        for line in f:
+            parts = line.strip().split(',')
+            lookup[tuple([int(i) for i in parts[:-1]])] = int(parts[-1])
+    return lookup
