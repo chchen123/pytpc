@@ -2,6 +2,7 @@ from setuptools import setup, Extension
 import numpy as np
 from Cython.Build import cythonize
 from sys import platform
+from copy import deepcopy
 
 extra_args = ['-Wall', '-Wno-unused-function', '-std=c++11', '-g']
 if platform == 'darwin':
@@ -9,14 +10,25 @@ if platform == 'darwin':
 
 include_path = [np.get_include()]
 
-ext_kwargs = dict(include_dirs=[np.get_include()],
-                  libraries=['mcopt'],
-                  language='c++',
-                  extra_compile_args=extra_args,
-                  extra_link_args=extra_args)
+base_kwargs = dict(include_dirs=[np.get_include()],
+                   language='c++',
+                   extra_compile_args=extra_args,
+                   extra_link_args=extra_args)
 
-exts = [Extension('pytpc.fitting.mcopt_wrapper', ['pytpc/fitting/mcopt_wrapper.pyx'], **ext_kwargs),
-        Extension('pytpc.fitting.armadillo', ['pytpc/fitting/armadillo.pyx'], **ext_kwargs)]
+fitter_kwargs = deepcopy(base_kwargs)
+fitter_kwargs['libraries'] = ['mcopt']
+
+cleaner_compile_args = ['-Wall', '-Wno-unused-function', '-std=c11', '-O3', '-fopenmp=libomp']
+cleaner_kwargs = dict(include_dirs=[np.get_include()],
+                      language='c',
+                      extra_compile_args=cleaner_compile_args,
+                      extra_link_args=cleaner_compile_args,
+                      )
+
+
+exts = [Extension('pytpc.fitting.mcopt_wrapper', ['pytpc/fitting/mcopt_wrapper.pyx'], **fitter_kwargs),
+        Extension('pytpc.fitting.armadillo', ['pytpc/fitting/armadillo.pyx'], **fitter_kwargs),
+        Extension('pytpc.cleaning', ['pytpc/cleaning.pyx', 'pytpc/hough.c'], **cleaner_kwargs)]
 
 setup(
     name='pytpc',
