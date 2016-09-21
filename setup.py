@@ -28,7 +28,8 @@ cleaner_kwargs = dict(include_dirs=[np.get_include()],
 
 exts = [Extension('pytpc.fitting.mcopt_wrapper', ['pytpc/fitting/mcopt_wrapper.pyx'], **fitter_kwargs),
         Extension('pytpc.fitting.armadillo', ['pytpc/fitting/armadillo.pyx'], **fitter_kwargs),
-        Extension('pytpc.cleaning', ['pytpc/cleaning.pyx', 'pytpc/hough.c'], **cleaner_kwargs)]
+        Extension('pytpc.cleaning.hough_wrapper', ['pytpc/cleaning/hough_wrapper.pyx', 'pytpc/cleaning/hough.c'],
+                  **cleaner_kwargs)]
 
 setup(
     name='pytpc',
