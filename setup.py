@@ -38,7 +38,7 @@ setup(
     author='Joshua Bradt',
     author_email='bradt@nscl.msu.edu',
     url='https://github.com/attpc/pytpc',
-    packages=['pytpc', 'pytpc.fitting'],
+    packages=['pytpc', 'pytpc.fitting', 'pytpc.cleaning'],
     ext_modules=cythonize(exts),
     scripts=['bin/runfit'],
     install_requires=['scipy',

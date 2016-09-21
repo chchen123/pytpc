@@ -4,6 +4,7 @@ import pytpc.evtdata
 import pytpc.gases
 import pytpc.grawdata
 import pytpc.hdfdata
+import pytpc.cleaning
 import pytpc.fitting
 
 from pytpc.evtdata import EventFile, Event
