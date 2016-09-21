@@ -1,9 +1,11 @@
+# cython: profile=True
+
 import numpy as np
 cimport numpy as np
 import pandas as pd
 from .constants import pi
 import math
-from scipy.signal import argrelmax
+from scipy.signal import argrelextrema
 import cython
 from cython.parallel import parallel, prange
 from libc.stdint cimport int64_t
@@ -63,69 +65,73 @@ def nearest_neighbor_count(np.ndarray[np.double_t, ndim=2, mode='c'] xyz, double
     return counts
 
 
-cdef class HoughCleaner:
+def linefunc(x, r, t):
+    return (r - x * np.cos(t)) / np.sin(t)
 
-    @staticmethod
-    def linefunc(x, r, t):
-        return (r - x * np.cos(t)) / np.sin(t)
 
-    def clean(self, xyz):
-        xyz = np.ascontiguousarray(xyz)
+def find_peaks(data, pk_width=4):
+    maxima = argrelextrema(data, lambda a, b: np.greater_equal(a, b) & np.greater(a, 0),
+                           order=2)[0]
 
-        # Nearest neighbor cut
-        nncts = nearest_neighbor_count(xyz, 10)
-        xyz = xyz[nncts > 1]
+    keepmask = data[maxima] != np.roll(data[maxima], -1)
+    maxima = maxima[keepmask]
 
-        # Find center
-        cu, cv = hough_circle(xyz)
+    pkctrs = np.empty_like(maxima, dtype='float64')
 
-        # Find r-theta (arclength)
-        rads = np.sqrt((xyz[:, 0] - cu)**2 + (xyz[:, 1] - cv)**2)
-        thetas = np.arctan((xyz[:, 1] - cv) / (xyz[:, 0] - cu))
-        # xyz['th'] = (xyz.th + pi/2 + 90*degrees) % pi - pi/2
-        arclens = rads * thetas
+    for i, m in enumerate(maxima):
+        pkpts = data[m-pk_width:m+pk_width]
+        pklocs = np.arange(m-pk_width, m+pk_width)
+        pkctrs[i] = (pkpts * pklocs).sum() / pkpts.sum()
 
-        # Perform linear Hough transform
-        linear_hough_data = np.ascontiguousarray(np.column_stack((xyz[:, 2], arclens)))
-        counts = hough_line(linear_hough_data)
+    return pkctrs
 
-        # Find angle of max in Hough space
-        maxidx = counts.ravel().argsort()[::-1]  # Reversed list of peak indices
-        thmax = np.floor(np.unravel_index(maxidx[:5], counts.shape)[0].mean()).astype('int')  # Index of average max
 
-        pts2 = counts[thmax - 5:thmax + 5].sum(0)
-        pts2[pts2 < 60] = 0
+def clean(xyz, max_distance=40, hough_line_max=2000, hough_line_bins=500, hough_circle_max=500, hough_circle_bins=200):
+    xyz = np.ascontiguousarray(xyz)
 
-        maxima = argrelmax(pts2, order=2)[0]  # BUG: flat top peaks skipped since not > adjacent
-        pkctrs = np.zeros(len(maxima), dtype='float64')
+    # Nearest neighbor cut
+    nncts = nearest_neighbor_count(xyz, 10)
+    xyz = xyz[nncts > 1]
 
-        for i, m in enumerate(maxima):
-            d = 3
-            pkpts = pts2[(m - d):(m + d)]
-            pklocs = np.arange((m - d), (m + d))
-            pkctrs[i] = (pkpts * pklocs).sum() / pkpts.sum()
+    # Find center
+    cu, cv = hough_circle(xyz, nbins=hough_circle_bins, max_val=hough_circle_max)
 
-        maxima = pkctrs
+    # Find r-theta (arclength)
+    rads = np.sqrt((xyz[:, 0] - cu)**2 + (xyz[:, 1] - cv)**2)
+    thetas = np.arctan((xyz[:, 1] - cv) / (xyz[:, 0] - cu))
+    # xyz['th'] = (xyz.th + pi/2 + 90*degrees) % pi - pi/2
+    arclens = rads * thetas
 
-        max_distance = 40
+    # Perform linear Hough transform
+    linear_hough_data = np.ascontiguousarray(np.column_stack((xyz[:, 2], arclens)))
+    lin_space = hough_line(linear_hough_data, nbins=hough_line_bins, max_val=hough_line_max)
 
-        labels = np.full(xyz.shape[0], -1)
-        mindists = np.full(xyz.shape[0], np.inf)
+    # Find angle of max in Hough space
+    maxidx = lin_space.ravel().argsort()  # List of peak indices in increasing order, so look at last few in next step
+    thmax = np.floor(np.unravel_index(maxidx[-5:], lin_space.shape)[0].mean()).astype('int')  # Index of average max
 
-        t = thmax * pi / 500
-        for i, ridx in enumerate(maxima.astype('float64')):
-            r = ridx * 2000 * 2 / 500 - 2000
-            dists = (self.linefunc(xyz[:, 2], r, t) - arclens)**2
-            subset_mask = (dists < mindists) & (dists < max_distance**2)
-            labels[subset_mask] = i
-            mindists[subset_mask] = dists[subset_mask]
+    hough_slice = lin_space[thmax - 5:thmax + 5].sum(0)  # Slice of Hough space in angle dimension near max
+    hough_slice[hough_slice < 60] = 0
 
-        for label_value in filter(lambda x: x != -1, np.unique(labels)):
-            label_set = np.where(labels == label_value)[0]
-            if len(label_set) < 10:
-                labels[label_set] = -1
+    pkctrs = find_peaks(hough_slice)
 
-        return np.column_stack((xyz, labels, mindists)), (cu, cv)
+    labels = np.full(xyz.shape[0], -1)
+    mindists = np.full(xyz.shape[0], np.inf)
+
+    t = thmax * pi / hough_line_bins
+    for i, ridx in enumerate(pkctrs.astype('float64')):
+        r = ridx * hough_line_max * 2 / hough_line_bins - hough_line_max
+        dists = (linefunc(xyz[:, 2], r, t) - arclens)**2
+        subset_mask = (dists < mindists) & (dists < max_distance**2)
+        labels[subset_mask] = i
+        mindists[subset_mask] = dists[subset_mask]
+
+    for label_value in filter(lambda x: x != -1, np.unique(labels)):
+        label_set = np.where(labels == label_value)[0]
+        if len(label_set) < 10:
+            labels[label_set] = -1
+
+    return np.column_stack((xyz, labels, mindists)), (cu, cv)
 
 
 def find_center_hough(xyzs):
