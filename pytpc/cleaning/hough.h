@@ -8,7 +8,12 @@
 
 #include <stddef.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <math.h>
+
+#ifndef M_PI
+#define M_PI 3.1415926
+#endif
 
 void houghline(const double *restrict xy, const int dim0, const int dim1, int64_t *restrict accum, const int nbins, const double max_val);
 void houghcircle(const double *restrict xy, const int dim0, const int dim1, int64_t *restrict accum, const int nbins, const double max_val);

@@ -2,11 +2,18 @@ from setuptools import setup, Extension
 import numpy as np
 from Cython.Build import cythonize
 from sys import platform
+import os
+import re
 from copy import deepcopy
 
 extra_args = ['-Wall', '-Wno-unused-function', '-std=c++11', '-g']
 if platform == 'darwin':
     extra_args.append('-mmacosx-version-min=10.9')
+
+if re.search(r'clang', os.environ['CC']):
+    omp_flag = '-fopenmp=libomp'
+else:
+    omp_flag = '-fopenmp'
 
 include_path = [np.get_include()]
 
@@ -18,7 +25,7 @@ base_kwargs = dict(include_dirs=[np.get_include()],
 fitter_kwargs = deepcopy(base_kwargs)
 fitter_kwargs['libraries'] = ['mcopt']
 
-cleaner_compile_args = ['-Wall', '-Wno-unused-function', '-std=c11', '-O3', '-fopenmp=libomp']
+cleaner_compile_args = ['-Wall', '-Wno-unused-function', '-std=c11', '-O3', omp_flag]
 cleaner_kwargs = dict(include_dirs=[np.get_include()],
                       language='c',
                       extra_compile_args=cleaner_compile_args,
