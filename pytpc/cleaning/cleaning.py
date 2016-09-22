@@ -24,12 +24,13 @@ class HoughCleaner(object):
         self.min_num_neighbors = config['min_num_neighbors']
         self.neighbor_radius = config['neighbor_radius']
 
-    def neighbor_cut(self, xyz):
+    def neighbor_count(self, xyz):
         xyz_cont = np.ascontiguousarray(xyz)
         nncts = nearest_neighbor_count(xyz_cont, self.neighbor_radius)
-        return xyz[nncts > self.min_num_neighbors]
+        return nncts
 
     def find_center(self, xyz):
+        xyz = np.ascontiguousarray(xyz[self.neighbor_count(xyz) > 1])
         return hough_circle(xyz, nbins=self.circle_hough_nbins, max_val=self.circle_hough_max)
 
     def find_arclen(self, xyz, cu, cv, extra_rotation=None):
@@ -103,9 +104,6 @@ class HoughCleaner(object):
         return (labels, mindists)
 
     def clean(self, xyz):
-        # Nearest neighbor cut
-        xyz = self.neighbor_cut(xyz)
-
         # Find center
         cu, cv = self.find_center(xyz)
 
@@ -125,7 +123,10 @@ class HoughCleaner(object):
         # Identify which line (if any) each point belongs to
         labels, mindists = self.classify_points(xyz, arclens, theta_max, radii)
 
-        return np.column_stack((xyz, labels, mindists)), (cu, cv)
+        # Nearest neighbor cut
+        nn_counts = self.neighbor_count(xyz)
+
+        return labels, mindists, nn_counts, (cu, cv)
 
 
 def nn_remove_noise(data, radius=40, num_neighbors=10):
