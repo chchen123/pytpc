@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy.signal import argrelextrema
 from .hough_wrapper import hough_line, hough_circle, nearest_neighbor_count
+from ..utilities import Base
 from ..constants import pi
 
 
@@ -10,7 +11,7 @@ def linefunc(x, r, t):
     return (r - x * np.cos(t)) / np.sin(t)
 
 
-class HoughCleaner(object):
+class HoughCleaner(Base):
     """Provides functions to clean xyz data using the Hough transform and nearest-neighbor search.
 
     The different steps of the cleaning process are broken down into separate functions, so parts
@@ -19,7 +20,7 @@ class HoughCleaner(object):
 
     The class is initialized using a dictionary of configuration parameters. This might be loaded from
     a config file, for instance. The keys that must be in the dictionary are the same as the class's
-    attributes given below.
+    attributes given below. All keys for this class must be in a group called 'cleaning_config'.
 
     Parameters
     ----------
@@ -49,15 +50,19 @@ class HoughCleaner(object):
 
     """
     def __init__(self, config):
-        self.peak_width = config['peak_width']
+        super().__init__(config)
 
-        self.linear_hough_max = config['linear_hough_max']
-        self.linear_hough_nbins = config['linear_hough_nbins']
-        self.circle_hough_max = config['circle_hough_max']
-        self.circle_hough_nbins = config['circle_hough_nbins']
+        clean_conf = config['cleaning_config']
 
-        self.min_pts_per_line = config['min_pts_per_line']
-        self.neighbor_radius = config['neighbor_radius']
+        self.peak_width = clean_conf['peak_width']
+
+        self.linear_hough_max = clean_conf['linear_hough_max']
+        self.linear_hough_nbins = clean_conf['linear_hough_nbins']
+        self.circle_hough_max = clean_conf['circle_hough_max']
+        self.circle_hough_nbins = clean_conf['circle_hough_nbins']
+
+        self.min_pts_per_line = clean_conf['min_pts_per_line']
+        self.neighbor_radius = clean_conf['neighbor_radius']
 
     def neighbor_count(self, xyz):
         """Count the number of neighbors each point has within radius `self.neighbor_radius`
@@ -172,8 +177,8 @@ class HoughCleaner(object):
         pkctrs = np.empty_like(maxima, dtype='float64')
 
         for i, m in enumerate(maxima):
-            first = m - self.peak_width
-            last = m + self.peak_width
+            first = max(m - self.peak_width, 0)
+            last = min(m + self.peak_width, data.shape[0])
             pkpts = data[first:last]
             pklocs = np.arange(first, last)
             pkctrs[i] = (pkpts * pklocs).sum() / pkpts.sum()

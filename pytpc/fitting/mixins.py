@@ -5,23 +5,11 @@ from scipy import odr
 from pytpc.evtdata import calibrate
 from pytpc.gases import InterpolatedGas
 from pytpc.constants import degrees, pi, e_chg, p_kg
-from pytpc.utilities import rot_matrix, tilt_matrix
+from pytpc.utilities import rot_matrix, tilt_matrix, Base
 import h5py
 
 
-class MixinBase(object):
-    """A base class that discards all arguments sent to its initializer.
-
-    The mixins in this file take arguments in their initializers, and they pass these on to the next class in the
-    MRO using `super`. However, `object.__init__` does not take any arguments, so if one of these `super` calls
-    reaches `object`, it will cause an error. Therefore the mixins inherit from this class instead.
-
-    """
-    def __init__(self, *args, **kwargs):
-        pass
-
-
-class TrackerMixin(MixinBase):
+class TrackerMixin(Base):
     """Provides a particle tracker to the inheriting class.
 
     This adds a particle tracker as `self.tracker` with associated attributes.
@@ -74,7 +62,7 @@ class TrackerMixin(MixinBase):
         return np.linalg.norm(self.bfield)
 
 
-class EventGeneratorMixin(MixinBase):
+class EventGeneratorMixin(Base):
     """Provides an event generator to the inheriting class.
 
     This adds an EventGenerator object as `self.evtgen`, with some other associated attributes.
@@ -166,7 +154,7 @@ def constrain_angle(ang):
     return x
 
 
-class LinearPrefitMixin(MixinBase):
+class LinearPrefitMixin(Base):
     """Provides methods to perform a linear fit to the data to find an initial guess for the Monte Carlo parameters.
 
     Two methods are provided:
@@ -260,7 +248,7 @@ class LinearPrefitMixin(MixinBase):
         return np.array([x0, y0, z0, enu0, azi0, pol0], dtype='float64')
 
 
-class PreprocessMixin(MixinBase):
+class PreprocessMixin(Base):
     """Provides preprocessing (calibration) functions to its child class.
     """
 

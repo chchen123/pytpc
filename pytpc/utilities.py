@@ -313,3 +313,15 @@ def read_lookup_table(path):
             parts = line.strip().split(',')
             lookup[tuple([int(i) for i in parts[:-1]])] = int(parts[-1])
     return lookup
+
+
+class Base(object):
+    """A base class that discards all arguments sent to its initializer.
+
+    The mixins in this package take arguments in their initializers, and they pass these on to the next class in the
+    MRO using `super`. However, `object.__init__` does not take any arguments, so if one of these `super` calls
+    reaches `object`, it will cause an error. Therefore the mixins inherit from this class instead.
+
+    """
+    def __init__(self, *args, **kwargs):
+        pass
