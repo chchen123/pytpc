@@ -11,6 +11,43 @@ def linefunc(x, r, t):
 
 
 class HoughCleaner(object):
+    """Provides functions to clean xyz data using the Hough transform and nearest-neighbor search.
+
+    The different steps of the cleaning process are broken down into separate functions, so parts
+    of the process can be applied independently (e.g. for testing purposes). The main function to use
+    to clean a dataset is `clean`. That one will perform the full cleaning process.
+
+    The class is initialized using a dictionary of configuration parameters. This might be loaded from
+    a config file, for instance. The keys that must be in the dictionary are the same as the class's
+    attributes given below.
+
+    Parameters
+    ----------
+    config : dict-like
+        A set of configuration parameters to initialize the object. See the attributes section below
+        to find out what keys this dictionary must contain.
+
+    Attributes
+    ----------
+    peak_width
+        The number of bins to consider in each direction when finding the center of mass of
+        peaks in the Hough space.
+    linear_hough_max
+        The largest radial distance to consider in the linear Hough transform. This sets the scale of the
+        largest bin in the Hough space.
+    linear_hough_nbins
+        The number of bins to use in each dimension in the linear Hough transform.
+    circle_hough_max
+        The largest radial distance to consider in the circular Hough transform. This sets the scale of the
+        largest bin in the Hough space.
+    circle_hough_nbins
+        The number of bins to use in each dimension in the circular Hough transform.
+    min_pts_per_line
+        If a line has fewer points than this near it, it will not be considered a true line.
+    neighbor_radius
+        The largest separation between two points that will still allow them to be considered neighbors.
+
+    """
     def __init__(self, config):
         self.peak_width = config['peak_width']
 
@@ -19,21 +56,64 @@ class HoughCleaner(object):
         self.circle_hough_max = config['circle_hough_max']
         self.circle_hough_nbins = config['circle_hough_nbins']
 
-        self.max_distance_from_line = config['max_distance_from_line']
         self.min_pts_per_line = config['min_pts_per_line']
-        self.min_num_neighbors = config['min_num_neighbors']
         self.neighbor_radius = config['neighbor_radius']
 
     def neighbor_count(self, xyz):
+        """Count the number of neighbors each point has within radius `self.neighbor_radius`
+
+        Parameters
+        ----------
+        xyz : array-like
+            The 3D data to consider. The first three columns must correspond to the position coordinates.
+
+        Returns
+        -------
+        nncts
+            The number of neighbors that each point has.
+
+        """
         xyz_cont = np.ascontiguousarray(xyz)
         nncts = nearest_neighbor_count(xyz_cont, self.neighbor_radius)
         return nncts
 
     def find_center(self, xyz):
+        """Finds the center using the circular Hough transform.
+
+        A nearest-neighbor cut will be applied to the data before finding the center.
+
+        Parameters
+        ----------
+        xyz : array-like
+            The 2D data to consider. The first two columns must be x and y positions.
+
+        Returns
+        -------
+        cx, cy : float
+            The x, y position of the found center.
+
+        """
         xyz = np.ascontiguousarray(xyz[self.neighbor_count(xyz) > 1])
         return hough_circle(xyz, nbins=self.circle_hough_nbins, max_val=self.circle_hough_max)
 
     def find_arclen(self, xyz, cu, cv, extra_rotation=None):
+        """Calculate the R-phi (arclength) position for each point with respect to the given center.
+
+        Parameters
+        ----------
+        xyz : array-like
+            The position data. Columns 0 and 1 are assumed to be x and y positions.
+        cu, cv : float
+            The x and y positions of the center, respectively.
+        extra_rotation : float, optional
+            If provided, the calculated theta values will be rotated by this amount (in radians) before returning.
+
+        Returns
+        -------
+        ndarray
+            The r-phi values.
+
+        """
         rads = np.sqrt((xyz[:, 0] - cu)**2 + (xyz[:, 1] - cv)**2)
         thetas = np.arctan((xyz[:, 1] - cv) / (xyz[:, 0] - cu))
 
@@ -43,10 +123,31 @@ class HoughCleaner(object):
         return rads * thetas
 
     def find_linear_hough_space(self, zs, arclens):
+        """Performs the linear Hough transform."""
         linear_hough_data = np.ascontiguousarray(np.column_stack((zs, arclens)))
         return hough_line(linear_hough_data, nbins=self.linear_hough_nbins, max_val=self.linear_hough_max)
 
     def find_hough_max_angle(self, lin_space):
+        """Finds the maximum angle slice in the linear Hough space.
+
+        The lines in the R-phi plot should all be parallel for a spiral-shaped track. Therefore we can find the
+        angle corresponding to the highest max in the Hough space, and then look at a slice of the Hough space to
+        find the radius corresponding to each line. This greatly reduces the number of lines to consider.
+
+        Parameters
+        ----------
+        lin_space : ndarray
+            The linear Hough space bins.
+
+        Returns
+        -------
+        theta_max : float
+            The angle of the found lines.
+        hough_slice : ndarray
+            A 1D slice of the Hough space at angle `theta_max`. The values are summed over a few angular bins to
+            account for inaccuracies in `theta_max`.
+
+        """
         # Find angle of max in Hough space
         maxidx = lin_space.ravel().argsort()  # List of peak indices in increasing order: look at last few in next step
         thmax = np.floor(np.unravel_index(maxidx[-5:], lin_space.shape)[0].mean()).astype('int')  # Index of average max
@@ -59,7 +160,7 @@ class HoughCleaner(object):
         return theta_max, hough_slice
 
     def find_peaks(self, data):
-
+        """Find the center of mass of the peaks in the 1D array `data` (e.g. the slice of the Hough space)."""
         def comparator(a, b):
             return np.greater_equal(a, b) & np.greater(a, 0)
 
@@ -86,13 +187,35 @@ class HoughCleaner(object):
         return r * self.linear_hough_max * 2 / self.linear_hough_nbins - self.linear_hough_max
 
     def classify_points(self, xyz, arclens, theta, radii):
+        """Identify which line each point belongs to, and find the distance from each point to the closest line.
+
+        Parameters
+        ----------
+        xyz : array-like
+            The data, with columns 0, 1, and 2 corresponding to x, y, and z.
+        arclens : array-like
+            The arclength (r-phi) values.
+        theta : float
+            The angle of the lines.
+        radii : array-like
+            The radius coordinate of each line.
+
+        Returns
+        -------
+        labels : ndarray
+            An integer label identifying which line each point is near. A value of -1 indicates that the point
+            is not matched to any line.
+        mindists : ndarray
+            The distance from each point to the nearest line.
+
+        """
         labels = np.full(xyz.shape[0], -1, dtype='int64')          # Group labels for each xyz point
         mindists = np.full(xyz.shape[0], np.inf, dtype='float64')  # Distance to closest line for each xyz point
 
         # Find min distances for each identified line
         for i, rad in enumerate(radii):
-            dists = (linefunc(xyz[:, 2], rad, theta) - arclens)**2
-            subset_mask = (dists < mindists) & (dists < self.max_distance_from_line**2)
+            dists = np.sqrt(np.square(linefunc(xyz[:, 2], rad, theta) - arclens))
+            subset_mask = (dists < mindists)
             labels[subset_mask] = i
             mindists[subset_mask] = dists[subset_mask]
 
@@ -101,9 +224,29 @@ class HoughCleaner(object):
             if len(label_set) < self.min_pts_per_line:
                 labels[label_set] = -1
 
-        return (labels, mindists)
+        return labels, mindists
 
     def clean(self, xyz):
+        """Clean the data `xyz`.
+
+        Parameters
+        ----------
+        xyz : array-like
+            The data, with first three columns (x, y, z).
+
+        Returns
+        -------
+        labels : ndarray
+            An integer label identifying which line each point is near. A value of -1 indicates that the point
+            is not matched to any line.
+        mindists : ndarray
+            The distance from each point to the nearest line.
+        nn_counts : ndarray
+            The number of neighbors each point has within distance `self.neighbor_radius`.
+        (cu, cv) : tuple of floats
+            The center of the event.
+
+        """
         # Find center
         cu, cv = self.find_center(xyz)
 
