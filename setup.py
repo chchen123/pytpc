@@ -40,7 +40,7 @@ setup(
     url='https://github.com/attpc/pytpc',
     packages=['pytpc', 'pytpc.fitting', 'pytpc.cleaning'],
     ext_modules=cythonize(exts),
-    scripts=['bin/runfit'],
+    scripts=['bin/runfit', 'bin/pyclean'],
     install_requires=['scipy',
                       'numpy',
                       'h5py',
@@ -51,11 +51,3 @@ setup(
         'plots': ['matplotlib', 'seaborn'],
     },
 )
-
-# setup(name='atmc',
-#       version='2.1.0',
-#       description='Particle tracking and MC optimizer module',
-#       packages=['atmc'],
-#       package_data={'atmc': ['*.pxd']},
-#       ext_modules=cythonize(exts),
-#       )
