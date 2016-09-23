@@ -293,7 +293,7 @@ def nn_remove_noise(data, radius=40, num_neighbors=10):
         return data[~noise]
 
 
-def apply_clean_cut(raw_xyz_full, qthresh=0.5, nthresh=10, tbthresh=505):
+def apply_clean_cut(raw_xyz_full, qthresh=40, nthresh=2, tbthresh=500):
     qcut = raw_xyz_full[:, -1] <= qthresh
     ncut = raw_xyz_full[:, -2] >= nthresh
     tbcut = raw_xyz_full[:, 2] <= tbthresh
