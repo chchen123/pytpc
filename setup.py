@@ -1,53 +1,83 @@
 from setuptools import setup, Extension
 import numpy as np
 from Cython.Build import cythonize
-from sys import platform
+import sys
 import os
 import re
-from copy import deepcopy
-
-extra_args = ['-Wall', '-Wno-unused-function', '-std=c++11', '-g']
-if platform == 'darwin':
-    extra_args.append('-mmacosx-version-min=10.9')
-
-if re.search(r'clang', os.environ['CC']):
-    omp_flag = '-fopenmp=libomp'
-else:
-    omp_flag = '-fopenmp'
-
-include_path = [np.get_include()]
-
-base_kwargs = dict(include_dirs=[np.get_include()],
-                   language='c++',
-                   extra_compile_args=extra_args,
-                   extra_link_args=extra_args)
-
-fitter_kwargs = deepcopy(base_kwargs)
-fitter_kwargs['libraries'] = ['mcopt']
-
-cleaner_compile_args = ['-Wall', '-Wno-unused-function', '-std=c11', '-O3', omp_flag]
-cleaner_kwargs = dict(include_dirs=[np.get_include()],
-                      language='c',
-                      extra_compile_args=cleaner_compile_args,
-                      extra_link_args=cleaner_compile_args,
-                      )
 
 
-exts = [Extension('pytpc.fitting.mcopt_wrapper', ['pytpc/fitting/mcopt_wrapper.pyx'], **fitter_kwargs),
-        Extension('pytpc.fitting.armadillo', ['pytpc/fitting/armadillo.pyx'], **fitter_kwargs),
-        Extension('pytpc.cleaning.hough_wrapper', ['pytpc/cleaning/hough_wrapper.pyx', 'pytpc/cleaning/hough.c'],
-                  **cleaner_kwargs)]
+def get_omp_flag():
+    if re.search(r'clang', os.environ['CC']):
+        return '-fopenmp=libomp'
+    else:
+        return '-fopenmp'
+
+
+def make_extension(module, sources, language, libraries=[], extra_args=[], openmp=False):
+    flags = ['-Wall', '-Wno-unused-function', '-g', '-O3']
+
+    if language == 'c++':
+        flags.append('-std=c++11')
+    elif language == 'c':
+        flags.append('-std=c11')
+
+    if openmp:
+        flags.append(get_omp_flag())
+
+    if sys.platform == 'darwin':
+        flags.append('-mmacosx-version-min=10.9')
+
+    flags += extra_args
+
+    include_dirs = [np.get_include()]
+
+    return Extension(module, sources,
+                     include_dirs=include_dirs,
+                     language=language,
+                     libraries=libraries,
+                     extra_compile_args=flags,
+                     extra_link_args=flags)
+
+
+fitter_ext = make_extension(
+    module='pytpc.fitting.mcopt_wrapper',
+    sources=['pytpc/fitting/mcopt_wrapper.pyx'],
+    language='c++',
+    libraries=['mcopt'],
+)
+
+armadillo_ext = make_extension(
+    module='pytpc.fitting.armadillo',
+    sources=['pytpc/fitting/armadillo.pyx'],
+    language='c++',
+    libraries=['armadillo'],
+)
+
+cleaner_ext = make_extension(
+    module='pytpc.cleaning.hough_wrapper',
+    sources=['pytpc/cleaning/hough_wrapper.pyx', 'pytpc/cleaning/hough.c'],
+    language='c',
+    openmp=True,
+)
+
+multiplicity_ext = make_extension(
+    module='pytpc.trigger.multiplicity',
+    sources=['pytpc/trigger/multiplicity.pyx'],
+    language='c',
+)
+
+all_extensions = [fitter_ext, armadillo_ext, cleaner_ext, multiplicity_ext]
 
 setup(
     name='pytpc',
-    version='1.0.0',
+    version='1.1.0',
     description='Tools for analyzing AT-TPC events in Python',
     author='Joshua Bradt',
     author_email='bradt@nscl.msu.edu',
     url='https://github.com/attpc/pytpc',
-    packages=['pytpc', 'pytpc.fitting', 'pytpc.cleaning'],
-    ext_modules=cythonize(exts),
-    scripts=['bin/runfit', 'bin/pyclean'],
+    packages=['pytpc', 'pytpc.fitting', 'pytpc.cleaning', 'pytpc.trigger'],
+    ext_modules=cythonize(all_extensions),
+    scripts=['bin/runfit', 'bin/pyclean', 'bin/effsim'],
     install_requires=['scipy',
                       'numpy',
                       'h5py',
