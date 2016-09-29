@@ -1,6 +1,5 @@
 #!/usr/local/env python3
 import numpy as np
-import pandas as pd
 import pytpc
 from pytpc.gases import InterpolatedGas
 from pytpc.evtdata import Event
@@ -17,10 +16,11 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, Float, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, Float, Boolean
 import logging
 import logging.config
 from contextlib import contextmanager
+import random
 
 
 logger = logging.getLogger(__name__)
@@ -99,47 +99,32 @@ def three_point_center(p1, p2, p3):
     return xc, yc
 
 
-def make_params(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg, gas, num_evts):
-    params = pd.DataFrame(0, columns=('x0', 'y0', 'z0', 'enu0', 'azi0', 'pol0'), index=range(num_evts))
-    params.x0 = np.random.normal(0, 0.010, size=num_evts)
-    params.y0 = np.random.normal(0, 0.010, size=num_evts)
-    params.z0 = np.random.uniform(0, 1, size=num_evts)
-    params.azi0 = np.random.uniform(0, 2*pi, size=num_evts)
-    params.pol0 = np.random.uniform(pi/2, pi - 10*degrees, size=num_evts)
+def param_generator(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg, gas, num_evts):
+    num_good = 0
+    while num_good < num_evts:
+        x0 = random.gauss(0, 0.010)
+        y0 = random.gauss(0, 0.010)
+        z0 = random.uniform(0, 1)
+        azi0 = random.uniform(0, 2 * pi)
+        pol0 = random.uniform(pi / 2, pi - 10 * degrees)
 
-    vert_ens = find_vertex_energy(params.z0, beam_enu0, beam_mass, beam_chg, gas)  # the total kinetic energies
-    vert_ens[np.where(vert_ens > beam_enu0 * beam_mass)] = 0.0
-    params.enu0 = find_proton_params(pi - params.pol0, beam_mass*p_mc2, proj_mass*p_mc2,
-                                     proj_mass*p_mc2, beam_mass*p_mc2, vert_ens)[1] - proj_mass*p_mc2
+        vert_en = find_vertex_energy(z0, beam_enu0, beam_mass, beam_chg, gas)  # the total kinetic energy
+        if vert_en > beam_enu0 * beam_mass:
+            vert_en = 0.0
 
-    while np.any(params.enu0 < 1.0):
-        params = params[params.enu0 >= 1.0].copy()
-        num_good = len(params)
-        params.index = range(num_good)
-        replacements = make_params(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg, gas, num_evts - num_good)
-        replacements.index = range(num_good, num_evts)
-        params = pd.concat((params, replacements), axis=0)
+        _, proj_total_en = find_proton_params(
+            th3=pi - pol0,
+            m1=beam_mass * p_mc2,
+            m2=proj_mass * p_mc2,
+            m3=proj_mass * p_mc2,
+            m4=beam_mass * p_mc2,
+            T=vert_en
+        )
+        enu0 = proj_total_en - proj_mass * p_mc2
 
-    return params
-
-
-def make_params_uniform(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg, gas, num_evts):
-    params = pd.DataFrame(0, columns=('evt_id', 'x0', 'y0', 'z0', 'enu0', 'azi0', 'pol0'), index=range(num_evts**2))
-    stop_dist = gas.range(beam_enu0*beam_mass, beam_mass, beam_chg)
-    zs = np.linspace(max(1.0 - stop_dist, 0.0), 1, num_evts)
-    pols = np.linspace(pi/2 + 5*degrees, pi - 10*degrees, num_evts)
-    params.z0 = np.repeat(zs, num_evts)
-    params.pol0 = np.tile(pols, num_evts)
-
-    params.evt_id = np.arange(num_evts**2)
-    params.azi0 = 180.*degrees
-
-    vert_ens = find_vertex_energy(params.z0, beam_enu0, beam_mass, beam_chg, gas)  # the total kinetic energies
-    vert_ens[np.where(vert_ens > beam_enu0 * beam_mass)] = 0.0
-    params.enu0 = find_proton_params(pi - params.pol0, beam_mass*p_mc2, proj_mass*p_mc2,
-                                     proj_mass*p_mc2, beam_mass*p_mc2, vert_ens)[1] - proj_mass*p_mc2
-
-    return params
+        if enu0 >= 1.0:
+            yield np.array([x0, y0, z0, enu0, azi0, pol0])
+            num_good += 1
 
 
 class EventSimulator(TrackerMixin, EventGeneratorMixin):
@@ -220,7 +205,6 @@ class EfficiencySimulator(object):
 def parse_arguments():
     parser = argparse.ArgumentParser(description='A program to check the efficiency of the linear and MC fits')
     parser.add_argument('--num_pts', '-n', help='Number of points to simulate. If uniform dist, num per dimension', type=int)
-    parser.add_argument('--uniform', '-u', help='Use uniform distribution', action='store_true', default=False)
     parser.add_argument('--algorithm', '-a', help='Algorithm to use', type=str, choices=['mc', 'simplex', 'compass'], default='mc')
     parser.add_argument('--drop_pads', '-d', help='Path to list of pads to drop. Plain text with newline separators')
     parser.add_argument('--evtgen-config-patch', '-e', help='A special patch for the evtgen config')
@@ -283,13 +267,6 @@ def main():
     else:
         badpads = None
 
-    if args.uniform:
-        params = make_params_uniform(config['beam_enu0'], config['beam_mass'], config['beam_charge'],
-                                     config['mass_num'], config['charge_num'], gas, num_pts)
-    else:
-        params = make_params(config['beam_enu0'], config['beam_mass'], config['beam_charge'],
-                             config['mass_num'], config['charge_num'], gas, num_pts)
-
     effsim = EfficiencySimulator(config)
 
     logger.info('Using fitter %s', args.algorithm)
@@ -298,26 +275,34 @@ def main():
     SQLBase.metadata.create_all(bind=sql_engine)
     Session.configure(bind=sql_engine)
 
-    for evt_id, param_set in params.iterrows():
-        evt_id = int(evt_id)
+    params = param_generator(
+        beam_enu0=config['beam_enu0'],
+        beam_mass=config['beam_mass'],
+        beam_chg=config['beam_charge'],
+        proj_mass=config['mass_num'],
+        proj_chg=config['charge_num'],
+        gas=gas,
+        num_evts=num_pts
+    )
 
+    for evt_id, param_vector in enumerate(params):
         try:
             with managed_session() as session:
                 if evt_id % 100 == 0:
-                    logger.info('Progress: at event %d / %d', evt_id, len(params))
+                    logger.info('Progress: at event %d / %d', evt_id, num_pts)
 
-                param_row = ParameterSet(
+                param_set = ParameterSet(
                     evt_id=evt_id,
-                    x0=param_set.x0,
-                    y0=param_set.y0,
-                    z0=param_set.z0,
-                    enu0=param_set.enu0,
-                    azi0=param_set.azi0,
-                    pol0=param_set.pol0,
+                    x0=param_vector[0],
+                    y0=param_vector[1],
+                    z0=param_vector[2],
+                    enu0=param_vector[3],
+                    azi0=param_vector[4],
+                    pol0=param_vector[5],
                 )
-                session.add(param_row)
+                session.add(param_set)
 
-                dict_evt, evt, true_ctr = effsim.make_event(evt_id, param_set)
+                dict_evt, evt, true_ctr = effsim.make_event(evt_id, param_vector)
 
                 trig_res = effsim.run_trigger(evt_id, dict_evt)
                 session.add(trig_res)
