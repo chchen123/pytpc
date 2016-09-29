@@ -13,14 +13,9 @@ This code:
 This distance can be used to make cuts on how agressively you want to clean the data.
 """
 
-import numpy as np
 import argparse
 import pytpc
-from pytpc.cleaning import HoughCleaner
-from pytpc.fitting.mixins import PreprocessMixin
-from pytpc.padplane import generate_pad_plane
-from pytpc.utilities import tilt_matrix, rot_matrix
-from pytpc.constants import degrees
+from pytpc.cleaning import EventCleaner
 import sys
 import h5py
 import yaml
@@ -47,35 +42,6 @@ def event_iterator(input_evtid_set, output_evtid_set):
         yield i
     else:
         raise StopIteration()
-
-
-class EventCleaner(HoughCleaner, PreprocessMixin):
-    def __init__(self, config):
-        super().__init__(config)
-        self.tilt = config['tilt'] * degrees
-        self.vd = np.array(config['vd'])
-        self.clock = config['clock']
-        self.pad_rot_angle = config['pad_rot_angle'] * degrees
-        self.padrotmat = rot_matrix(self.pad_rot_angle)
-        self.beampads = []
-        self.untilt_mat = tilt_matrix(self.tilt)
-        self.pads = generate_pad_plane(self.pad_rot_angle)
-
-    def process_event(self, evt):
-        raw_xyz = evt.xyzs(pads=self.pads, peaks_only=True, return_pads=True, cg_times=True, baseline_correction=True)
-        xyz = self.preprocess(raw_xyz, rotate_pads=False)
-
-        cleaning_data = xyz[['u', 'v', 'w']].values
-
-        labels, mindists, nn_counts, (cu, cv) = self.clean(cleaning_data)
-
-        clean_xyz = np.column_stack((raw_xyz, nn_counts, mindists))
-
-        center = np.array([cu, cv, 0])
-        center[1] -= np.tan(self.tilt) * 1000.
-        cx, cy, _ = self.untilt_mat @ center
-
-        return clean_xyz, (cx, cy)
 
 
 def setup_logging(config):

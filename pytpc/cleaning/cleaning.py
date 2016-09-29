@@ -2,8 +2,10 @@ import numpy as np
 import pandas as pd
 from scipy.signal import argrelextrema
 from .hough_wrapper import hough_line, hough_circle, nearest_neighbor_count
-from ..utilities import Base
-from ..constants import pi
+from ..fitting.mixins import PreprocessMixin
+from ..utilities import Base, rot_matrix, tilt_matrix
+from ..padplane import generate_pad_plane
+from ..constants import pi, degrees
 
 
 def linefunc(x, r, t):
@@ -275,6 +277,35 @@ class HoughCleaner(Base):
         nn_counts = self.neighbor_count(xyz)
 
         return labels, mindists, nn_counts, (cu, cv)
+
+
+class EventCleaner(HoughCleaner, PreprocessMixin):
+    def __init__(self, config):
+        super().__init__(config)
+        self.tilt = config['tilt'] * degrees
+        self.vd = np.array(config['vd'])
+        self.clock = config['clock']
+        self.pad_rot_angle = config['pad_rot_angle'] * degrees
+        self.padrotmat = rot_matrix(self.pad_rot_angle)
+        self.beampads = []
+        self.untilt_mat = tilt_matrix(self.tilt)
+        self.pads = generate_pad_plane(self.pad_rot_angle)
+
+    def process_event(self, evt):
+        raw_xyz = evt.xyzs(pads=self.pads, peaks_only=True, return_pads=True, cg_times=True, baseline_correction=True)
+        xyz = self.preprocess(raw_xyz, rotate_pads=False)
+
+        cleaning_data = xyz[['u', 'v', 'w']].values
+
+        labels, mindists, nn_counts, (cu, cv) = self.clean(cleaning_data)
+
+        clean_xyz = np.column_stack((raw_xyz, nn_counts, mindists))
+
+        center = np.array([cu, cv, 0])
+        center[1] -= np.tan(self.tilt) * 1000.
+        cx, cy, _ = self.untilt_mat @ center
+
+        return clean_xyz, (cx, cy)
 
 
 def nn_remove_noise(data, radius=40, num_neighbors=10):

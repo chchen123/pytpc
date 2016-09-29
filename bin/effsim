@@ -3,18 +3,90 @@ import numpy as np
 import pandas as pd
 import pytpc
 from pytpc.gases import InterpolatedGas
+from pytpc.evtdata import Event
 from pytpc.constants import pi, degrees, p_mc2
-from pytpc.utilities import find_vertex_energy, Base
+from pytpc.utilities import find_vertex_energy, read_lookup_table
 from pytpc.fitting import MCFitter
 from pytpc.fitting.mixins import TrackerMixin, EventGeneratorMixin
-from pytpc.simulation import find_proton_params
+from pytpc.relativity import find_proton_params
+from pytpc.cleaning import EventCleaner, apply_clean_cut
+from pytpc.trigger import TriggerSimulator
 import yaml
 import argparse
-import h5py
 import os
-
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, Integer, Float, ForeignKey, Boolean
 import logging
+import logging.config
+from contextlib import contextmanager
+
+
 logger = logging.getLogger(__name__)
+
+SQLBase = declarative_base()
+Session = sessionmaker()
+
+
+@contextmanager
+def managed_session():
+    session = Session()
+    try:
+        yield session
+        session.commit()
+    except:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+class ParameterSet(SQLBase):
+    __tablename__ = 'params'
+    evt_id = Column(Integer, primary_key=True)
+    x0 = Column(Float)
+    y0 = Column(Float)
+    z0 = Column(Float)
+    enu0 = Column(Float)
+    azi0 = Column(Float)
+    pol0 = Column(Float)
+
+
+class TriggerResult(SQLBase):
+    __tablename__ = 'trigger'
+    evt_id = Column(Integer, primary_key=True)
+    did_trigger = Column(Boolean)
+    num_pads_hit = Column(Integer)
+
+
+class CleaningResult(SQLBase):
+    __tablename__ = 'clean'
+    evt_id = Column(Integer, primary_key=True)
+    num_pts_before = Column(Integer)
+    num_pts_after = Column(Integer)
+
+
+class MinimizerResult(SQLBase):
+    __tablename__ = 'minres'
+    evt_id = Column(Integer, primary_key=True)
+    x0 = Column(Float)
+    y0 = Column(Float)
+    z0 = Column(Float)
+    enu0 = Column(Float)
+    azi0 = Column(Float)
+    pol0 = Column(Float)
+    posChi2 = Column(Float)
+    enChi2 = Column(Float)
+    vertChi2 = Column(Float)
+    lin_scat_ang = Column(Float)
+    lin_beam_int = Column(Float)
+    lin_chi2 = Column(Float)
+    rad_curv = Column(Float)
+    brho = Column(Float)
+    curv_en = Column(Float)
+    curv_ctr_x = Column(Float)
+    curv_ctr_y = Column(Float)
 
 
 def three_point_center(p1, p2, p3):
@@ -28,13 +100,12 @@ def three_point_center(p1, p2, p3):
 
 
 def make_params(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg, gas, num_evts):
-    params = pd.DataFrame(0, columns=('evt_id', 'x0', 'y0', 'z0', 'enu0', 'azi0', 'pol0'), index=range(num_evts))
+    params = pd.DataFrame(0, columns=('x0', 'y0', 'z0', 'enu0', 'azi0', 'pol0'), index=range(num_evts))
     params.x0 = np.random.normal(0, 0.010, size=num_evts)
     params.y0 = np.random.normal(0, 0.010, size=num_evts)
     params.z0 = np.random.uniform(0, 1, size=num_evts)
     params.azi0 = np.random.uniform(0, 2*pi, size=num_evts)
     params.pol0 = np.random.uniform(pi/2, pi - 10*degrees, size=num_evts)
-    params.evt_id = np.arange(num_evts)
 
     vert_ens = find_vertex_energy(params.z0, beam_enu0, beam_mass, beam_chg, gas)  # the total kinetic energies
     vert_ens[np.where(vert_ens > beam_enu0 * beam_mass)] = 0.0
@@ -45,10 +116,8 @@ def make_params(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg, gas, num_ev
         params = params[params.enu0 >= 1.0].copy()
         num_good = len(params)
         params.index = range(num_good)
-        params.evt_id = range(num_good)
         replacements = make_params(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg, gas, num_evts - num_good)
         replacements.index = range(num_good, num_evts)
-        replacements.evt_id = range(num_good, num_evts)
         params = pd.concat((params, replacements), axis=0)
 
     return params
@@ -73,42 +142,13 @@ def make_params_uniform(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg, gas
     return params
 
 
-class EventGenerator(object):
-    def __init__(self, config, badpads=None):
-        self.tilt = config['tilt'] * degrees
+class EventSimulator(TrackerMixin, EventGeneratorMixin):
+    def __init__(self, config, badpads=[]):
+        super().__init__(config)
         self.untiltmat = pytpc.utilities.tilt_matrix(self.tilt)
-        self.efield = np.array(config['efield'])
-        self.bfield = np.array(config['bfield'])
-        self.vd = np.array(config['vd'])  # must remain in detector frame since it is used after un-tilting
-        self.clock = config['clock']
-        self.gas = InterpolatedGas(config['gas_name'], config['gas_pressure'])
-        self.mass_num = config['mass_num']
-        self.charge_num = config['charge_num']
-        self.beam_enu0 = config['beam_enu0']
-        self.beam_mass = config['beam_mass']
-        self.beam_charge = config['beam_charge']
-        self.pad_rot_angle = config['pad_rot_angle'] * degrees
-        self.ioniz = config['ioniz']
-        self.gain = config['micromegas_gain']
-        self.shape = float(config['shape'])
-        self.badpads = badpads
-        self.diff_sigma = config['evtgen_diffusion_sigma']
-
-        self.tracker = atmc.Tracker(mass_num=self.mass_num,
-                                    charge_num=self.charge_num,
-                                    beam_enu0=self.beam_enu0,
-                                    beam_mass=self.beam_mass,
-                                    beam_charge=self.beam_charge,
-                                    gas=self.gas,
-                                    efield=self.efield,
-                                    bfield=self.bfield,
-                                    max_en=1000)
-
-        with h5py.File(config['lut_path'], 'r') as hf:
-            lut = hf['LUT'][:]
-        self.padplane = atmc.PadPlane(lut, -0.280, 0.0001, -0.280, 0.0001, self.pad_rot_angle)
-        self.evtgen = atmc.EventGenerator(self.padplane, self.vd, self.clock, self.shape, self.mass_num,
-                                          self.ioniz, self.gain, self.tilt, self.diff_sigma)
+        self.badpads = set(badpads)
+        self.padmap = read_lookup_table(config['padmap_path'])  # maps (cobo, asad, aget, ch) -> pad
+        self.reverse_padmap = {v: k for k, v in self.padmap.items()}  # maps pad -> (cobo, asad, aget, ch)
 
     def make_event(self, x0, y0, z0, enu0, azi0, pol0):
         tr = self.tracker.track_particle(x0, y0, z0, enu0, azi0, pol0)
@@ -122,21 +162,62 @@ class EventGenerator(object):
         center[1] -= np.tan(self.tilt) * 1000
         center = pytpc.evtdata.uncalibrate(center.reshape((-1, 3)), self.vd, self.clock).ravel()
 
-        peaks = self.evtgen.make_peaks(pos, en)
+        evt = self.evtgen.make_event(pos, en)
 
-        hit_pattern = self.evtgen.make_hit_pattern(pos, en)
+        hitpads = set(evt.keys())
+        for p in self.badpads.intersection(hitpads):
+            del evt[p]
 
-        return peaks, center[:2], hit_pattern
+        return evt, center[:2]
 
-    def drop_excluded_pads(self, xyz=None, hit_pattern=None):
-        # Assume that the last column of xyz represents the pad number
-        xyz = xyz[np.where(~np.in1d(xyz[:, -1], self.badpads))]
-        hit_pattern[self.badpads] = 0
+    def convert_event(self, dict_evt, evt_id=0, timestamp=0):
+        py_evt = Event(evt_id, timestamp)
+        py_evt.traces = np.zeros(len(dict_evt), dtype=py_evt.dt)
 
-        return xyz, hit_pattern
+        for i, (pad, data) in enumerate(dict_evt.items()):
+            tr_item = py_evt.traces[i]
+            tr_item['cobo'], tr_item['asad'], tr_item['aget'], tr_item['channel'] = self.reverse_padmap[pad]
+            tr_item['pad'] = pad
+            tr_item['data'] = data
+
+        return py_evt
 
 
-def main():
+class EfficiencySimulator(object):
+    def __init__(self, config):
+        self.evtsim = EventSimulator(config)
+        self.trigger = TriggerSimulator(config)
+        self.cleaner = EventCleaner(config)
+        self.fitter = MCFitter(config)
+
+    def make_event(self, evt_id, params):
+        dict_evt, true_ctr = self.evtsim.make_event(*params)
+        evt = self.evtsim.convert_event(dict_evt)
+
+        return dict_evt, evt, true_ctr
+
+    def run_trigger(self, evt_id, dict_evt):
+        didtrig, num_hits = self.trigger.process_event(dict_evt)
+        return TriggerResult(evt_id=evt_id, did_trigger=didtrig, num_pads_hit=num_hits)
+
+    def run_cleaner(self, evt_id, evt):
+        clean_xyz_full, ctr = self.cleaner.process_event(evt)
+
+        clean_xyz = apply_clean_cut(clean_xyz_full)
+        num_pts_before = len(clean_xyz_full)
+        num_pts_after = len(clean_xyz)
+
+        clean_res = CleaningResult(evt_id=evt_id, num_pts_before=num_pts_before, num_pts_after=num_pts_after)
+
+        return clean_res, clean_xyz, ctr
+
+    def run_fit(self, evt_id, clean_xyz, ctr):
+        mcres = self.fitter.process_event(clean_xyz, ctr[0], ctr[1], preprocess_kwargs={'rotate_pads': False})
+        mcres['evt_id'] = int(evt_id)
+        return MinimizerResult(**mcres)
+
+
+def parse_arguments():
     parser = argparse.ArgumentParser(description='A program to check the efficiency of the linear and MC fits')
     parser.add_argument('--num_pts', '-n', help='Number of points to simulate. If uniform dist, num per dimension', type=int)
     parser.add_argument('--uniform', '-u', help='Use uniform distribution', action='store_true', default=False)
@@ -146,18 +227,31 @@ def main():
     parser.add_argument('--config-patch', '-p', help='One or more YAML files to patch the config with', action='append')
     parser.add_argument('config', help='Path to config file')
     parser.add_argument('output', help='Path to output database')
-    args = parser.parse_args()
+    return parser.parse_args()
 
-    with open(args.config, 'r') as f:
+
+def setup_logging(config):
+    try:
+        log_conf = config['logging_config']
+        logging.config.dictConfig(log_conf)
+    except KeyError:
+        logger.warning('No logging config found. Info messages may be suppressed.')
+
+
+def load_config_file(path, patches=None, evtgen_patch=None):
+    with open(path, 'r') as f:
         config = yaml.load(f)
-    logger.info('Read config file %s', os.path.basename(args.config))
+
+    setup_logging(config)
+
+    logger.info('Read config file %s', os.path.basename(path))
 
     if config['micromegas_tb'] != 0:
         logger.warning('Micromegas TB was nonzero in config. Setting value to zero.')
         config['micromegas_tb'] = 0
 
-    if args.config_patch is not None:
-        for patch_path in args.config_patch:
+    if patches is not None:
+        for patch_path in patches:
             with open(patch_path, 'r') as f:
                 patch = yaml.load(f)
             config.update(patch)
@@ -165,11 +259,19 @@ def main():
 
     evtgen_config = config.copy()
 
-    if args.evtgen_config_patch is not None:
-        with open(args.evtgen_config_patch, 'r') as f:
+    if evtgen_patch is not None:
+        with open(evtgen_patch, 'r') as f:
             evtgen_config_patch = yaml.load(f)
         evtgen_config.update(evtgen_config_patch)
-        logger.info('Patched config for event generator using %s', os.path.basename(args.evtgen_config_patch))
+        logger.info('Patched config for event generator using %s', os.path.basename(evtgen_patch))
+
+    return config, evtgen_config
+
+
+def main():
+    args = parse_arguments()
+
+    config, evtgen_config = load_config_file(args.config, args.config_patch, args.evtgen_config_patch)
 
     gas = InterpolatedGas(config['gas_name'], config['gas_pressure'])
 
@@ -188,64 +290,45 @@ def main():
         params = make_params(config['beam_enu0'], config['beam_mass'], config['beam_charge'],
                              config['mass_num'], config['charge_num'], gas, num_pts)
 
-    evtgen = EventGenerator(evtgen_config, badpads=badpads)
-
-    algo_dict = {'mc': mcmin.MCFitter,
-                 'simplex': simplex.SimplexFitter,
-                 'compass': compass.CompassFitter}
-
-    fitter_class = algo_dict[args.algorithm]
-    fitter = fitter_class(config)
+    effsim = EfficiencySimulator(config)
 
     logger.info('Using fitter %s', args.algorithm)
+    sql_engine = create_engine('sqlite:///{}'.format(args.output))
 
-    writer = Writer(args.output)
-    params_table_name = 'params'
-    params_table_cols = [['evt_id', 'INTEGER UNIQUE'],
-                         ['x0', 'REAL'],
-                         ['y0', 'REAL'],
-                         ['z0', 'REAL'],
-                         ['enu0', 'REAL'],
-                         ['azi0', 'REAL'],
-                         ['pol0', 'REAL']]
-    writer.create_table(params_table_name, params_table_cols)
+    SQLBase.metadata.create_all(bind=sql_engine)
+    Session.configure(bind=sql_engine)
 
-    mcmin_table_name = 'fit_res'
-    mcmin_table_cols = [['evt_id', 'INTEGER PRIMARY KEY']] + fitter_class.output_columns
-    mcmin_table_cols.append(['num_pts', 'INTEGER'])
-
-    writer.create_table(mcmin_table_name, mcmin_table_cols)
-
-    for i, p in params.iterrows():
-        writer.write(params_table_name, p)
-        if i % 100 == 0:
-            logger.info('Progress: at event %d / %d', i, len(params))
-
-        if p.enu0 < 1.0:
-            continue
+    for evt_id, param_set in params.iterrows():
+        evt_id = int(evt_id)
 
         try:
-            raw_xyz, (cx, cy), exp_hits = evtgen.make_event(p.x0, p.y0, p.z0, p.enu0, p.azi0, p.pol0)
-            if badpads is not None:
-                raw_xyz, exp_hits = evtgen.drop_excluded_pads(raw_xyz, exp_hits)
-        except Exception:
-            logger.exception('Evt %d: Track simulation failed', i)
-            continue
+            with managed_session() as session:
+                if evt_id % 100 == 0:
+                    logger.info('Progress: at event %d / %d', evt_id, len(params))
 
-        if len(raw_xyz) == 0:
-            logger.warn('Evt %d: Result was zero-length', i)
-            continue
+                param_row = ParameterSet(
+                    evt_id=evt_id,
+                    x0=param_set.x0,
+                    y0=param_set.y0,
+                    z0=param_set.z0,
+                    enu0=param_set.enu0,
+                    azi0=param_set.azi0,
+                    pol0=param_set.pol0,
+                )
+                session.add(param_row)
 
-        try:
-            res = fitter.process_event(raw_xyz, cx, cy, remove_noise=False)
-            res['evt_id'] = int(i)
-            res['num_pts'] = int(raw_xyz.shape[0])
-        except mcmin.BadEventError as e:
-            logger.warning('Event %d: Bad event (%s)', i, e)
+                dict_evt, evt, true_ctr = effsim.make_event(evt_id, param_set)
+
+                trig_res = effsim.run_trigger(evt_id, dict_evt)
+                session.add(trig_res)
+
+                clean_res, clean_xyz, ctr = effsim.run_cleaner(evt_id, evt)
+                session.add(clean_res)
+
+                fit_res = effsim.run_fit(evt_id, clean_xyz, ctr)
+                session.add(fit_res)
         except Exception:
-            logger.exception('Evt %d: Fit failure', i)
-        else:
-            writer.write(mcmin_table_name, res)
+            logger.exception('Failure')
 
 
 if __name__ == '__main__':

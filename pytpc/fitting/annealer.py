@@ -5,7 +5,6 @@ from ..constants import degrees
 from .mixins import TrackerMixin, EventGeneratorMixin, PreprocessMixin, LinearPrefitMixin
 from .mcopt_wrapper import Annealer as McoptAnnealer
 from . import BadEventError
-from ..cleaning import nn_remove_noise
 
 import logging
 logger = logging.getLogger(__name__)
@@ -54,10 +53,6 @@ class Annealer(PreprocessMixin, LinearPrefitMixin, TrackerMixin, EventGeneratorM
     def process_event(self, raw_xyz, cx, cy, exp_hits=None, remove_noise=True, return_details=False,
                       multi=False, preprocess_kwargs={}):
         xyz, (cu, cv) = self.preprocess(raw_xyz, center=[cx, cy], **preprocess_kwargs)
-
-        # Remove noise. This part will eventually be taken out once we have cleaned data.
-        if remove_noise:
-            xyz = nn_remove_noise(xyz)
 
         if len(xyz) < 50:
             raise BadEventError("Not enough points")
