@@ -5,7 +5,7 @@ from pytpc.gases import InterpolatedGas
 from pytpc.evtdata import Event
 from pytpc.constants import pi, degrees, p_mc2
 from pytpc.utilities import find_vertex_energy, read_lookup_table
-from pytpc.fitting import MCFitter
+from pytpc.fitting import MCFitter, BadEventError
 from pytpc.fitting.mixins import TrackerMixin, EventGeneratorMixin
 from pytpc.relativity import find_proton_params
 from pytpc.cleaning import EventCleaner, apply_clean_cut
@@ -29,12 +29,19 @@ SQLBase = declarative_base()
 Session = sessionmaker()
 
 
+class EventCannotContinue(Exception):
+    pass
+
+
 @contextmanager
 def managed_session():
     session = Session()
     try:
         yield session
         session.commit()
+    except EventCannotContinue:
+        session.commit()
+        raise
     except:
         session.rollback()
         raise
@@ -201,11 +208,51 @@ class EfficiencySimulator(object):
         mcres['evt_id'] = int(evt_id)
         return MinimizerResult(**mcres)
 
+    def process_event(self, evt_id, param_vector):
+        with managed_session() as session:
+            param_set = ParameterSet(
+                evt_id=evt_id,
+                x0=param_vector[0],
+                y0=param_vector[1],
+                z0=param_vector[2],
+                enu0=param_vector[3],
+                azi0=param_vector[4],
+                pol0=param_vector[5],
+            )
+            session.add(param_set)
+
+            try:
+                dict_evt, evt, true_ctr = self.make_event(evt_id, param_vector)
+            except Exception as err:
+                raise EventCannotContinue('Simulation failed for event {:d}'.format(evt_id)) from err
+
+            try:
+                trig_res = self.run_trigger(evt_id, dict_evt)
+            except Exception:
+                logger.exception('Trigger failed for event %d', evt_id)
+            else:
+                session.add(trig_res)
+
+            try:
+                clean_res, clean_xyz, ctr = self.run_cleaner(evt_id, evt)
+            except Exception as err:
+                raise EventCannotContinue('Cleaning failed for event {:d}'.format(evt_id)) from err
+            else:
+                session.add(clean_res)
+
+            try:
+                fit_res = self.run_fit(evt_id, clean_xyz, ctr)
+            except BadEventError as err:
+                logger.warning('Fit failed for event %d: %s', evt_id, str(err))
+            except Exception as err:
+                raise EventCannotContinue('Fit failed for event {:d}'.format(evt_id)) from err
+            else:
+                session.add(fit_res)
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='A program to check the efficiency of the linear and MC fits')
     parser.add_argument('--num_pts', '-n', help='Number of points to simulate. If uniform dist, num per dimension', type=int)
-    parser.add_argument('--algorithm', '-a', help='Algorithm to use', type=str, choices=['mc', 'simplex', 'compass'], default='mc')
     parser.add_argument('--drop_pads', '-d', help='Path to list of pads to drop. Plain text with newline separators')
     parser.add_argument('--evtgen-config-patch', '-e', help='A special patch for the evtgen config')
     parser.add_argument('--config-patch', '-p', help='One or more YAML files to patch the config with', action='append')
@@ -269,7 +316,6 @@ def main():
 
     effsim = EfficiencySimulator(config)
 
-    logger.info('Using fitter %s', args.algorithm)
     sql_engine = create_engine('sqlite:///{}'.format(args.output))
 
     SQLBase.metadata.create_all(bind=sql_engine)
@@ -286,34 +332,13 @@ def main():
     )
 
     for evt_id, param_vector in enumerate(params):
+        if evt_id % 100 == 0:
+            logger.info('Progress: at event %d / %d', evt_id, num_pts)
+
         try:
-            with managed_session() as session:
-                if evt_id % 100 == 0:
-                    logger.info('Progress: at event %d / %d', evt_id, num_pts)
-
-                param_set = ParameterSet(
-                    evt_id=evt_id,
-                    x0=param_vector[0],
-                    y0=param_vector[1],
-                    z0=param_vector[2],
-                    enu0=param_vector[3],
-                    azi0=param_vector[4],
-                    pol0=param_vector[5],
-                )
-                session.add(param_set)
-
-                dict_evt, evt, true_ctr = effsim.make_event(evt_id, param_vector)
-
-                trig_res = effsim.run_trigger(evt_id, dict_evt)
-                session.add(trig_res)
-
-                clean_res, clean_xyz, ctr = effsim.run_cleaner(evt_id, evt)
-                session.add(clean_res)
-
-                fit_res = effsim.run_fit(evt_id, clean_xyz, ctr)
-                session.add(fit_res)
+            effsim.process_event(evt_id, param_vector)
         except Exception:
-            logger.exception('Failure')
+            logger.exception('Event %d failed', evt_id)
 
 
 if __name__ == '__main__':
