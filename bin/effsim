@@ -96,6 +96,13 @@ class MinimizerResult(SQLBase):
     curv_ctr_y = Column(Float)
 
 
+def count_finished_events():
+    with managed_session() as session:
+        num_finished = session.query(ParameterSet).count()
+        assert num_finished >= 0, 'Negative number of events finished?'
+        return num_finished
+
+
 def three_point_center(p1, p2, p3):
     mp1 = (p1 + p2) / 2
     mp2 = (p2 + p3) / 2
@@ -324,6 +331,14 @@ def main():
     SQLBase.metadata.create_all(bind=sql_engine)
     Session.configure(bind=sql_engine)
 
+    num_finished = count_finished_events()
+    if num_finished >= num_pts:
+        logger.info('Already finished all requested events.')
+        return
+    elif num_finished > 0:
+        logger.info('Already finished %d events. Resuming from where we left off.', num_finished)
+        num_pts -= num_finished
+
     params = param_generator(
         beam_enu0=config['beam_enu0'],
         beam_mass=config['beam_mass'],
@@ -335,6 +350,8 @@ def main():
     )
 
     for evt_id, param_vector in enumerate(params):
+        evt_id += num_finished
+
         if evt_id % 100 == 0:
             logger.info('Progress: at event %d / %d', evt_id, num_pts)
 
