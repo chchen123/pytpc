@@ -1,6 +1,5 @@
 from .multiplicity import MultiplicityTrigger
-from pytpc.utilities import read_lookup_table, find_exclusion_region
-import os
+from pytpc.utilities import read_lookup_table
 import logging
 
 __all__ = ['TriggerSimulator']
@@ -9,17 +8,11 @@ logger = logging.getLogger(__name__)
 
 
 class TriggerSimulator(object):
-    def __init__(self, config, xcfg_path=None):
+    def __init__(self, config, excluded_pads=[]):
         self.padmap = read_lookup_table(config['padmap_path'])  # maps (cobo, asad, aget, ch) -> pad
         self.reverse_padmap = {v: k for k, v in self.padmap.items()}  # maps pad -> (cobo, asad, aget, ch)
-        if xcfg_path is not None:
-            self.excluded_pads, _ = find_exclusion_region(xcfg_path, self.padmap)
-            logger.info('Excluding pads from regions in file %s', os.path.basename(xcfg_path))
-        else:
-            self.excluded_pads = []
-
-        self.badpads = set(self.excluded_pads)
-        logger.info('%d pads will be excluded', len(self.badpads))
+        self.badpads = set(excluded_pads)
+        logger.info('%d pads will be excluded from trigger', len(self.badpads))
 
         self.trigger = MultiplicityTrigger(config, self.reverse_padmap)
 

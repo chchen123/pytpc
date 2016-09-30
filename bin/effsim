@@ -4,7 +4,7 @@ import pytpc
 from pytpc.gases import InterpolatedGas
 from pytpc.evtdata import Event
 from pytpc.constants import pi, degrees, p_mc2
-from pytpc.utilities import find_vertex_energy, read_lookup_table
+from pytpc.utilities import find_vertex_energy, read_lookup_table, find_exclusion_region
 from pytpc.fitting import MCFitter, BadEventError
 from pytpc.fitting.mixins import TrackerMixin, EventGeneratorMixin
 from pytpc.relativity import find_proton_params
@@ -139,6 +139,7 @@ class EventSimulator(TrackerMixin, EventGeneratorMixin):
         super().__init__(config)
         self.untiltmat = pytpc.utilities.tilt_matrix(self.tilt)
         self.badpads = set(badpads)
+        logger.info('%d pads will be dropped from the generated events', len(badpads))
         self.padmap = read_lookup_table(config['padmap_path'])  # maps (cobo, asad, aget, ch) -> pad
         self.reverse_padmap = {v: k for k, v in self.padmap.items()}  # maps pad -> (cobo, asad, aget, ch)
 
@@ -176,9 +177,9 @@ class EventSimulator(TrackerMixin, EventGeneratorMixin):
 
 
 class EfficiencySimulator(object):
-    def __init__(self, config):
-        self.evtsim = EventSimulator(config)
-        self.trigger = TriggerSimulator(config)
+    def __init__(self, config, excluded_pads=[], lowgain_pads=[]):
+        self.evtsim = EventSimulator(config, badpads=lowgain_pads)
+        self.trigger = TriggerSimulator(config, excluded_pads=excluded_pads)
         self.cleaner = EventCleaner(config)
         self.fitter = MCFitter(config)
 
@@ -253,7 +254,7 @@ class EfficiencySimulator(object):
 def parse_arguments():
     parser = argparse.ArgumentParser(description='A program to check the efficiency of the linear and MC fits')
     parser.add_argument('--num_pts', '-n', help='Number of points to simulate. If uniform dist, num per dimension', type=int)
-    parser.add_argument('--drop_pads', '-d', help='Path to list of pads to drop. Plain text with newline separators')
+    parser.add_argument('--xcfg-path', '-x', help='Path to GET config file, for exlusion region')
     parser.add_argument('--evtgen-config-patch', '-e', help='A special patch for the evtgen config')
     parser.add_argument('--config-patch', '-p', help='One or more YAML files to patch the config with', action='append')
     parser.add_argument('config', help='Path to config file')
@@ -308,13 +309,15 @@ def main():
 
     num_pts = args.num_pts or config['dist_num_pts']
 
-    if args.drop_pads is not None:
-        logger.info('Reading dropped pads list from %s', os.path.basename(args.drop_pads))
-        badpads = np.fromfile(args.drop_pads, sep='\n', dtype='int64')
+    if args.xcfg_path is not None:
+        logger.info('Reading exclusion regions from %s', os.path.basename(args.xcfg_path))
+        lookup = read_lookup_table(config['padmap_path'])
+        excluded_pads, lowgain_pads = find_exclusion_region(args.xcfg_path, lookup)
     else:
-        badpads = None
+        excluded_pads = []
+        lowgain_pads = []
 
-    effsim = EfficiencySimulator(config)
+    effsim = EfficiencySimulator(config, excluded_pads=excluded_pads, lowgain_pads=lowgain_pads)
 
     sql_engine = create_engine('sqlite:///{}'.format(args.output))
 
