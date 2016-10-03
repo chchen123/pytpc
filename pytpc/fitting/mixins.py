@@ -24,6 +24,7 @@ class TrackerMixin(Base):
         self.beam_enu0 = config['beam_enu0']
         self.beam_mass = config['beam_mass']
         self.beam_charge = config['beam_charge']
+        self.max_en = config['tracker_max_en']
 
         self.tracker = Tracker(self.mass_num,
                                self.charge_num,
@@ -33,7 +34,7 @@ class TrackerMixin(Base):
                                self.gas,
                                self.efield,
                                self.bfield,
-                               100)
+                               self.max_en)
 
         super().__init__(config)
 

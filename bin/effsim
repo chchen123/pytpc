@@ -79,7 +79,8 @@ def main():
         excluded_pads = []
         lowgain_pads = []
 
-    effsim = EfficiencySimulator(config, excluded_pads=excluded_pads, lowgain_pads=lowgain_pads)
+    effsim = EfficiencySimulator(config, excluded_pads=excluded_pads, lowgain_pads=lowgain_pads,
+                                 evtgen_config=evtgen_config)
 
     sql_engine = create_engine('sqlite:///{}'.format(args.output))
     initialize_database(sql_engine)

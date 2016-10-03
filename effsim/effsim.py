@@ -98,8 +98,10 @@ class EventSimulator(TrackerMixin, EventGeneratorMixin):
 
 
 class EfficiencySimulator(object):
-    def __init__(self, config, excluded_pads=[], lowgain_pads=[]):
-        self.evtsim = EventSimulator(config, badpads=lowgain_pads)
+    def __init__(self, config, excluded_pads=[], lowgain_pads=[], evtgen_config=None):
+        if evtgen_config is None:
+            evtgen_config = config
+        self.evtsim = EventSimulator(evtgen_config, badpads=lowgain_pads)
         self.trigger = TriggerSimulator(config, excluded_pads=excluded_pads)
         self.cleaner = EventCleaner(config)
         self.fitter = MCFitter(config)
