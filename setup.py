@@ -75,13 +75,26 @@ setup(
     author='Joshua Bradt',
     author_email='bradt@nscl.msu.edu',
     url='https://github.com/attpc/pytpc',
-    packages=['pytpc', 'pytpc.fitting', 'pytpc.cleaning', 'pytpc.trigger'],
+    packages=[
+        'pytpc',
+        'pytpc.fitting',
+        'pytpc.cleaning',
+        'pytpc.trigger',
+        'effsim',
+    ],
     ext_modules=cythonize(all_extensions),
-    scripts=['bin/runfit', 'bin/pyclean', 'bin/effsim'],
-    install_requires=['scipy',
-                      'numpy',
-                      'h5py',
-                      'tables'],
+    scripts=[
+        'bin/runfit',
+        'bin/pyclean',
+        'bin/effsim'
+    ],
+    install_requires=[
+        'scipy',
+        'numpy',
+        'h5py',
+        'tables',
+        'sqlalchemy',
+    ],
     package_data={'pytpc': ['data/gases/*', 'data/raw/*', 'fitting/*.pxd']},
     extras_require={
         'docs': ['sphinx_bootstrap_theme>=0.4.5', 'sphinx>=1.2'],
