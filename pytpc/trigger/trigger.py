@@ -17,11 +17,12 @@ class TriggerSimulator(object):
         self.trigger = MultiplicityTrigger(config, self.reverse_padmap)
 
     def process_event(self, evt):
+        # Remove pads in exclusion region
         non_excluded_pads = set(evt.keys()) - self.badpads
         evt_for_trigger = {k: evt[k] for k in non_excluded_pads}
 
-        trig = self.trigger.find_trigger_signals(evt_for_trigger)
+        trig, hitmask = self.trigger.find_trigger_signals(evt_for_trigger)
         mult = self.trigger.find_multiplicity_signals(trig)
         did_trig = self.trigger.did_trigger(mult)
 
-        return did_trig, len(evt)
+        return did_trig, hitmask

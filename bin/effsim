@@ -192,13 +192,17 @@ class EfficiencySimulator(object):
 
     def make_event(self, evt_id, params):
         dict_evt, true_ctr = self.evtsim.make_event(*params)
-        evt = self.evtsim.convert_event(dict_evt)
 
-        return dict_evt, evt, true_ctr
+        return dict_evt, true_ctr
+
+    def prepare_event_for_cleaner(self, dict_evt, hitmask):
+        sliced_evt = {k: v for k, v in dict_evt.items() if bool(hitmask[k])}
+        return self.evtsim.convert_event(sliced_evt)
 
     def run_trigger(self, evt_id, dict_evt):
-        didtrig, num_hits = self.trigger.process_event(dict_evt)
-        return TriggerResult(evt_id=evt_id, did_trigger=didtrig, num_pads_hit=num_hits)
+        didtrig, hitmask = self.trigger.process_event(dict_evt)
+        num_hits = len(hitmask.nonzero()[0])
+        return TriggerResult(evt_id=evt_id, did_trigger=didtrig, num_pads_hit=num_hits), hitmask
 
     def run_cleaner(self, evt_id, evt):
         clean_xyz_full, ctr = self.cleaner.process_event(evt)
@@ -230,18 +234,19 @@ class EfficiencySimulator(object):
             session.add(param_set)
 
             try:
-                dict_evt, evt, true_ctr = self.make_event(evt_id, param_vector)
+                dict_evt, true_ctr = self.make_event(evt_id, param_vector)
             except Exception as err:
                 raise EventCannotContinue('Simulation failed for event {:d}'.format(evt_id)) from err
 
             try:
-                trig_res = self.run_trigger(evt_id, dict_evt)
-            except Exception:
-                logger.exception('Trigger failed for event %d', evt_id)
+                trig_res, hitmask = self.run_trigger(evt_id, dict_evt)
+            except Exception as err:
+                raise EventCannotContinue('Trigger failed for event {:d}'.format(evt_id)) from err
             else:
                 session.add(trig_res)
 
             try:
+                evt = self.prepare_event_for_cleaner(dict_evt, hitmask)
                 clean_res, clean_xyz, ctr = self.run_cleaner(evt_id, evt)
             except Exception as err:
                 raise EventCannotContinue('Cleaning failed for event {:d}'.format(evt_id)) from err

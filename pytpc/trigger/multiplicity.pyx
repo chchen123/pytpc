@@ -44,8 +44,9 @@ cdef class MultiplicityTrigger:
 
         self.padmap = padmap
 
-    cpdef np.ndarray[np.double_t, ndim=2] find_trigger_signals(self, dict evt):
+    def find_trigger_signals(self, dict evt):
         cdef np.ndarray[np.double_t, ndim=2] result = np.zeros((10, 512), dtype=np.double)
+        cdef np.ndarray[np.int8_t, ndim=1] hitmask = np.zeros(10240, dtype=np.int8)
 
         cdef np.ndarray[np.double_t, ndim=1] trigSignal
         cdef int tbIdx, sqIdx
@@ -68,10 +69,11 @@ cdef class MultiplicityTrigger:
             if np.any(trigSignal > 0):
                 cobo = self.padmap[padnum][0]
                 result[cobo] += trigSignal
+                hitmask[padnum] = True
 
-        return result
+        return result, hitmask
 
-    cpdef np.ndarray[np.double_t, ndim=2] find_multiplicity_signals(self, np.ndarray[np.double_t, ndim=2] trig):
+    def find_multiplicity_signals(self, np.ndarray[np.double_t, ndim=2] trig):
         cdef np.ndarray[np.double_t, ndim=2] result = np.zeros_like(trig, dtype=np.double)
 
         cdef int j, minIdx, maxIdx
@@ -90,5 +92,5 @@ cdef class MultiplicityTrigger:
 
         return result
 
-    cpdef bint did_trigger(self, np.ndarray[np.double_t, ndim=2] mult):
+    def did_trigger(self, np.ndarray[np.double_t, ndim=2] mult):
         return np.any(np.max(mult, axis=1) > self.multiplicity_threshold)
