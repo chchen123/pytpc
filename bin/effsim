@@ -94,11 +94,11 @@ def main():
         num_pts -= num_finished
 
     params = param_generator(
-        beam_enu0=config['beam_enu0'],
-        beam_mass=config['beam_mass'],
-        beam_chg=config['beam_charge'],
-        proj_mass=config['mass_num'],
-        proj_chg=config['charge_num'],
+        beam_enu0=evtgen_config['beam_enu0'],
+        beam_mass=evtgen_config['beam_mass'],
+        beam_chg=evtgen_config['beam_charge'],
+        proj_mass=evtgen_config['mass_num'],
+        proj_chg=evtgen_config['charge_num'],
         gas=gas,
         num_evts=num_pts
     )
