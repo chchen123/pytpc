@@ -1,7 +1,8 @@
 #!/usr/local/env python3
 from pytpc.gases import InterpolatedGas
 from pytpc.utilities import read_lookup_table, find_exclusion_region
-from effsim import EfficiencySimulator, param_generator, count_finished_events, initialize_database
+from effsim import EfficiencySimulator, count_finished_events, initialize_database
+from effsim.paramgen import uniform_param_generator, distribution_param_generator, parse_dsigmaiv_output
 import yaml
 import argparse
 import os
@@ -19,6 +20,7 @@ def parse_arguments():
     parser.add_argument('--xcfg-path', '-x', help='Path to GET config file, for exlusion region')
     parser.add_argument('--evtgen-config-patch', '-e', help='A special patch for the evtgen config')
     parser.add_argument('--config-patch', '-p', help='One or more YAML files to patch the config with', action='append')
+    parser.add_argument('--distrib-path', '-d', help='Path to DSIGMAIV-ELAS.DAT')
     parser.add_argument('config', help='Path to config file')
     parser.add_argument('output', help='Path to output database')
     return parser.parse_args()
@@ -62,6 +64,33 @@ def load_config_file(path, patches=None, evtgen_patch=None):
     return config, evtgen_config
 
 
+def make_param_generator(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg, gas, num_evts, dist_file=None):
+    if dist_file is not None:
+        ens, angs, xsecs = parse_dsigmaiv_output(dist_file, ratio_to_rutherford=True, Z1=beam_chg, Z2=proj_chg)
+        logger.info('Using DSIGMAIV output to build parameter distribution.')
+        return distribution_param_generator(
+            ens=ens,
+            angs=angs,
+            xsecs=xsecs,
+            beam_enu0=beam_enu0,
+            beam_mass=beam_mass,
+            beam_chg=beam_chg,
+            proj_mass=proj_mass,
+            gas=gas,
+            num_evts=num_evts,
+        )
+
+    else:
+        return uniform_param_generator(
+            beam_enu0=beam_enu0,
+            beam_mass=beam_mass,
+            beam_chg=beam_chg,
+            proj_mass=proj_mass,
+            gas=gas,
+            num_evts=num_evts,
+        )
+
+
 def main():
     args = parse_arguments()
 
@@ -93,17 +122,18 @@ def main():
         logger.info('Already finished %d events. Resuming from where we left off.', num_finished)
         num_pts -= num_finished
 
-    params = param_generator(
+    param_gen = make_param_generator(
         beam_enu0=evtgen_config['beam_enu0'],
         beam_mass=evtgen_config['beam_mass'],
         beam_chg=evtgen_config['beam_charge'],
         proj_mass=evtgen_config['mass_num'],
         proj_chg=evtgen_config['charge_num'],
         gas=gas,
-        num_evts=num_pts
+        num_evts=num_pts,
+        dist_file=args.distrib_path,
     )
 
-    for evt_id, param_vector in enumerate(params):
+    for evt_id, param_vector in enumerate(param_gen):
         evt_id += num_finished
 
         if evt_id % 100 == 0:

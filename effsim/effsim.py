@@ -1,15 +1,12 @@
 import numpy as np
 import pytpc
 from pytpc.evtdata import Event
-from pytpc.constants import pi, degrees, p_mc2
-from pytpc.utilities import find_vertex_energy, read_lookup_table
+from pytpc.utilities import read_lookup_table
 from pytpc.fitting import MCFitter, BadEventError
 from pytpc.fitting.mixins import TrackerMixin, EventGeneratorMixin
-from pytpc.relativity import find_proton_params
 from pytpc.cleaning import EventCleaner, apply_clean_cut
 from pytpc.trigger import TriggerSimulator
 import logging
-import random
 
 from .database import ParameterSet, TriggerResult, CleaningResult, MinimizerResult
 from .database import EventCannotContinue, managed_session
@@ -25,34 +22,6 @@ def three_point_center(p1, p2, p3):
     xc = (sl1 * mp1[0] - sl2 * mp2[0] - mp1[1] + mp2[1]) / (sl1 - sl2)
     yc = (-sl2 * mp1[1] + sl1 * (sl2 * (mp1[0] - mp2[0]) + mp2[1])) / (sl1 - sl2)
     return xc, yc
-
-
-def param_generator(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg, gas, num_evts):
-    num_good = 0
-    while num_good < num_evts:
-        x0 = random.gauss(0, 0.010)
-        y0 = random.gauss(0, 0.010)
-        z0 = random.uniform(0, 1)
-        azi0 = random.uniform(0, 2 * pi)
-        pol0 = random.uniform(pi / 2, pi - 10 * degrees)
-
-        vert_en = find_vertex_energy(z0, beam_enu0, beam_mass, beam_chg, gas)  # the total kinetic energy
-        if vert_en > beam_enu0 * beam_mass:
-            vert_en = 0.0
-
-        _, proj_total_en = find_proton_params(
-            th3=pi - pol0,
-            m1=beam_mass * p_mc2,
-            m2=proj_mass * p_mc2,
-            m3=proj_mass * p_mc2,
-            m4=beam_mass * p_mc2,
-            T=vert_en
-        )
-        enu0 = proj_total_en - proj_mass * p_mc2
-
-        if enu0 >= 1.0:
-            yield np.array([x0, y0, z0, enu0, azi0, pol0])
-            num_good += 1
 
 
 class EventSimulator(TrackerMixin, EventGeneratorMixin):

@@ -209,6 +209,13 @@ def find_vertex_energy(beam_intercept, beam_enu0, beam_mass, beam_chg, gas):
     return ef
 
 
+def find_vertex_position_from_energy(vertex_enu0, beam_enu0, beam_mass, beam_chg, gas):
+    ei = beam_enu0 * beam_mass
+    ri = gas.range(ei, beam_mass, beam_chg)  # this is in meters
+    rf = gas.range(vertex_enu0 * beam_mass, beam_mass, beam_chg)
+    return 1.0 + (rf - ri)
+
+
 class SQLWriter(object):
     def __init__(self, dbpath):
         self.dbpath = dbpath

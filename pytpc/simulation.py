@@ -9,6 +9,7 @@ Contains code for simulating the tracking of particles in a TPC.
 from __future__ import division, print_function
 import numpy as np
 from math import sin, cos
+from .constants import e_chg, pi, eps_0
 
 
 def lorentz(vel, ef, bf, charge):
@@ -127,3 +128,25 @@ def drift_velocity_vector(vd, efield, bfield, tilt):
     zcomp = front * (1 + ot**2 * cos(tilt)**2)
 
     return np.array([xcomp, ycomp, zcomp])  # in cm/us, as long as vd had the right units
+
+
+def rutherford(angle, Z1, Z2, energy):
+    """Calculate the Rutherford scattering cross section.
+
+    Parameters
+    ----------
+    angle : number or array-like
+        The scattering angle in radians.
+    Z1, Z2 : int
+        The charge number of the two particles.
+    energy : number or array-like
+        The energy of the scattered particle.
+
+    Returns
+    -------
+    float
+        The Rutherford cross section in mb/sr.
+
+    """
+    energy = energy * 1e6 * e_chg
+    return (Z1 * Z2 * e_chg**2 / (16 * pi * eps_0 * energy))**2 / np.sin(angle / 2)**4 * 1e31  # mb/sr
