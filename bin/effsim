@@ -1,6 +1,7 @@
 #!/usr/local/env python3
 from pytpc.gases import InterpolatedGas
 from pytpc.utilities import read_lookup_table, find_exclusion_region
+from pytpc.constants import degrees
 from effsim import EfficiencySimulator, count_finished_events, initialize_database
 from effsim.paramgen import uniform_param_generator, distribution_param_generator, parse_dsigmaiv_output
 import yaml
@@ -20,7 +21,7 @@ def parse_arguments():
     parser.add_argument('--xcfg-path', '-x', help='Path to GET config file, for exlusion region')
     parser.add_argument('--evtgen-config-patch', '-e', help='A special patch for the evtgen config')
     parser.add_argument('--config-patch', '-p', help='One or more YAML files to patch the config with', action='append')
-    parser.add_argument('--distrib-path', '-d', help='Path to DSIGMAIV-ELAS.DAT')
+    parser.add_argument('--distrib-info', '-d', help='YAML file giving info about distribution to use')
     parser.add_argument('config', help='Path to config file')
     parser.add_argument('output', help='Path to output database')
     return parser.parse_args()
@@ -64,10 +65,36 @@ def load_config_file(path, patches=None, evtgen_patch=None):
     return config, evtgen_config
 
 
-def make_param_generator(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg, gas, num_evts, dist_file=None):
-    if dist_file is not None:
-        ens, angs, xsecs = parse_dsigmaiv_output(dist_file, ratio_to_rutherford=True, Z1=beam_chg, Z2=proj_chg)
-        logger.info('Using DSIGMAIV output to build parameter distribution.')
+def get_distribution(distconfig_path, proj_charge=None, beam_charge=None):
+    distconfig_path = os.path.abspath(os.path.expanduser(distconfig_path))
+    with open(distconfig_path, 'r') as f:
+        distconfig = yaml.load(f)
+
+    try:
+        dist_file = os.path.abspath(os.path.expanduser(distconfig['dist_path']))
+        ratio_to_rutherford = distconfig['ratio_to_rutherford']
+        en_min, en_max = distconfig['en_min'], distconfig['en_max']
+        logger.info('Energy domain: (%0.4f, %0.4f) MeV in CM', en_min, en_max)
+        ang_min, ang_max = distconfig['ang_min'] * degrees, distconfig['ang_max'] * degrees
+        logger.info('Angular domain: (%0.4f, %0.4f) deg in CM', ang_min / degrees, ang_max / degrees)
+
+    except KeyError as err:
+        raise KeyError('A required key was missing from the distribution info file.') from err
+
+    ens, angs, xsecs = parse_dsigmaiv_output(
+        input_path=dist_file,
+        ratio_to_rutherford=ratio_to_rutherford,
+        Z1=proj_charge,
+        Z2=beam_charge,
+    )
+
+    return ens, angs, xsecs, (en_min, en_max), (ang_min, ang_max)
+
+
+def make_param_generator(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg, gas, num_evts, dist_info=None):
+    if dist_info is not None:
+        logger.info('Reading distribution from DSIGMAIV output')
+        ens, angs, xsecs, en_bounds, ang_bounds = get_distribution(dist_info, proj_chg, beam_chg)
         return distribution_param_generator(
             ens=ens,
             angs=angs,
@@ -78,6 +105,8 @@ def make_param_generator(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg, ga
             proj_mass=proj_mass,
             gas=gas,
             num_evts=num_evts,
+            en_bounds=en_bounds,
+            ang_bounds=ang_bounds,
         )
 
     else:
@@ -114,14 +143,6 @@ def main():
     sql_engine = create_engine('sqlite:///{}'.format(args.output))
     initialize_database(sql_engine)
 
-    num_finished = count_finished_events()
-    if num_finished >= num_pts:
-        logger.info('Already finished all requested events.')
-        return
-    elif num_finished > 0:
-        logger.info('Already finished %d events. Resuming from where we left off.', num_finished)
-        num_pts -= num_finished
-
     param_gen = make_param_generator(
         beam_enu0=evtgen_config['beam_enu0'],
         beam_mass=evtgen_config['beam_mass'],
@@ -130,8 +151,16 @@ def main():
         proj_chg=evtgen_config['charge_num'],
         gas=gas,
         num_evts=num_pts,
-        dist_file=args.distrib_path,
+        dist_info=args.distrib_info,
     )
+
+    num_finished = count_finished_events()
+    if num_finished >= num_pts:
+        logger.info('Already finished all requested events.')
+        return
+    elif num_finished > 0:
+        logger.info('Already finished %d events. Resuming from where we left off.', num_finished)
+        num_pts -= num_finished
 
     for evt_id, param_vector in enumerate(param_gen):
         evt_id += num_finished

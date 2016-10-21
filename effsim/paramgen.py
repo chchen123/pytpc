@@ -100,11 +100,32 @@ def uniform_param_generator(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg,
             num_good += 1
 
 
-def distribution_param_generator(ens, angs, xsecs, beam_enu0, beam_mass, beam_chg, proj_mass, gas, num_evts):
+def distribution_param_generator(ens, angs, xsecs, beam_enu0, beam_mass, beam_chg, proj_mass, gas, num_evts,
+                                 en_bounds=None, ang_bounds=None):
     spline = RectBivariateSpline(ens, angs, xsecs)
-    norm_factor = xsecs.max()
     en_min, en_max = ens.min(), ens.max()
     ang_min, ang_max = angs.min(), angs.max()
+
+    def bounds_are_valid(old, new):
+        return old[0] <= new[0] and old[1] >= new[1]
+
+    if en_bounds is not None:
+        if bounds_are_valid((en_min, en_max), en_bounds):
+            en_min, en_max = en_bounds
+        else:
+            raise ValueError('Energy bounds were outside domain of data')
+
+    if ang_bounds is not None:
+        if bounds_are_valid((ang_min, ang_max), ang_bounds):
+            ang_min, ang_max = ang_bounds
+        else:
+            raise ValueError('Angular bounds were outside domain of data')
+
+    encut = np.where((ens > en_min) & (ens < en_max))[0]
+    angcut = np.where((angs > ang_min) & (angs < ang_max))[0]
+    ixgrid = np.ix_(encut, angcut)
+
+    norm_factor = xsecs[ixgrid].max()
 
     def rejection_sample():
         while True:
