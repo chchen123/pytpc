@@ -86,7 +86,7 @@ class EfficiencySimulator(object):
         if evtgen_config is None:
             evtgen_config = config
         self.evtsim = EventSimulator(evtgen_config, badpads=lowgain_pads, pedestals=pedestals)
-        self.trigger = TriggerSimulator(config, excluded_pads=excluded_pads)
+        self.trigger = TriggerSimulator(config, excluded_pads=excluded_pads, pedestals=pedestals)
         self.cleaner = EventCleaner(config)
         self.fitter = MCFitter(config)
 
