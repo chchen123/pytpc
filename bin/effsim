@@ -4,7 +4,9 @@ from pytpc.utilities import read_lookup_table, find_exclusion_region
 from pytpc.constants import degrees
 from effsim import EfficiencySimulator, count_finished_events, initialize_database
 from effsim.paramgen import uniform_param_generator, distribution_param_generator, parse_dsigmaiv_output
+import numpy as np
 import yaml
+import csv
 import argparse
 import os
 from sqlalchemy import create_engine
@@ -91,6 +93,17 @@ def get_distribution(distconfig_path, proj_charge=None, beam_charge=None):
     return ens, angs, xsecs, (en_min, en_max), (ang_min, ang_max)
 
 
+def load_pedestals(path):
+    with open(path, 'r') as f:
+        reader = csv.reader(f)
+        pedestals = np.zeros(10240, dtype='float64')
+        for row in reader:
+            pad, ped = row
+            pedestals[int(pad)] = float(ped)
+
+    return pedestals
+
+
 def make_param_generator(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg, gas, num_evts, dist_info=None):
     if dist_info is not None:
         logger.info('Reading distribution from DSIGMAIV output')
@@ -137,8 +150,15 @@ def main():
         excluded_pads = []
         lowgain_pads = []
 
-    effsim = EfficiencySimulator(config, excluded_pads=excluded_pads, lowgain_pads=lowgain_pads,
-                                 evtgen_config=evtgen_config)
+    pedestals = load_pedestals(config['pedestals_path'])
+
+    effsim = EfficiencySimulator(
+        config=config,
+        excluded_pads=excluded_pads,
+        lowgain_pads=lowgain_pads,
+        evtgen_config=evtgen_config,
+        pedestals=pedestals,
+    )
 
     sql_engine = create_engine('sqlite:///{}'.format(args.output))
     initialize_database(sql_engine)
