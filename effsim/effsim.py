@@ -6,7 +6,10 @@ from pytpc.fitting import MCFitter, BadEventError
 from pytpc.fitting.mixins import TrackerMixin, EventGeneratorMixin
 from pytpc.cleaning import EventCleaner, apply_clean_cut
 from pytpc.trigger import TriggerSimulator
+from pytpc.constants import pi
+from pytpc.padplane import generate_pad_plane
 import logging
+from copy import copy
 
 from .database import ParameterSet, TriggerResult, CleaningResult, MinimizerResult
 from .database import EventCannotContinue, managed_session
@@ -25,7 +28,7 @@ def three_point_center(p1, p2, p3):
 
 
 class EventSimulator(TrackerMixin, EventGeneratorMixin):
-    def __init__(self, config, badpads=[], pedestals=None):
+    def __init__(self, config, badpads=[]):
         super().__init__(config)
         self.untiltmat = pytpc.utilities.tilt_matrix(self.tilt)
         self.badpads = set(badpads)
@@ -33,11 +36,6 @@ class EventSimulator(TrackerMixin, EventGeneratorMixin):
         self.padmap = read_lookup_table(config['padmap_path'])  # maps (cobo, asad, aget, ch) -> pad
         self.reverse_padmap = {v: k for k, v in self.padmap.items()}  # maps pad -> (cobo, asad, aget, ch)
         self.noise_stddev = config['noise_stddev']
-
-        if pedestals is not None:
-            self.pedestals = pedestals
-        else:
-            self.pedestals = np.zeros(10240, dtype='float64')
 
     def make_event(self, x0, y0, z0, enu0, azi0, pol0):
         tr = self.tracker.track_particle(x0, y0, z0, enu0, azi0, pol0)
@@ -59,15 +57,6 @@ class EventSimulator(TrackerMixin, EventGeneratorMixin):
 
         return evt, center[:2]
 
-    def add_noise(self, evt, clip=False):
-        for pad, trace in evt.items():
-            trace += np.random.normal(self.pedestals[pad], self.noise_stddev, len(trace))
-
-            if clip:
-                np.clip(trace, a_min=0, a_max=4095, out=trace)  # Perform clip in-place
-
-        return evt
-
     def convert_event(self, dict_evt, evt_id=0, timestamp=0):
         py_evt = Event(evt_id, timestamp)
         py_evt.traces = np.zeros(len(dict_evt), dtype=py_evt.dt)
@@ -81,19 +70,61 @@ class EventSimulator(TrackerMixin, EventGeneratorMixin):
         return py_evt
 
 
+class NoiseMaker(object):
+    def __init__(self, config, pedestals=None):
+        config = copy(config)
+        config['mass_num'] = config['beam_mass']
+        config['charge_num'] = config['beam_charge']
+        config['tracker_max_en'] = config['beam_enu0'] * config['beam_mass'] * 1.1  # The last part is just to be safe
+
+        self.beam_sim = EventSimulator(config)
+
+        beam_evt, _ = self.beam_sim.make_event(0, 0, 1.0, config['beam_enu0'], 0, pi)
+        self.beam_mesh = sum((v for v in beam_evt.values()))
+        self.beam_mesh /= self.beam_mesh.max()
+
+        pads = generate_pad_plane()
+        self.bigpads = np.where(np.round(np.abs(pads[:, 1, 1] - pads[:, 0, 1])) > 6)[0]
+        self.smallpads = np.where(np.round(np.abs(pads[:, 1, 1] - pads[:, 0, 1])) < 6)[0]
+        assert(len(self.bigpads) + len(self.smallpads) == 10240)
+
+        self.baseline_depression_scale = config['baseline_depression_scale']
+        self.big_pad_multiplier = config['big_pad_multiplier']
+
+        self.noise_stddev = config['noise_stddev']
+
+        if pedestals is not None:
+            self.pedestals = pedestals
+        else:
+            self.pedestals = np.zeros(10240, dtype='float64')
+
+    def add_noise(self, evt, depress_baseline=True, add_gaussian_noise=True, clip=True):
+        for pad, trace in evt.items():
+            if add_gaussian_noise:
+                trace += np.random.normal(self.pedestals[pad], self.noise_stddev, len(trace))
+
+            if depress_baseline:
+                mult = self.big_pad_multiplier if pad in self.bigpads else 1
+                trace -= self.beam_mesh * self.baseline_depression_scale * mult
+
+            if clip:
+                np.clip(trace, a_min=0, a_max=4095, out=trace)  # Perform clip in-place
+
+        return evt
+
+
 class EfficiencySimulator(object):
     def __init__(self, config, excluded_pads=[], lowgain_pads=[], evtgen_config=None, pedestals=None):
         if evtgen_config is None:
             evtgen_config = config
-        self.evtsim = EventSimulator(evtgen_config, badpads=lowgain_pads, pedestals=pedestals)
+        self.evtsim = EventSimulator(evtgen_config, badpads=lowgain_pads)
+        self.noisemaker = NoiseMaker(evtgen_config, pedestals=pedestals)
         self.trigger = TriggerSimulator(config, excluded_pads=excluded_pads, pedestals=pedestals)
         self.cleaner = EventCleaner(config)
         self.fitter = MCFitter(config)
 
-    def make_event(self, evt_id, params, noise=True, clip=True):
+    def make_event(self, evt_id, params):
         dict_evt, true_ctr = self.evtsim.make_event(*params)
-        if noise:
-            dict_evt = self.evtsim.add_noise(dict_evt, clip=clip)
 
         return dict_evt, true_ctr
 
@@ -139,6 +170,11 @@ class EfficiencySimulator(object):
                 dict_evt, true_ctr = self.make_event(evt_id, param_vector)
             except Exception as err:
                 raise EventCannotContinue('Simulation failed for event {:d}'.format(evt_id)) from err
+
+            try:
+                dict_evt = self.noisemaker.add_noise(dict_evt)
+            except Exception as err:
+                raise EventCannotContinue('Failed to add noise for event {:d}'.format(evt_id)) from err
 
             try:
                 trig_res, hitmask = self.run_trigger(evt_id, dict_evt)
