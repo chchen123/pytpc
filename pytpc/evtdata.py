@@ -80,10 +80,10 @@ def fftbaseline(data, factor=20):
 
     if data.ndim == 2:
         for j, row in enumerate(clipped):
-            mask = row > stds[j] * 1.5
+            mask = row - row.mean() > stds[j] * 1.5
             clipped[j, mask] = clipped[j, ~mask].mean()
     elif data.ndim == 1:
-        mask = row > stds * 1.5
+        mask = clipped - clipped.mean() > stds * 1.5
         clipped[mask] = clipped[~mask].mean()
     else:
         raise ValueError('Only supports 1D or 2D arrays')
