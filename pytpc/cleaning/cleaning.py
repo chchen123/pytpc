@@ -290,16 +290,21 @@ class EventCleaner(HoughCleaner, PreprocessMixin):
         self.beampads = []
         self.untilt_mat = tilt_matrix(self.tilt)
         self.pads = generate_pad_plane(self.pad_rot_angle)
+        self.last_tb = config['cleaning_config']['last_tb']
 
     def process_event(self, evt):
         raw_xyz = evt.xyzs(pads=self.pads, peaks_only=True, return_pads=True, cg_times=True, baseline_correction=True)
-        xyz = self.preprocess(raw_xyz, rotate_pads=False)
+        xyz = self.preprocess(raw_xyz, rotate_pads=False, last_tb=self.last_tb)
 
         cleaning_data = xyz[['u', 'v', 'w']].values
 
         labels, mindists, nn_counts, (cu, cv) = self.clean(cleaning_data)
 
-        clean_xyz = np.column_stack((raw_xyz, nn_counts, mindists))
+        clean_xyz = np.column_stack((
+            raw_xyz[np.where(raw_xyz[:, 2] < self.last_tb)],  # Remove dropped TBs to make dimensions match
+            nn_counts,
+            mindists,
+        ))
 
         center = np.array([cu, cv, 0])
         center[1] -= np.tan(self.tilt) * 1000.
