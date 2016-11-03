@@ -6,16 +6,143 @@ import sys
 import os
 import argparse
 import h5py
-import numpy as np
 from pytpc.fitting import MCFitter, Annealer, BadEventError
-from pytpc.utilities import SQLWriter, find_run_number
+from pytpc.utilities import find_run_number
 from pytpc.cleaning import apply_clean_cut
 import yaml
 import logging
 import logging.config
 
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, Integer, Float, create_engine
+from sqlalchemy.sql import func
+from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
+
+
+# Database setup
+
+SQLBase = declarative_base()
+Session = sessionmaker()
+
+
+@contextmanager
+def managed_session():
+    session = Session()
+    try:
+        yield session
+        session.commit()
+    except:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+class MinimizerResult(SQLBase):
+    __tablename__ = 'mcmin_results'
+    evt_id = Column(Integer, primary_key=True)
+    x0 = Column(Float)
+    y0 = Column(Float)
+    z0 = Column(Float)
+    enu0 = Column(Float)
+    azi0 = Column(Float)
+    pol0 = Column(Float)
+    posChi2 = Column(Float)
+    enChi2 = Column(Float)
+    vertChi2 = Column(Float)
+    lin_scat_ang = Column(Float)
+    lin_beam_int = Column(Float)
+    lin_chi2 = Column(Float)
+    rad_curv = Column(Float)
+    brho = Column(Float)
+    curv_en = Column(Float)
+    curv_ctr_x = Column(Float)
+    curv_ctr_y = Column(Float)
+
+
+def find_last_completed_event():
+    with managed_session() as session:
+        query = session.query(func.max(MinimizerResult.evt_id).label('last_evtid'))
+        res = query.one()
+        last_evtid = res.last_evtid
+        if last_evtid is None:
+            return 0
+        else:
+            return last_evtid
+
+
+def create_and_setup_database_engine(path):
+    engine = create_engine('sqlite:///{}'.format(path))
+    SQLBase.metadata.create_all(bind=engine)
+    Session.configure(bind=engine)
+    return engine
+
+
+@contextmanager
+def monitored_execution(procedure_name, evt_id):
+    try:
+        yield
+    except BadEventError:
+        raise
+    except Exception as err:
+        raise RuntimeError('{:s} failed for event {:d}'.format(procedure_name, evt_id)) from err
+
+
+class FitManager(object):
+    def __init__(self, config, fitter_class, evtlist_path, input_path, output_path):
+        self.fitter = fitter_class(config)
+        self.run_num = find_run_number(input_path)
+        self.input_file = h5py.File(input_path, 'r')
+        self.db_engine = create_and_setup_database_engine(output_path)
+
+        good_evts = pd.read_hdf(evtlist_path, 'evt_list')
+        run_mask = good_evts.run_num == self.run_num
+        nevts = len(good_evts[run_mask])
+        logger.info('Loaded VME results. VME had %d valid events in this run.', nevts)
+
+        last_evtid = find_last_completed_event()
+        if last_evtid > 0:
+            logger.info('Already finished up to event %d. Starting from where we left off.', last_evtid)
+        evtid_mask = good_evts.evt_id > last_evtid
+
+        self.evt_ids_to_process = good_evts[run_mask & evtid_mask].evt_id.values
+
+    def evtid_iterator(self):
+        nevts = len(self.evt_ids_to_process)
+        for i, evt_id in enumerate(self.evt_ids_to_process):
+            if i % 100 == 0:
+                logger.info('Finished %d / %d events', i, nevts)
+            yield int(evt_id)
+
+    def read_data(self, evt_id):
+        dataset = self.input_file['/clean/{}'.format(evt_id)]
+        data = dataset[:]
+        cx, cy = dataset.attrs['center'][:2]
+        return data, (cx, cy)
+
+    def clean_data(self, data):
+        cleaned = apply_clean_cut(data)
+        if len(cleaned) < 50:
+            raise BadEventError('Too few points after cleaning')
+        else:
+            return cleaned
+
+    def process_event(self, evt_id):
+        with monitored_execution('Reading', evt_id):
+            raw_xyz, (cx, cy) = self.read_data(evt_id)
+
+        with monitored_execution('Cleaning', evt_id):
+            clean_xyz = self.clean_data(raw_xyz)
+
+        with monitored_execution('Fitting', evt_id):
+            fitres = self.fitter.process_event(clean_xyz, cx, cy, preprocess_kwargs={'rotate_pads': False})
+
+        with managed_session() as session:
+            dbfitres = MinimizerResult(evt_id=evt_id, **fitres)
+            session.add(dbfitres)
 
 
 def parse_args():
@@ -67,51 +194,22 @@ def main():
                  'annealer': Annealer}
 
     fitter_class = algo_dict[args.algorithm]
-    fitter = fitter_class(config)
 
-    run_num = find_run_number(args.input_file)
+    fit_manager = FitManager(
+        config=config,
+        fitter_class=fitter_class,
+        evtlist_path=args.evtlist,
+        input_path=args.input_file,
+        output_path=args.db_path,
+    )
 
-    writer = SQLWriter(args.db_path)
-    mcmin_res_name = 'mcmin_results'
-    mcmin_res_columns = [['evt_id', 'INTEGER PRIMARY KEY']] + fitter.output_columns
-    writer.create_table(mcmin_res_name, mcmin_res_columns)
-
-    good_evts = pd.read_hdf(args.evtlist, 'evt_list')
-    run_mask = good_evts.run_num == run_num
-    nevts = len(good_evts[run_mask])
-    logger.info('Loaded VME results. VME had %d valid events in this run.', nevts)
-
-    with h5py.File(args.input_file, 'r') as input_file:
-        gp = input_file['clean']
-
-        for i, evt_id in enumerate(good_evts[run_mask].evt_id.values):
-            if i % 100 == 0:
-                logger.info('At event %d / %d', i, nevts)
-
-            try:
-                dataset = gp[str(evt_id)]
-                raw_xyz_full = dataset[:]
-                cx, cy = dataset.attrs['center'][:2]
-            except Exception:
-                logger.exception('Failed to read peaks / center for event %d', evt_id)
-                continue
-
-            try:
-                raw_xyz = apply_clean_cut(raw_xyz_full)
-                if len(raw_xyz) < 50:
-                    raise BadEventError("Too few points after cleaning")
-
-                res = fitter.process_event(raw_xyz, cx, cy, preprocess_kwargs={'rotate_pads': False})
-                res['evt_id'] = int(evt_id)
-            except BadEventError as e:
-                logger.info('Event %d was bad: %s', int(evt_id), e)
-            except Exception:
-                logger.exception('Processing failed for event %d', evt_id)
-            else:
-                try:
-                    writer.write(mcmin_res_name, res)
-                except Exception:
-                    logger.exception('Writing failed for event %d', evt_id)
+    for evt_id in fit_manager.evtid_iterator():
+        try:
+            fit_manager.process_event(evt_id)
+        except BadEventError as err:
+            logger.warning('Event %d was bad: %s', evt_id, err)
+        except Exception:
+            logger.exception('Event %d failed', evt_id)
 
 
 if __name__ == '__main__':
