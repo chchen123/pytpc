@@ -7,7 +7,7 @@ import re
 
 
 def get_omp_flag():
-    if re.search(r'clang', os.environ['CC']):
+    if re.search(r'clang', os.environ.get('CC', default='')):
         return '-fopenmp=libomp'
     else:
         return '-fopenmp'
