@@ -1,7 +1,16 @@
 #!/usr/bin/env python3
+"""The main executable script for fitting events.
+
+This script can be used to run the Monte Carlo fitter on a data file. It will write output to a SQLite database.
+For information about the command options, try::
+
+    runfit -h
+
+in a terminal, or take a look at the function `parse_args`.
+
+"""
 
 import pandas as pd
-
 import sys
 import os
 import argparse
@@ -30,6 +39,19 @@ Session = sessionmaker()
 
 @contextmanager
 def managed_session():
+    """A context manager that initiates DB sessions and either commits or rolls them back.
+
+    This manager is used to safely and conveniently access the database. Create a database session with
+
+        with managed_session() as session:
+            # do something
+
+    and it will handle committing the data to the database for you. You can add things to the session with
+    ``session.add()`` as usual. If an exception is raised inside the ``with`` block, the session will be rolled back
+    and the exception will be re-raised. If the block exits normally, the session is committed. Either way, it's closed
+    when the block exits.
+
+    """
     session = Session()
     try:
         yield session
@@ -42,6 +64,19 @@ def managed_session():
 
 
 class MinimizerResult(SQLBase):
+    """The database table for storing fit results.
+
+    To add a result to the database, do this::
+
+        with managed_session() as session:
+            # Assume we have a result called fitres
+            db_entry = MinimizerResult(evt_id=evt_id, **fitres)
+            session.add(db_entry)
+
+    This works because the fitter returns a dictionary with keys that match the columns of the table. If there is an
+    extra key in the dictionary, this will fail with an error about unknown keyword arguments, so make sure they match!
+
+    """
     __tablename__ = 'mcmin_results'
     evt_id = Column(Integer, primary_key=True)
     x0 = Column(Float)
@@ -64,6 +99,14 @@ class MinimizerResult(SQLBase):
 
 
 def find_last_completed_event():
+    """Look up the event ID of the last event in the output database.
+
+    Returns
+    -------
+    int
+        The last event ID. If the database is empty, 0 is returned.
+
+    """
     with managed_session() as session:
         query = session.query(func.max(MinimizerResult.evt_id).label('last_evtid'))
         res = query.one()
@@ -75,6 +118,19 @@ def find_last_completed_event():
 
 
 def create_and_setup_database_engine(path):
+    """Create the output database and initialize it.
+
+    Parameters
+    ----------
+    path : string
+        The path where the SQLite database should be created. If it already exists, new results will be added to it.
+
+    Returns
+    -------
+    engine : sqlalchemy.engine.Engine
+        The database engine. You probably won't need to use it directly.
+
+    """
     engine = create_engine('sqlite:///{}'.format(path))
     SQLBase.metadata.create_all(bind=engine)
     Session.configure(bind=engine)
@@ -83,6 +139,22 @@ def create_and_setup_database_engine(path):
 
 @contextmanager
 def monitored_execution(procedure_name, evt_id):
+    """Basically a fancy try/except block.
+
+    This context manager just monitors the block inside the ``with`` statement for exceptions and filters them. If
+    the exception is a `BadEventError`, it passes it along unchanged, but other exceptions are wrapped with a
+    `RuntimeError` that contains the event ID and the name of the procedure that failed. The main reason this exists
+    is to avoid repeating the same try/except block over and over.
+
+    Parameters
+    ----------
+    procedure_name : string
+        A string that will be included in the message attached to the RuntimeError that will be raised in the event
+        of an exception. Examples might include "Fitting", or "Cleaning".
+    evt_id : int
+        The event ID.
+
+    """
     try:
         yield
     except BadEventError:
@@ -92,6 +164,28 @@ def monitored_execution(procedure_name, evt_id):
 
 
 class FitManager(object):
+    """A convenience class to handle all aspects of reading, cleaning, and fitting data.
+
+    This is just a wrapper class that holds onto the input and output files and manages the database connection.
+    It also offers an iterator that loops over all event IDs that need to be processed.
+
+    Parameters
+    ----------
+    config : dict-like
+        The config dictionary.
+    fitter_class : class
+        The fitter class that should be instantiated to fit data.
+    evtlist_path, input_path, output_path : string
+        Paths to the list of good events, input data file, and output database, respectively.
+
+    Methods
+    -------
+    evtid_iterator()
+        Returns an iterator that loops over the event IDs that need to be processed.
+    process_event(evt_id)
+        Reads the event, cleans it, fits it, and writes the output to the database.
+
+    """
     def __init__(self, config, fitter_class, evtlist_path, input_path, output_path):
         self.fitter = fitter_class(config)
         self.run_num = find_run_number(input_path)
@@ -111,6 +205,16 @@ class FitManager(object):
         self.evt_ids_to_process = good_evts[run_mask & evtid_mask].evt_id.values
 
     def evtid_iterator(self):
+        """Iterates over all event IDs to be processed.
+
+        A progress message is logged every 100 events.
+
+        Yields
+        ------
+        evt_id : int
+            The next event ID.
+
+        """
         nevts = len(self.evt_ids_to_process)
         for i, evt_id in enumerate(self.evt_ids_to_process):
             if i % 100 == 0:
@@ -118,12 +222,44 @@ class FitManager(object):
             yield int(evt_id)
 
     def read_data(self, evt_id):
+        """Reads the given event from the input file.
+
+        Parameters
+        ----------
+        evt_id : int
+            The event ID to read.
+
+        Returns
+        -------
+        data : ndarray
+            The data from the file.
+        (cx, cy) : (float, float)
+            The center of curvature of the track.
+        """
         dataset = self.input_file['/clean/{}'.format(evt_id)]
         data = dataset[:]
         cx, cy = dataset.attrs['center'][:2]
         return data, (cx, cy)
 
     def clean_data(self, data):
+        """Apply the cleaning cut to the data.
+
+        Parameters
+        ----------
+        data : array-like
+            The data to clean.
+
+        Returns
+        -------
+        cleaned : ndarray
+            The subset of ``data`` that passes the cleaning cuts.
+
+        Raises
+        ------
+        BadEventError
+            If there are fewer than 50 points remaining after the cut.
+
+        """
         cleaned = apply_clean_cut(data)
         if len(cleaned) < 50:
             raise BadEventError('Too few points after cleaning')
@@ -131,6 +267,16 @@ class FitManager(object):
             return cleaned
 
     def process_event(self, evt_id):
+        """Run the whole fitting process on the given event.
+
+        This does everything: it reads the event, cleans it, fits it, and writes the results to the database.
+
+        Parameters
+        ----------
+        evt_id : int
+            The ID of the event to read and process.
+
+        """
         with monitored_execution('Reading', evt_id):
             raw_xyz, (cx, cy) = self.read_data(evt_id)
 
@@ -140,12 +286,14 @@ class FitManager(object):
         with monitored_execution('Fitting', evt_id):
             fitres = self.fitter.process_event(clean_xyz, cx, cy, preprocess_kwargs={'rotate_pads': False})
 
+        # Write the results to the database
         with managed_session() as session:
             dbfitres = MinimizerResult(evt_id=evt_id, **fitres)
             session.add(dbfitres)
 
 
 def parse_args():
+    """Parses the command-line argument list and returns the values."""
     parser = argparse.ArgumentParser(description='Fit data using Monte Carlo optimization')
     parser.add_argument('--config', '-c', help='Path to config file, in YAML format', required=True)
     parser.add_argument('--config-patch', '-p', help='Configuration patches', action='append')
@@ -167,6 +315,11 @@ def parse_args():
 
 
 def setup_logging(config):
+    """Configure the logging library from the given dictionary.
+
+    The dictionary must have a key "logging_config" that contains a valid configuration for the logging library.
+
+    """
     try:
         log_conf = config['logging_config']
         logging.config.dictConfig(log_conf)
