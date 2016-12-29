@@ -1,0 +1,278 @@
+#!/usr/bin/env python3
+"""A script that tests parameters for the Monte Carlo optimizer."""
+
+from pytpc.fitting import MCFitter, BadEventError
+from pytpc.cleaning import apply_clean_cut
+from itertools import product
+from functools import reduce
+import operator
+import h5py
+import yaml
+import os
+import sys
+from argparse import ArgumentParser
+
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, Integer, Float, create_engine
+from contextlib import contextmanager
+
+import logging
+import logging.config
+logger = logging.getLogger(__name__)
+
+# Database setup
+
+SQLBase = declarative_base()
+Session = sessionmaker()
+
+
+@contextmanager
+def managed_session():
+    """A context manager that initiates DB sessions and either commits or rolls them back.
+
+    This manager is used to safely and conveniently access the database. Create a database session with
+
+        with managed_session() as session:
+            # do something
+
+    and it will handle committing the data to the database for you. You can add things to the session with
+    ``session.add()`` as usual. If an exception is raised inside the ``with`` block, the session will be rolled back
+    and the exception will be re-raised. If the block exits normally, the session is committed. Either way, it's closed
+    when the block exits.
+
+    """
+    session = Session()
+    try:
+        yield session
+        session.commit()
+    except:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+class ConvergenceTestResult(SQLBase):
+    __tablename__ = 'conv_results'
+    test_id = Column(Integer, primary_key=True, autoincrement=True)
+    num_iters = Column(Integer)
+    num_pts = Column(Integer)
+    red_factor = Column(Float)
+    trial_num = Column(Integer)
+    x0 = Column(Float)
+    y0 = Column(Float)
+    z0 = Column(Float)
+    enu0 = Column(Float)
+    azi0 = Column(Float)
+    pol0 = Column(Float)
+    posChi2 = Column(Float)
+    enChi2 = Column(Float)
+    vertChi2 = Column(Float)
+
+
+def float_range(min_, max_, step):
+    """Like the builtin ``range``, but for floats.
+
+    This has some issues with numerical imprecision, but it is probably good enough.
+
+    """
+    val = min_
+    while val < max_:
+        yield val
+        val += step
+
+
+class VariableGenerator(object):
+    def __init__(self, min_, max_, step):
+        self.min_ = min_
+        self.max_ = max_
+        self.step = step
+
+    def _is_float(self):
+        return isinstance(self.min_, float) or isinstance(self.max_, float) or isinstance(self.step, float)
+
+    def __iter__(self):
+        generator = float_range if self._is_float() else range
+        yield from generator(self.min_, self.max_, self.step)
+
+    def __len__(self):
+        return int((self.max_ - self.min_) // self.step)
+
+
+class ConvergenceTestManager(object):
+    def __init__(self, fitter_config, convtest_config):
+        self.fitter = MCFitter(fitter_config)
+
+        for variable in ('num_iters', 'num_pts', 'red_factor'):
+            config_entry = convtest_config[variable]
+            var_name = variable + '_gen'
+            gen = VariableGenerator(config_entry['min'], config_entry['max'], config_entry['step'])
+            setattr(self, var_name, gen)
+
+        self.num_trials = convtest_config['num_trials']
+
+        self.file_path = convtest_config['file_path']
+        self.evt_id = convtest_config['evt_id']
+
+    def iter_vars(self):
+        """Iterate over the Monte Carlo variables"""
+        yield from product(self.num_iters_gen, self.num_pts_gen, self.red_factor_gen)
+
+    def total_num_trials(self):
+        return len(self.num_iters_gen) * len(self.num_pts_gen) * len(self.red_factor_gen) * self.num_trials
+
+    def total_num_tracks(self):
+        return reduce(operator.add, (n * p * self.num_trials for (n, p, _) in self.iter_vars()))
+
+    def clean_data(self, data):
+        """Apply the cleaning cut to the data.
+
+        Parameters
+        ----------
+        data : array-like
+            The data to clean.
+
+        Returns
+        -------
+        cleaned : ndarray
+            The subset of ``data`` that passes the cleaning cuts.
+
+        Raises
+        ------
+        BadEventError
+            If there are fewer than 50 points remaining after the cut.
+
+        """
+        cleaned = apply_clean_cut(data)
+        if len(cleaned) < 50:
+            raise BadEventError('Too few points after cleaning')
+        else:
+            return cleaned
+
+    def get_event(self, file_path, evt_id):
+        """Reads and cleans the given event from the input file.
+
+        Parameters
+        ----------
+        file_path : str
+            The path to the HDF data file
+        evt_id : int
+            The event ID to read.
+
+        Returns
+        -------
+        data : ndarray
+            The data from the file.
+        (cx, cy) : (float, float)
+            The center of curvature of the track.
+        """
+        with h5py.File(file_path, 'r') as hf:
+            dataset = hf['/clean/{}'.format(evt_id)]
+            data = dataset[:]
+            cx, cy = dataset.attrs['center'][:2]
+
+        clean_xyz = self.clean_data(data)
+
+        return clean_xyz, (cx, cy)
+
+    def run_test(self):
+        logger.info('Beginning test')
+        logger.info('Reading event %d from file %s', self.evt_id, os.path.basename(self.file_path))
+        raw_xyz, (cx, cy) = self.get_event(self.file_path, self.evt_id)
+
+        logger.info('Total number of trials expected: %d', self.total_num_trials())
+        logger.info('Will simulate track %0.2e times', self.total_num_tracks())
+
+        for (num_iters, num_pts, red_factor) in self.iter_vars():
+            logger.info('Testing with num_iters=%d, num_pts=%d, red_factor=%0.2f', num_iters, num_pts, red_factor)
+            self.fitter.num_iters = num_iters
+            self.fitter.num_pts = num_pts
+            self.fitter.red_factor = red_factor
+
+            for trial in range(self.num_trials):
+                fit_res = self.fitter.process_event(raw_xyz, cx, cy, preprocess_kwargs={'rotate_pads': False})
+
+                with managed_session() as session:
+                    db_entry = ConvergenceTestResult(
+                        num_iters=num_iters,
+                        num_pts=num_pts,
+                        red_factor=red_factor,
+                        trial_num=trial,
+                        x0=fit_res['x0'],
+                        y0=fit_res['y0'],
+                        z0=fit_res['z0'],
+                        enu0=fit_res['enu0'],
+                        azi0=fit_res['azi0'],
+                        pol0=fit_res['pol0'],
+                        posChi2=fit_res['posChi2'],
+                        enChi2=fit_res['enChi2'],
+                        vertChi2=fit_res['vertChi2'],
+                    )
+                    session.add(db_entry)
+
+
+def setup_logging(config):
+    """Configure the logging library from the given dictionary.
+
+    The dictionary must have a key "logging_config" that contains a valid configuration for the logging library.
+
+    """
+    try:
+        log_conf = config['logging_config']
+        logging.config.dictConfig(log_conf)
+    except KeyError:
+        logger.warning('No logging config found. Info messages may be suppressed.')
+
+
+def load_configs(fitter_config_path, convtest_config_path, fitter_config_patches=[]):
+    with open(os.path.abspath(fitter_config_path)) as f:
+        fitter_config = yaml.load(f)
+
+    for patch_path in fitter_config_patches:
+        with open(os.path.abspath(patch_path)) as f:
+            patch = yaml.load(f)
+
+        fitter_config.update(patch)
+        logger.info('Patched config with file %s', os.path.basename(convtest_config_path))
+
+    with open(os.path.abspath(convtest_config_path)) as f:
+        convtest_config = yaml.load(f)
+
+    return fitter_config, convtest_config
+
+
+def parse_args():
+    parser = ArgumentParser(description='A script to vary MC parameters and test convergence')
+    parser.add_argument('--fitter-config-patch', '-p', help='Patches for fitter config', action='append')
+    parser.add_argument('fitter_config', help='Path to config file for fitter')
+    parser.add_argument('convtest_config', help='Path to config file for this test program')
+    parser.add_argument('output_path', help='Path where the output should be written')
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+    fitter_config, convtest_config = load_configs(args.fitter_config, args.convtest_config, args.fitter_config_patch)
+    setup_logging(fitter_config)
+
+    sql_engine = create_engine('sqlite:///{:s}'.format(os.path.abspath(args.output_path)))
+    SQLBase.metadata.create_all(bind=sql_engine)
+    Session.configure(bind=sql_engine)
+
+    manager = ConvergenceTestManager(fitter_config, convtest_config)
+    manager.run_test()
+
+
+if __name__ == '__main__':
+    import signal
+
+    def handle_signal(signum, stack_frame):
+        logger.critical('Received signal %d. Quitting.', signum)
+        sys.stdout.flush()
+        sys.exit(1)
+
+    signal.signal(signal.SIGTERM, handle_signal)
+    signal.signal(signal.SIGQUIT, handle_signal)
+
+    main()

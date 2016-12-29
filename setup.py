@@ -86,7 +86,8 @@ setup(
     scripts=[
         'bin/runfit',
         'bin/pyclean',
-        'bin/effsim'
+        'bin/effsim',
+        'bin/convergence',
     ],
     install_requires=[
         'scipy',
