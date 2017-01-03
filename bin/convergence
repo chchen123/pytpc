@@ -306,7 +306,8 @@ def load_configs(fitter_config_path, convtest_config_path, fitter_config_patches
 
 def parse_args():
     parser = ArgumentParser(description='A script to vary MC parameters and test convergence')
-    parser.add_argument('--fitter-config-patch', '-p', help='Patches for fitter config', action='append')
+    parser.add_argument('--fitter-config-patch', '-p', help='Patches for fitter config',
+                        action='append', default=[])
     parser.add_argument('fitter_config', help='Path to config file for fitter')
     parser.add_argument('convtest_config', help='Path to config file for this test program')
     parser.add_argument('output_path', help='Path where the output should be written')
