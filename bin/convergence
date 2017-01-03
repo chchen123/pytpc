@@ -3,14 +3,20 @@
 
 from pytpc.fitting import MCFitter, BadEventError
 from pytpc.cleaning import apply_clean_cut
+from pytpc.utilities import read_lookup_table, find_exclusion_region
 from itertools import product
 from functools import reduce
 import operator
 import h5py
 import yaml
 import os
+import csv
 import sys
+import numpy as np
 from argparse import ArgumentParser
+
+import effsim.database as effdb
+from effsim.effsim import EfficiencySimulator
 
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
@@ -71,6 +77,17 @@ class ConvergenceTestResult(SQLBase):
     vertChi2 = Column(Float)
 
 
+def load_pedestals(path):
+    with open(path, 'r') as f:
+        reader = csv.reader(f)
+        pedestals = np.zeros(10240, dtype='float64')
+        for row in reader:
+            pad, ped = row
+            pedestals[int(pad)] = float(ped)
+
+    return pedestals
+
+
 def float_range(min_, max_, step):
     """Like the builtin ``range``, but for floats.
 
@@ -101,8 +118,18 @@ class VariableGenerator(object):
 
 
 class ConvergenceTestManager(object):
-    def __init__(self, fitter_config, convtest_config):
+    def __init__(self, fitter_config, convtest_config, output_path):
         self.fitter = MCFitter(fitter_config)
+
+        pedestals = load_pedestals(fitter_config['pedestals_path'])
+        lookup = read_lookup_table(fitter_config['padmap_path'])
+        excluded_pads, lowgain_pads = find_exclusion_region(fitter_config['xcfg_path'], lookup)
+        self.simulator = EfficiencySimulator(
+            config=fitter_config,
+            pedestals=pedestals,
+            excluded_pads=excluded_pads,
+            lowgain_pads=lowgain_pads,
+        )
 
         for variable in ('num_iters', 'num_pts', 'red_factor'):
             config_entry = convtest_config[variable]
@@ -112,8 +139,15 @@ class ConvergenceTestManager(object):
 
         self.num_trials = convtest_config['num_trials']
 
-        self.file_path = convtest_config['file_path']
-        self.evt_id = convtest_config['evt_id']
+        self.event_info = convtest_config['event']
+        self.is_simulated = 'file_path' not in self.event_info.keys()
+
+        sql_engine = create_engine('sqlite:///{:s}'.format(os.path.abspath(output_path)))
+        SQLBase.metadata.create_all(bind=sql_engine)
+        Session.configure(bind=sql_engine)
+
+        if self.is_simulated:
+            effdb.SQLBase.metadata.create_all(bind=sql_engine)
 
     def iter_vars(self):
         """Iterate over the Monte Carlo variables"""
@@ -150,15 +184,8 @@ class ConvergenceTestManager(object):
         else:
             return cleaned
 
-    def get_event(self, file_path, evt_id):
-        """Reads and cleans the given event from the input file.
-
-        Parameters
-        ----------
-        file_path : str
-            The path to the HDF data file
-        evt_id : int
-            The event ID to read.
+    def read_event(self):
+        """Reads and cleans the event specified in ``self.event_info``.
 
         Returns
         -------
@@ -167,8 +194,8 @@ class ConvergenceTestManager(object):
         (cx, cy) : (float, float)
             The center of curvature of the track.
         """
-        with h5py.File(file_path, 'r') as hf:
-            dataset = hf['/clean/{}'.format(evt_id)]
+        with h5py.File(self.event_info['file_path'], 'r') as hf:
+            dataset = hf['/clean/{}'.format(self.event_info['evt_id'])]
             data = dataset[:]
             cx, cy = dataset.attrs['center'][:2]
 
@@ -176,10 +203,45 @@ class ConvergenceTestManager(object):
 
         return clean_xyz, (cx, cy)
 
+    def simulate_event(self):
+        param_vector = np.array([self.event_info[k] for k in ['x0', 'y0', 'z0', 'enu0', 'azi0', 'pol0']])
+        evt_id = 0
+
+        dict_evt, true_ctr = self.simulator.make_event(evt_id, param_vector)
+        dict_evt = self.simulator.noisemaker.add_noise(dict_evt)
+        trig_res, hitmask = self.simulator.run_trigger(evt_id, dict_evt)
+        evt = self.simulator.prepare_event_for_cleaner(dict_evt, hitmask)
+        clean_res, clean_xyz, ctr = self.simulator.run_cleaner(evt_id, evt)
+        fit_res = self.simulator.run_fit(evt_id, clean_xyz, ctr)
+
+        with managed_session() as session:
+            param_set = effdb.ParameterSet(
+                evt_id=evt_id,
+                x0=param_vector[0],
+                y0=param_vector[1],
+                z0=param_vector[2],
+                enu0=param_vector[3],
+                azi0=param_vector[4],
+                pol0=param_vector[5],
+            )
+
+            session.add(param_set)
+            session.add(trig_res)
+            session.add(clean_res)
+            session.add(fit_res)
+
+        return clean_xyz, ctr
+
     def run_test(self):
         logger.info('Beginning test')
-        logger.info('Reading event %d from file %s', self.evt_id, os.path.basename(self.file_path))
-        raw_xyz, (cx, cy) = self.get_event(self.file_path, self.evt_id)
+
+        if self.is_simulated:
+            logger.info('Simulating event')
+            raw_xyz, (cx, cy) = self.simulate_event()
+        else:
+            logger.info('Reading event %d from file %s', self.event_info['evt_id'],
+                        os.path.basename(self.event_info['file_path']))
+            raw_xyz, (cx, cy) = self.read_event()
 
         logger.info('Total number of trials expected: %d', self.total_num_trials())
         logger.info('Will simulate track %0.2e times', self.total_num_tracks())
@@ -256,11 +318,7 @@ def main():
     fitter_config, convtest_config = load_configs(args.fitter_config, args.convtest_config, args.fitter_config_patch)
     setup_logging(fitter_config)
 
-    sql_engine = create_engine('sqlite:///{:s}'.format(os.path.abspath(args.output_path)))
-    SQLBase.metadata.create_all(bind=sql_engine)
-    Session.configure(bind=sql_engine)
-
-    manager = ConvergenceTestManager(fitter_config, convtest_config)
+    manager = ConvergenceTestManager(fitter_config, convtest_config, args.output_path)
     manager.run_test()
 
 
