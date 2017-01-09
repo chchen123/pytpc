@@ -128,6 +128,7 @@ def make_param_generator(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg, ga
             beam_mass=beam_mass,
             beam_chg=beam_chg,
             proj_mass=proj_mass,
+            proj_chg=proj_chg,
             gas=gas,
             num_evts=num_evts,
         )
