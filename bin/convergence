@@ -291,12 +291,19 @@ def load_configs(fitter_config_path, convtest_config_path, fitter_config_patches
     with open(os.path.abspath(fitter_config_path)) as f:
         fitter_config = yaml.load(f)
 
+    setup_logging(fitter_config)
+
     for patch_path in fitter_config_patches:
         with open(os.path.abspath(patch_path)) as f:
             patch = yaml.load(f)
 
         fitter_config.update(patch)
+
         logger.info('Patched config with file %s', os.path.basename(convtest_config_path))
+
+    if fitter_config['micromegas_tb'] != 0:
+        logger.warning('Micromegas TB was nonzero in fitter_config. Setting value to zero.')
+        fitter_config['micromegas_tb'] = 0
 
     with open(os.path.abspath(convtest_config_path)) as f:
         convtest_config = yaml.load(f)
@@ -317,7 +324,6 @@ def parse_args():
 def main():
     args = parse_args()
     fitter_config, convtest_config = load_configs(args.fitter_config, args.convtest_config, args.fitter_config_patch)
-    setup_logging(fitter_config)
 
     manager = ConvergenceTestManager(fitter_config, convtest_config, args.output_path)
     manager.run_test()
