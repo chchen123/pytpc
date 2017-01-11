@@ -11,7 +11,7 @@ from pytpc.padplane import generate_pad_plane
 import logging
 from copy import copy
 
-from .database import ParameterSet, TriggerResult, CleaningResult, MinimizerResult
+from .database import ParameterSet, TriggerResult, CleaningResult, MinimizerResult, ClockOffsets
 from .database import EventCannotContinue, managed_session
 
 logger = logging.getLogger(__name__)
@@ -71,7 +71,7 @@ class EventSimulator(TrackerMixin, EventGeneratorMixin):
 
 
 class NoiseMaker(object):
-    def __init__(self, config, pedestals=None):
+    def __init__(self, config, pedestals=None, corrupt_cobo_clocks=False):
         config = copy(config)
         config['mass_num'] = config['beam_mass']
         config['charge_num'] = config['beam_charge']
@@ -98,6 +98,15 @@ class NoiseMaker(object):
         else:
             self.pedestals = np.zeros(10240, dtype='float64')
 
+        self.padmap = read_lookup_table(config['padmap_path'])  # maps (cobo, asad, aget, ch) -> pad
+        self.pad_cobos = np.zeros(10240, dtype=np.int64)  # List index = pad, value = cobo
+        for (cobo, asad, aget, ch), pad in self.padmap.items():
+            self.pad_cobos[pad] = cobo
+
+        self.cobo_offsets = self.make_cobo_clock_offsets()
+        if corrupt_cobo_clocks:
+            self.apply_cobo_clock_patch()
+
     def add_noise(self, evt, depress_baseline=True, add_gaussian_noise=True, clip=True):
         for pad, trace in evt.items():
             if add_gaussian_noise:
@@ -112,16 +121,50 @@ class NoiseMaker(object):
 
         return evt
 
+    def make_cobo_clock_offsets(self):
+        cobo_offsets = np.zeros(10)
+        cobo_offsets[1:] = np.random.triangular(left=-1, mode=0, right=1, size=9)
+        return cobo_offsets
+
+    @property
+    def pad_offsets(self):
+        return self.cobo_offsets[self.pad_cobos]
+
+    def apply_cobo_clock_patch(self):
+        logger.warning("Applying patch to Event.xyzs to corrupt CoBo clocks with random offsets")
+        old_xyzs = Event.xyzs  # patch in the scope of this module
+
+        def patched_xyzs(self_, *args, **kwargs):
+            assert 'return_pads' in kwargs, "Must call with 'return_pads == True' for this hack to work"
+            assert len(args) == 0, "I can't work with args"
+            assert 'vd' not in kwargs, "We can't calibrate in this step with the patch"
+
+            xyz = old_xyzs(self_, *args, **kwargs)  # format: [x, y, z, a, pad, ...]
+            xyz[:, 2] += self.pad_offsets[xyz[:, 4].astype('int')]
+            return xyz
+
+        Event.xyzs = patched_xyzs
+
 
 class EfficiencySimulator(object):
-    def __init__(self, config, excluded_pads=[], lowgain_pads=[], evtgen_config=None, pedestals=None):
+    def __init__(self, config, excluded_pads=[], lowgain_pads=[], evtgen_config=None, pedestals=None,
+                 corrupt_cobo_clocks=False):
         if evtgen_config is None:
             evtgen_config = config
         self.evtsim = EventSimulator(evtgen_config, badpads=lowgain_pads)
-        self.noisemaker = NoiseMaker(evtgen_config, pedestals=pedestals)
+        self.noisemaker = NoiseMaker(evtgen_config, pedestals=pedestals, corrupt_cobo_clocks=corrupt_cobo_clocks)
         self.trigger = TriggerSimulator(config, excluded_pads=excluded_pads, pedestals=pedestals)
         self.cleaner = EventCleaner(config)
         self.fitter = MCFitter(config)
+
+        self.clocks_are_corrupted = corrupt_cobo_clocks
+
+    def setup_clock_offsets(self, evt_id):
+        self.noisemaker.cobo_offsets = self.noisemaker.make_cobo_clock_offsets()
+
+        cobo_names = ('cobo{:d}'.format(i) for i in range(10))
+        offset_map = dict(zip(cobo_names, self.noisemaker.cobo_offsets))
+        return ClockOffsets(evt_id=evt_id, **offset_map)
 
     def make_event(self, evt_id, params):
         dict_evt, true_ctr = self.evtsim.make_event(*params)
@@ -165,6 +208,10 @@ class EfficiencySimulator(object):
                 pol0=param_vector[5],
             )
             session.add(param_set)
+
+            if self.clocks_are_corrupted:
+                clock_res = self.setup_clock_offsets(evt_id)
+                session.add(clock_res)
 
             try:
                 dict_evt, true_ctr = self.make_event(evt_id, param_vector)

@@ -36,6 +36,21 @@ def initialize_database(engine):
     Session.configure(bind=engine)
 
 
+class ClockOffsets(SQLBase):
+    __tablename__ = 'clock_offsets'
+    evt_id = Column(Integer, primary_key=True)
+    cobo0 = Column(Float)
+    cobo1 = Column(Float)
+    cobo2 = Column(Float)
+    cobo3 = Column(Float)
+    cobo4 = Column(Float)
+    cobo5 = Column(Float)
+    cobo6 = Column(Float)
+    cobo7 = Column(Float)
+    cobo8 = Column(Float)
+    cobo9 = Column(Float)
+
+
 class ParameterSet(SQLBase):
     __tablename__ = 'params'
     evt_id = Column(Integer, primary_key=True)

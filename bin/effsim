@@ -24,6 +24,7 @@ def parse_arguments():
     parser.add_argument('--evtgen-config-patch', '-e', help='A special patch for the evtgen config')
     parser.add_argument('--config-patch', '-p', help='One or more YAML files to patch the config with', action='append')
     parser.add_argument('--distrib-info', '-d', help='YAML file giving info about distribution to use')
+    parser.add_argument('--corrupt-cobo-clocks', '-c', help='Apply offsets to CoBo clocks', action='store_true')
     parser.add_argument('config', help='Path to config file')
     parser.add_argument('output', help='Path to output database')
     return parser.parse_args()
@@ -159,6 +160,7 @@ def main():
         lowgain_pads=lowgain_pads,
         evtgen_config=evtgen_config,
         pedestals=pedestals,
+        corrupt_cobo_clocks=args.corrupt_cobo_clocks,
     )
 
     sql_engine = create_engine('sqlite:///{}'.format(args.output))
