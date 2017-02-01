@@ -266,6 +266,10 @@ class FitManager(object):
         else:
             return cleaned
 
+    def preprocess_data(self, raw_xyz, cx, cy, preprocess_kwargs={}):
+        xyz, (cu, cv) = self.preprocess(raw_xyz, center=[cx, cy], **preprocess_kwargs)
+        return xyz, (cu, cv)
+
     def process_event(self, evt_id):
         """Run the whole fitting process on the given event.
 
@@ -283,8 +287,11 @@ class FitManager(object):
         with monitored_execution('Cleaning', evt_id):
             clean_xyz = self.clean_data(raw_xyz)
 
+        with monitored_execution('Preprocessing', evt_id):
+            xyz, (cu, cv) = self.preprocess_data(clean_xyz, cx, cy, preprocess_kwargs={'rotate_pads': False})
+
         with monitored_execution('Fitting', evt_id):
-            fitres = self.fitter.process_event(clean_xyz, cx, cy, preprocess_kwargs={'rotate_pads': False})
+            fitres = self.fitter.process_event(xyz, cu, cv)
 
         # Write the results to the database
         with managed_session() as session:

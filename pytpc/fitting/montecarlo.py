@@ -50,17 +50,20 @@ class MCFitter(PreprocessMixin, LinearPrefitMixin, TrackerMixin, EventGeneratorM
 
         self.minimizer = Minimizer(self.tracker, self.evtgen)
 
-    def process_event(self, raw_xyz, cx, cy, exp_hits=None, remove_noise=True, return_details=False,
-                      preprocess_kwargs={}):
-        xyz, (cu, cv) = self.preprocess(raw_xyz, center=[cx, cy], **preprocess_kwargs)
-
-        if len(xyz) < 50:
-            raise BadEventError("Not enough points")
-
+    def process_event(self, xyz, cu, cv, exp_hits=None, return_details=False, beamloc=None):
         if exp_hits is None:
             exp_hits = np.zeros(10240)
             for a, p in xyz[['a', 'pad']].values:
                 exp_hits[int(p)] = a
+
+        if beamloc is not None:
+            xslope, yslope = beamloc.slopes         # unitless since it's mm / mm
+            xint, yint = beamloc.intercepts / 1000  # in meters for mcopt
+        else:
+            xslope = 0
+            yslope = 0
+            xint = 0
+            yint = 0
 
         xyz_sorted = xyz.sort_values(by='w', ascending=True)
         prefit_data = xyz_sorted.iloc[-len(xyz_sorted) // 4:].copy()
@@ -71,8 +74,20 @@ class MCFitter(PreprocessMixin, LinearPrefitMixin, TrackerMixin, EventGeneratorM
 
         ctr0 = self.guess_parameters(prefit_res)
 
-        minres = self.minimizer.minimize(ctr0, self.sigma, exp_pos, exp_hits, self.num_iters, self.num_pts,
-                                         self.red_factor, details=return_details)
+        minres = self.minimizer.minimize(
+            ctr0,
+            self.sigma,
+            exp_pos,
+            exp_hits,
+            xslope,
+            xint,
+            yslope,
+            yint,
+            numIters=self.num_iters,
+            numPts=self.num_pts,
+            redFactor=self.red_factor,
+            details=return_details
+        )
 
         if return_details:
             ctr, min_chis, all_params, good_param_idx = minres

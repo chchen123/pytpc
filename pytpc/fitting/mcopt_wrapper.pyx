@@ -499,7 +499,8 @@ cdef class Minimizer:
         del self.thisptr
 
     def minimize(self, np.ndarray[np.double_t, ndim=1] ctr0, np.ndarray[np.double_t, ndim=1] sigma0,
-                 np.ndarray[np.double_t, ndim=2] expPos, np.ndarray[np.double_t, ndim=1] expMesh,
+                 np.ndarray[np.double_t, ndim=2] expPos, np.ndarray[np.double_t, ndim=1] expHits,
+                 double beam_xslope, double beam_xint, double beam_yslope, double beam_yint,
                  unsigned numIters=10, unsigned numPts=200, double redFactor=0.8, bint details=False):
         """Perform chi^2 minimization for the track.
 
@@ -542,9 +543,10 @@ cdef class Minimizer:
         """
         cdef arma.vec *ctr0Arr
         cdef arma.vec *sigma0Arr
-        cdef arma.vec *expMeshArr
+        cdef arma.vec *expHitsArr
         cdef arma.mat *expPosArr
         cdef mcopt.MCminimizeResult minres
+        cdef mcopt.BeamLocationEstimator* beamloc
 
         if len(ctr0) != len(sigma0):
             raise ValueError("Length of ctr0 and sigma0 arrays must be equal")
@@ -553,11 +555,12 @@ cdef class Minimizer:
             ctr0Arr = arma.np2vec(ctr0)
             sigma0Arr = arma.np2vec(sigma0)
             expPosArr = arma.np2mat(expPos)
-            expMeshArr = arma.np2vec(expMesh)
-            minres = self.thisptr.minimize(deref(ctr0Arr), deref(sigma0Arr), deref(expPosArr), deref(expMeshArr),
-                                           numIters, numPts, redFactor)
+            expHitsArr = arma.np2vec(expHits)
+            beamloc = new mcopt.BeamLocationEstimator(beam_xslope, beam_xint, beam_yslope, beam_yint)
+            minres = self.thisptr.minimize(deref(ctr0Arr), deref(sigma0Arr), deref(expPosArr), deref(expHitsArr),
+                                           numIters, numPts, redFactor, deref(beamloc))
         finally:
-            del ctr0Arr, sigma0Arr, expPosArr, expMeshArr
+            del ctr0Arr, sigma0Arr, expPosArr, expHitsArr
 
         cdef np.ndarray[np.double_t, ndim=1] ctr = arma.vec2np(minres.ctr)
 
