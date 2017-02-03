@@ -74,7 +74,6 @@ cdef extern from "mcopt/mcopt.h" namespace "mcopt":
         Chi2Set() except+
         double posChi2
         double enChi2
-        double vertChi2
 
 
     cdef cppclass BeamLocationEstimator:
@@ -87,15 +86,15 @@ cdef extern from "mcopt/mcopt.h" namespace "mcopt":
 
 
     cdef cppclass MCminimizer:
-        MCminimizer(const Tracker* tracker, const EventGenerator* evtgen) except+
+        MCminimizer(const Tracker* tracker, const EventGenerator* evtgen,
+                    const unsigned numIters, const unsigned numPts, const double redFactor) except+
 
         arma.mat makeParams(const arma.vec& ctr, const arma.vec& sigma, const unsigned numSets,
                             const arma.vec& mins, const arma.vec& maxes) except+
         arma.mat findPositionDeviations(const arma.mat& simPos, const arma.mat& expPos) except+
         arma.vec findHitPatternDeviation(const arma.mat& simPos, const arma.vec& simEn, const arma.vec& expHits) except+
         MCminimizeResult minimize(const arma.vec& ctr0, const arma.vec& sigma0, const arma.mat& expPos,
-                                  const arma.vec& expMesh, const unsigned numIters, const unsigned numPts,
-                                  const double redFactor, const BeamLocationEstimator& beamloc) except+
+                                  const arma.vec& expMesh, const BeamLocationEstimator& beamloc) except+
         Chi2Set runTrack(const arma.vec& params, const arma.mat& expPos, const arma.vec& expHits) except+
         arma.mat runTracks(const arma.mat& params, const arma.mat& expPos, const arma.vec& expHits) except+
 
@@ -107,41 +106,6 @@ cdef extern from "mcopt/mcopt.h" namespace "mcopt":
         double enChi2NormFraction
         double vertChi2Norm
 
-
-    cdef cppclass AnnealStopReason:
-        bint operator==(const AnnealStopReason&) except+
-
-
-    cdef:
-        AnnealStopReason ANNEAL_CONVERGED "mcopt::AnnealStopReason::converged"
-        AnnealStopReason ANNEAL_MAX_ITERS "mcopt::AnnealStopReason::maxIters"
-        AnnealStopReason ANNEAL_TOO_MANY_CALLS "mcopt::AnnealStopReason::tooManyCalls"
-
-
-    cdef cppclass AnnealResult:
-        AnnealResult() except+
-        arma.mat ctrs
-        arma.mat chis
-        AnnealStopReason stopReason
-        int numCalls
-
-
-    cdef cppclass Annealer:
-        Annealer(const Tracker* tracker, const EventGenerator* evtgen, const double T0, const double coolRate,
-                 const int numIters, const int maxCallsPerIter) except+
-        AnnealResult minimize(const arma.vec& ctr0, const arma.vec& sigma0, const arma.mat& expPos,
-                              const arma.vec& expHits) except+
-        arma.vec randomStep(const arma.vec& ctr, const arma.vec& sigma) except+
-        double T0
-        double coolRate
-        int numIters
-        int maxCallsPerIter
-        size_t multiMinimizeNumTrials
-
-        bint posChi2Enabled
-        bint enChi2Enabled
-        bint vertChi2Enabled
-
-        double posChi2Norm
-        double enChi2NormFraction
-        double vertChi2Norm
+        unsigned numIters
+        unsigned numPts
+        double redFactor

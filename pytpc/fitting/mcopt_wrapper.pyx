@@ -490,18 +490,18 @@ cdef class Minimizer:
     evtgen : mcopt.EventGenerator
         The event generator to use to do the projection onto the pad plane.
     """
-    def __cinit__(self, Tracker tr, EventGenerator evtgen):
+    def __cinit__(self, Tracker tr, EventGenerator evtgen, unsigned numIters, unsigned numPts, double redFactor):
         self.pyTracker = tr
         self.pyEvtGen = evtgen
-        self.thisptr = new mcopt.MCminimizer(self.pyTracker.thisptr, self.pyEvtGen.thisptr)
+        self.thisptr = new mcopt.MCminimizer(self.pyTracker.thisptr, self.pyEvtGen.thisptr,
+                                             numIters, numPts, redFactor)
 
     def __dealloc__(self):
         del self.thisptr
 
     def minimize(self, np.ndarray[np.double_t, ndim=1] ctr0, np.ndarray[np.double_t, ndim=1] sigma0,
                  np.ndarray[np.double_t, ndim=2] expPos, np.ndarray[np.double_t, ndim=1] expHits,
-                 double beam_xslope, double beam_xint, double beam_yslope, double beam_yint,
-                 unsigned numIters=10, unsigned numPts=200, double redFactor=0.8, bint details=False):
+                 double beam_xslope, double beam_xint, double beam_yslope, double beam_yint, bint details=False):
         """Perform chi^2 minimization for the track.
 
         Parameters
@@ -558,7 +558,7 @@ cdef class Minimizer:
             expHitsArr = arma.np2vec(expHits)
             beamloc = new mcopt.BeamLocationEstimator(beam_xslope, beam_xint, beam_yslope, beam_yint)
             minres = self.thisptr.minimize(deref(ctr0Arr), deref(sigma0Arr), deref(expPosArr), deref(expHitsArr),
-                                           numIters, numPts, redFactor, deref(beamloc))
+                                           deref(beamloc))
         finally:
             del ctr0Arr, sigma0Arr, expPosArr, expHitsArr
 
@@ -580,8 +580,7 @@ cdef class Minimizer:
         else:
             lastPosChi = minres.minChis(minres.minChis.n_rows - 1, 0)
             lastEnChi = minres.minChis(minres.minChis.n_rows - 1, 1)
-            lastVertChi = minres.minChis(minres.minChis.n_rows - 1, 2)
-            return ctr, lastPosChi, lastEnChi, lastVertChi
+            return ctr, lastPosChi, lastEnChi
 
     def find_position_deviations(self, np.ndarray[np.double_t, ndim=2] simArr, np.ndarray[np.double_t, ndim=2] expArr):
         """Find the deviations in position between two tracks.
@@ -696,6 +695,30 @@ cdef class Minimizer:
         return chiArr
 
     @property
+    def num_iters(self):
+        return self.thisptr.numIters
+
+    @num_iters.setter
+    def num_iters(self, newval):
+        self.thisptr.numIters = newval
+
+    @property
+    def num_pts(self):
+        return self.thisptr.numPts
+
+    @num_pts.setter
+    def num_pts(self, newval):
+        self.thisptr.numPts = newval
+
+    @property
+    def red_factor(self):
+        return self.thisptr.redFactor
+
+    @red_factor.setter
+    def red_factor(self, newval):
+        self.thisptr.redFactor = newval
+
+    @property
     def posChi2Enabled(self):
         return self.thisptr.posChi2Enabled
 
@@ -710,14 +733,6 @@ cdef class Minimizer:
     @enChi2Enabled.setter
     def enChi2Enabled(self, newval):
         self.thisptr.enChi2Enabled = newval
-
-    @property
-    def vertChi2Enabled(self):
-        return self.thisptr.vertChi2Enabled
-
-    @vertChi2Enabled.setter
-    def vertChi2Enabled(self, newval):
-        self.thisptr.vertChi2Enabled = newval
 
     @property
     def posChi2Norm(self):
@@ -734,141 +749,3 @@ cdef class Minimizer:
     @enChi2NormFraction.setter
     def enChi2NormFraction(self, newval):
         self.thisptr.enChi2NormFraction = newval
-
-    @property
-    def vertChi2Norm(self):
-        return self.thisptr.vertChi2Norm
-
-    @vertChi2Norm.setter
-    def vertChi2Norm(self, newval):
-        self.thisptr.vertChi2Norm = newval
-
-
-cdef class Annealer:
-    def __cinit__(self, Tracker tr, EventGenerator evtgen, double initial_temp, double cool_rate, int num_iters,
-                  int max_calls_per_iter):
-        self.pyTracker = tr
-        self.pyEvtGen = evtgen
-        self.thisptr = new mcopt.Annealer(self.pyTracker.thisptr, self.pyEvtGen.thisptr, initial_temp, cool_rate, num_iters,
-                                          max_calls_per_iter)
-
-    def __dealloc__(self):
-        del self.thisptr
-
-    def minimize(self, np.ndarray[np.double_t, ndim=1] ctr0, np.ndarray[np.double_t, ndim=1] sigma0,
-                 np.ndarray[np.double_t, ndim=2] expPos, np.ndarray[np.double_t, ndim=1] expHits):
-        cdef arma.vec *ctr0Arr
-        cdef arma.vec *sigma0Arr
-        cdef arma.vec *expHitsArr
-        cdef arma.mat *expPosArr
-        cdef mcopt.AnnealResult minres
-
-        if len(ctr0) != len(sigma0):
-            raise ValueError("Length of ctr0 and sigma0 arrays must be equal")
-
-        try:
-            ctr0Arr = arma.np2vec(ctr0)
-            sigma0Arr = arma.np2vec(sigma0)
-            expPosArr = arma.np2mat(expPos)
-            expHitsArr = arma.np2vec(expHits)
-            minres = self.thisptr.minimize(deref(ctr0Arr), deref(sigma0Arr), deref(expPosArr), deref(expHitsArr))
-        finally:
-            del ctr0Arr, sigma0Arr, expPosArr, expHitsArr
-
-        cdef np.ndarray[np.double_t, ndim=2] ctrs = arma.mat2np(minres.ctrs)
-        cdef np.ndarray[np.double_t, ndim=2] chis = arma.mat2np(minres.chis)
-
-        if minres.stopReason == mcopt.ANNEAL_CONVERGED:
-            stop_reason = 'Converged'
-        elif minres.stopReason == mcopt.ANNEAL_MAX_ITERS:
-            stop_reason = 'Finished requested number of iterations'
-        elif minres.stopReason == mcopt.ANNEAL_TOO_MANY_CALLS:
-            stop_reason = 'Exceeded max number of calls per iteration'
-        else:
-            stop_reason = 'Unknown stop reason'
-
-        return {'ctrs': ctrs,
-                'chis': chis,
-                'stop_reason': stop_reason,
-                'num_calls': minres.numCalls}
-
-    def random_step(self, np.ndarray[np.double_t, ndim=1] ctr, np.ndarray[np.double_t, ndim=1] sigma):
-        cdef arma.vec *ctrArr
-        cdef arma.vec *sigmaArr
-        cdef arma.vec newCtr
-
-        try:
-            ctrArr = arma.np2vec(ctr)
-            sigmaArr = arma.np2vec(sigma)
-
-            newCtr = self.thisptr.randomStep(deref(ctrArr), deref(sigmaArr))
-
-        finally:
-            del ctrArr, sigmaArr
-
-        cdef np.ndarray[np.double_t, ndim=1] result = arma.vec2np(newCtr)
-        return result
-
-    @property
-    def initial_temp(self):
-        return self.thisptr.T0
-
-    @initial_temp.setter
-    def initial_temp(self, newval):
-        self.thisptr.T0 = newval
-
-    @property
-    def cool_rate(self):
-        return self.thisptr.coolRate
-
-    @cool_rate.setter
-    def cool_rate(self, newval):
-        self.thisptr.coolRate = newval
-
-    @property
-    def num_iters(self):
-        return self.thisptr.numIters
-
-    @num_iters.setter
-    def num_iters(self, newval):
-        self.thisptr.numIters = newval
-
-    @property
-    def max_calls_per_iter(self):
-        return self.thisptr.maxCallsPerIter
-
-    @max_calls_per_iter.setter
-    def max_calls_per_iter(self, newval):
-        self.thisptr.maxCallsPerIter = newval
-
-    @property
-    def multi_minimize_num_trials(self):
-        return self.thisptr.multiMinimizeNumTrials
-
-    @multi_minimize_num_trials.setter
-    def multi_minimize_num_trials(self, newval):
-        self.thisptr.multiMinimizeNumTrials = newval
-
-    @property
-    def posChi2Enabled(self):
-        return self.thisptr.posChi2Enabled
-
-    @posChi2Enabled.setter
-    def posChi2Enabled(self, newval):
-        self.thisptr.posChi2Enabled = newval
-
-    @property
-    def enChi2Enabled(self):
-        return self.thisptr.enChi2Enabled
-
-    @enChi2Enabled.setter
-    def enChi2Enabled(self, newval):
-        self.thisptr.enChi2Enabled = newval
-
-    @property
-    def vertChi2Enabled(self):
-        return self.thisptr.vertChi2Enabled
-
-    @vertChi2Enabled.setter
-    def vertChi2Enabled(self, newval):
-        self.thisptr.vertChi2Enabled = newval

@@ -15,7 +15,7 @@ import sys
 import os
 import argparse
 import h5py
-from pytpc.fitting import MCFitter, Annealer, BadEventError, BeamTrackLinearModel
+from pytpc.fitting import MCFitter, BadEventError, BeamTrackLinearModel
 from pytpc.utilities import find_run_number, find_exclusion_region, read_lookup_table
 from pytpc.cleaning import apply_clean_cut
 import yaml
@@ -87,7 +87,6 @@ class MinimizerResult(SQLBase):
     pol0 = Column(Float)
     posChi2 = Column(Float)
     enChi2 = Column(Float)
-    vertChi2 = Column(Float)
     lin_scat_ang = Column(Float)
     lin_beam_int = Column(Float)
     lin_chi2 = Column(Float)
@@ -184,8 +183,6 @@ class FitManager(object):
     ----------
     config : dict-like
         The config dictionary.
-    fitter_class : class
-        The fitter class that should be instantiated to fit data.
     evtlist_path, input_path, output_path : string
         Paths to the list of good events, input data file, and output database, respectively.
 
@@ -197,8 +194,8 @@ class FitManager(object):
         Reads the event, cleans it, fits it, and writes the output to the database.
 
     """
-    def __init__(self, config, fitter_class, evtlist_path, input_path, output_path, lowgpads):
-        self.fitter = fitter_class(config)
+    def __init__(self, config, evtlist_path, input_path, output_path, lowgpads):
+        self.fitter = MCFitter(config)
         self.run_num = find_run_number(input_path)
         self.input_file = h5py.File(input_path, 'r')
         self.db_engine = create_and_setup_database_engine(output_path)
@@ -337,8 +334,6 @@ def parse_args():
     parser.add_argument('--config-patch', '-p', help='Configuration patches', action='append')
     parser.add_argument('--xcfg-path', '-x', help='Path to GET electronics config file', required=True)
     parser.add_argument('--evtlist', '-e', help='Path to HDF5 file with results from the circle fit', required=True)
-    parser.add_argument('--algorithm', '-a', help='Algorithm to use', type=str,
-                        choices=['mc', 'annealer'], default='mc')
     parser.add_argument('--verbose', '-v', action='count', default=0,
                         help='Print more information')
     parser.add_argument('input_file', help='The input HDF5 file containing the peaks')
@@ -385,14 +380,8 @@ def main():
     lookup = read_lookup_table(config['padmap_path'])
     _, lowg = find_exclusion_region(args.xcfg_path, lookup)
 
-    algo_dict = {'mc': MCFitter,
-                 'annealer': Annealer}
-
-    fitter_class = algo_dict[args.algorithm]
-
     fit_manager = FitManager(
         config=config,
-        fitter_class=fitter_class,
         evtlist_path=args.evtlist,
         input_path=args.input_file,
         output_path=args.db_path,

@@ -34,9 +34,3 @@ cdef class Minimizer:
     cdef mcopt.MCminimizer *thisptr
     cdef Tracker pyTracker
     cdef EventGenerator pyEvtGen
-
-
-cdef class Annealer:
-    cdef mcopt.Annealer *thisptr
-    cdef Tracker pyTracker
-    cdef EventGenerator pyEvtGen
