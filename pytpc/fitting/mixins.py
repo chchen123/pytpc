@@ -257,7 +257,7 @@ class PreprocessMixin(Base):
         self.micromegas_tb = config['micromegas_tb']
         super().__init__(config)
 
-    def preprocess(self, raw_xyz, center=None, rotate_pads=False, last_tb=None):
+    def preprocess(self, raw_xyz, center=None, rotate_pads=False, last_tb=None, drop_beampads=True):
         """Preprocesses data by calibrating it and un-tilting it.
 
         Parameters
@@ -273,6 +273,8 @@ class PreprocessMixin(Base):
         last_tb : int, optional
             The last time bucket to consider. If provided, all time buckets after this one will be zeroed. This
             can help with noise at the end of the event.
+        drop_beampads : bool
+            Whether to throw out the beam pads in ``self.beampads`` when calibrating.
 
         Returns
         -------
@@ -297,9 +299,12 @@ class PreprocessMixin(Base):
         raw_xyz[:, 2] -= self.micromegas_tb
 
         # Correct for Lorentz angle and find z dimension
-        # xyz = pd.DataFrame(pytpc.evtdata.calibrate(raw_xyz, self.vd, self.clock), columns=('x', 'y', 'z', 'a', 'pad'))
-        xyz = pd.DataFrame(calibrate(raw_xyz[np.where(~np.in1d(raw_xyz[:, -1], self.beampads))],
-                                     self.vd, self.clock), columns=('x', 'y', 'z', 'a', 'pad'))
+        if drop_beampads:
+            good_data = raw_xyz[np.where(~np.in1d(raw_xyz[:, -1], self.beampads))]
+        else:
+            good_data = raw_xyz
+
+        xyz = pd.DataFrame(calibrate(good_data, self.vd, self.clock), columns=('x', 'y', 'z', 'a', 'pad'))
 
         # Find the untilted coordinates
         tmat = tilt_matrix(-self.tilt)
