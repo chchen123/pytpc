@@ -1,3 +1,9 @@
+"""cleaning.py
+
+This module contains the main Python part of the cleaning functions.
+
+"""
+
 import numpy as np
 import pandas as pd
 from scipy.signal import argrelextrema
@@ -29,41 +35,34 @@ class HoughCleaner(Base):
     config : dict-like
         A set of configuration parameters to initialize the object. See the attributes section below
         to find out what keys this dictionary must contain.
-
-    Attributes
-    ----------
-    peak_width
-        The number of bins to consider in each direction when finding the center of mass of
-        peaks in the Hough space.
-    linear_hough_max
-        The largest radial distance to consider in the linear Hough transform. This sets the scale of the
-        largest bin in the Hough space.
-    linear_hough_nbins
-        The number of bins to use in each dimension in the linear Hough transform.
-    circle_hough_max
-        The largest radial distance to consider in the circular Hough transform. This sets the scale of the
-        largest bin in the Hough space.
-    circle_hough_nbins
-        The number of bins to use in each dimension in the circular Hough transform.
-    min_pts_per_line
-        If a line has fewer points than this near it, it will not be considered a true line.
-    neighbor_radius
-        The largest separation between two points that will still allow them to be considered neighbors.
-
     """
     def __init__(self, config):
         super().__init__(config)
 
         clean_conf = config['cleaning_config']
 
+        #: The number of bins to consider in each direction when finding the center of mass of
+        #: peaks in the Hough space.
         self.peak_width = clean_conf['peak_width']
 
+        #: The largest radial distance to consider in the linear Hough transform. This sets the scale of the
+        #: largest bin in the Hough space.
         self.linear_hough_max = clean_conf['linear_hough_max']
+
+        #: The number of bins to use in each dimension in the linear Hough transform.
         self.linear_hough_nbins = clean_conf['linear_hough_nbins']
+
+        #: The largest radial distance to consider in the circular Hough transform. This sets the scale of the
+        #: largest bin in the Hough space.
         self.circle_hough_max = clean_conf['circle_hough_max']
+
+        #: The number of bins to use in each dimension in the circular Hough transform.
         self.circle_hough_nbins = clean_conf['circle_hough_nbins']
 
+        #: If a line has fewer points than this near it, it will not be considered a true line.
         self.min_pts_per_line = clean_conf['min_pts_per_line']
+
+        #: The largest separation between two points that will still allow them to be considered neighbors.
         self.neighbor_radius = clean_conf['neighbor_radius']
 
     def neighbor_count(self, xyz):
@@ -130,7 +129,19 @@ class HoughCleaner(Base):
         return rads * thetas
 
     def find_linear_hough_space(self, zs, arclens):
-        """Performs the linear Hough transform."""
+        """Performs the linear Hough transform.
+
+        Parameters
+        ----------
+        zs, arclens : array-like
+            One-dimensional arrays containing the z-axis and arc-length coordinate values to be transformed.
+
+        Returns
+        -------
+        ndarray
+            The Hough space accumulator array, which is essentially a 2D histogram of the Hough space.
+
+        """
         linear_hough_data = np.ascontiguousarray(np.column_stack((zs, arclens)))
         return hough_line(linear_hough_data, nbins=self.linear_hough_nbins, max_val=self.linear_hough_max)
 
@@ -167,7 +178,24 @@ class HoughCleaner(Base):
         return theta_max, hough_slice
 
     def find_peaks(self, data):
-        """Find the center of mass of the peaks in the 1D array `data` (e.g. the slice of the Hough space)."""
+        """Find the center of gravity of the peaks in the given data.
+
+        The data, in this case, should be a 1-dimensional slice of the Hough space.
+
+        Parameters
+        ----------
+        data : ndarray
+            A 1D array of data whose peak should be found.
+
+        Returns
+        -------
+        pkctrs : ndarray
+            The center of gravity of each peak found.
+
+        """
+        # Use >= for comparison instead of just > to find flat-top peaks.
+        # But, make sure the value is > 0 since otherwise a flat baseline
+        # would be identified as a peak!
         def comparator(a, b):
             return np.greater_equal(a, b) & np.greater(a, 0)
 
@@ -188,9 +216,11 @@ class HoughCleaner(Base):
         return pkctrs
 
     def linhough_theta_from_bin(self, t):
+        """Convert a bin number to the corresponding value of the Hough transform theta angle."""
         return t * pi / self.linear_hough_nbins
 
     def linhough_rad_from_bin(self, r):
+        """Convert a bin number to the corresponding Hough space radius."""
         return r * self.linear_hough_max * 2 / self.linear_hough_nbins - self.linear_hough_max
 
     def classify_points(self, xyz, arclens, theta, radii):
@@ -280,19 +310,56 @@ class HoughCleaner(Base):
 
 
 class EventCleaner(HoughCleaner, PreprocessMixin):
+    """A subclass of `HoughCleaner` with functionality for preprocessing and handling the TPC data.
+
+    Parameters
+    ----------
+    config : dict-like
+        The configuration file.
+
+    """
     def __init__(self, config):
         super().__init__(config)
-        self.tilt = config['tilt'] * degrees
-        self.vd = np.array(config['vd'])
-        self.clock = config['clock']
-        self.pad_rot_angle = config['pad_rot_angle'] * degrees
-        self.padrotmat = rot_matrix(self.pad_rot_angle)
-        self.beampads = []
-        self.untilt_mat = tilt_matrix(self.tilt)
-        self.pads = generate_pad_plane(self.pad_rot_angle)
+        self.tilt = config['tilt'] * degrees  #: The tilt angle of the detector, in radians.
+        self.vd = np.array(config['vd'])  #: The drift velocity vector, in cm/µs.
+        self.clock = config['clock']  #: The CoBo write clock frequency, in MHz.
+        self.pad_rot_angle = config['pad_rot_angle'] * degrees  #: The pad plane rotation angle, in radians.
+        self.padrotmat = rot_matrix(self.pad_rot_angle)  #: The pad plane rotation matrix.
+        self.beampads = []  #: A list of pads to exclude. Should be an empty list for this class.
+        self.untilt_mat = tilt_matrix(self.tilt)  #: A matrix that transforms from beam to detector coordinates.
+        self.pads = generate_pad_plane(self.pad_rot_angle)  #: The pad plane.
+
+        #: The last time bucket to consider. Anything past it is discarded.
         self.last_tb = config['cleaning_config']['last_tb']
 
     def process_event(self, evt):
+        """Preprocess and clean an event, and return the cleaned xyz data.
+
+        This is the main function to call for each event during the cleaning process. It returns the cleaned data
+        and the center of the spiral. The cleaned data is returned in an array with the following columns:
+
+            - x
+            - y
+            - z
+            - Peak amplitude
+            - Pad number
+            - Number of neighbors
+            - Orthogonal distance to nearest identified line
+
+        Parameters
+        ----------
+        evt : pytpc.evtdata.Event
+            The raw event object with the full data traces.
+
+        Returns
+        -------
+        clean_xyz : ndarray
+            The cleaned xyz data, as a 2D array. The columns are as shown above. The x, y, and z positions are in
+            the *uncalibrated* coordinate system, but the pad plane rotation will have already been applied.
+        (cx, cy) : tuple of floats
+            The x and y position of the center of the spiral.
+
+        """
         raw_xyz = evt.xyzs(pads=self.pads, peaks_only=True, return_pads=True, cg_times=True, baseline_correction=True)
         xyz = self.preprocess(raw_xyz, rotate_pads=False, last_tb=self.last_tb)
 
@@ -314,6 +381,23 @@ class EventCleaner(HoughCleaner, PreprocessMixin):
 
 
 def nn_remove_noise(data, radius=40, num_neighbors=10):
+    """Remove noise with a nearest-neighbors cut.
+
+    Parameters
+    ----------
+    data : array-like or pandas.DataFrame
+        The data, with columns (x, y, z).
+    radius : float
+        The radius of the neighborhood to search for neighbors.
+    num_neighbors : int
+        The minimum number of neighbors a point must have to be kept.
+
+    Returns
+    -------
+    ndarray or pandas.DataFrame
+        The original data without points that had too few neighbors.
+
+    """
     if isinstance(data, pd.DataFrame):
         xyz = np.ascontiguousarray(data.values)
     else:
@@ -330,6 +414,27 @@ def nn_remove_noise(data, radius=40, num_neighbors=10):
 
 
 def apply_clean_cut(raw_xyz_full, qthresh=40, nthresh=2, tbthresh=500):
+    """Cut the given data based on the results of the Hough space algorithm.
+
+    Parameters
+    ----------
+    raw_xyz_full : array-like
+        The raw data, with columns `[x, y, z, amplitude, pad, neighbor_count, min_distance_to_line]` as returned
+        by the cleaning algorithm.
+    qthresh : float, optional
+        The maximum orthogonal distance to an identified line.
+    nthresh : int, optional
+        The minimum number of neighbors.
+    tbthresh : int, optional
+        The last allowed time bucket. Anything past this value is cut.
+
+    Returns
+    -------
+    ndarray
+        The data, with noise cut. The dimension is `(N, 4)` since the neighbor count and minimum distance to line
+        columns are dropped.
+
+    """
     qcut = raw_xyz_full[:, -1] <= qthresh
     ncut = raw_xyz_full[:, -2] >= nthresh
     tbcut = raw_xyz_full[:, 2] <= tbthresh
