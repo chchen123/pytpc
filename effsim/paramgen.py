@@ -5,7 +5,7 @@ import random
 from pytpc.constants import degrees, p_mc2, pi
 from pytpc.simulation import rutherford
 from pytpc.relativity import cm_to_lab_frame, find_proton_params, find_kine_vert_en
-from pytpc.utilities import find_vertex_energy, find_vertex_position_from_energy
+from pytpc.utilities import find_vertex_energy, find_vertex_position_from_energy, euler_matrix
 
 import logging
 logger = logging.getLogger(__name__)
@@ -72,21 +72,56 @@ def parse_dsigmaiv_output(input_path, ratio_to_rutherford=False, Z1=None, Z2=Non
     return ens, angs, vals
 
 
-def uniform_param_generator(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg, gas, num_evts):
+def make_random_beam(max_beam_angle, beam_origin_z, vertex_z, window_z=1.0):
+    azi = random.uniform(0, 2 * pi)
+
+    sample_min = 0.5 * (np.cos(max_beam_angle) + 1)
+    pol = pi - np.arccos(2 * random.uniform(sample_min, 1) - 1)  # sample uniformly on a sphere, but going backwards
+
+    beam_vector = np.array([
+        np.sin(pol) * np.cos(azi),
+        np.sin(pol) * np.sin(azi),
+        np.cos(pol),
+    ])
+
+    slopes = beam_vector / np.abs(beam_vector[2])
+    beam_origin = np.array([0., 0., beam_origin_z])
+
+    vertex = beam_origin + slopes * (beam_origin_z - vertex_z)
+    window = beam_origin + slopes * (beam_origin_z - window_z)
+
+    transform = euler_matrix(azi, pi - pol, -azi)
+
+    return beam_vector, vertex, window, transform
+
+
+def uniform_param_generator(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg, max_beam_angle, beam_origin_z, gas, num_evts):
     num_good = 0
     while num_good < num_evts:
-        x0 = random.gauss(0, 0.010)
-        y0 = random.gauss(0, 0.010)
         z0 = random.uniform(0, 1)
-        azi0 = random.uniform(0, 2 * pi)
-        pol0 = random.uniform(pi / 2, pi - 10 * degrees)
+        beamvec, vertex, window, transform = make_random_beam(max_beam_angle, beam_origin_z, z0)
+        x0, y0 = vertex[:2]
 
-        vert_en = find_vertex_energy(z0, beam_enu0, beam_mass, beam_chg, gas)  # the total kinetic energy
+        proj_azi = random.uniform(0, 2 * pi)
+        proj_pol = random.uniform(pi / 2, pi)
+        proj_vec = np.array([
+            np.sin(proj_pol) * np.cos(proj_azi),
+            np.sin(proj_pol) * np.sin(proj_azi),
+            np.cos(proj_pol)
+        ])
+        proj_vec_trans = transform.T @ proj_vec
+        pol0 = np.arctan2(np.hypot(proj_vec_trans[0], proj_vec_trans[1]), proj_vec_trans[2])
+        azi0 = np.arctan2(proj_vec_trans[1], proj_vec_trans[0]) + pi  # Change domain from [-pi, pi] to [0, 2pi]
+
+        tracklen = np.linalg.norm(vertex - window)
+
+        # When finding vertex energy, use (1 - len) since find_vertex_energy takes 1-z as the length
+        vert_en = find_vertex_energy(1 - tracklen, beam_enu0, beam_mass, beam_chg, gas)  # the total kinetic energy
         if vert_en > beam_enu0 * beam_mass:
             vert_en = 0.0
 
         _, proj_total_en = find_proton_params(
-            th3=pi - pol0,
+            th3=pi - proj_pol,
             m1=beam_mass * p_mc2,
             m2=proj_mass * p_mc2,
             m3=proj_mass * p_mc2,
@@ -95,7 +130,7 @@ def uniform_param_generator(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg,
         )
         enu0 = proj_total_en - proj_mass * p_mc2
 
-        if enu0 >= 1.0:
+        if enu0 >= 0:
             yield np.array([x0, y0, z0, enu0, azi0, pol0])
             num_good += 1
 
