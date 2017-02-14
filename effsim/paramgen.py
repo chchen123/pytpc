@@ -95,7 +95,7 @@ def make_random_beam(max_beam_angle, beam_origin_z, vertex_z, window_z=1.0):
     return beam_vector, vertex, window, transform
 
 
-def uniform_param_generator(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg, max_beam_angle, beam_origin_z, gas, num_evts):
+def uniform_param_generator(beam_enu0, beam_mass, beam_chg, proj_mass, max_beam_angle, beam_origin_z, gas, num_evts):
     num_good = 0
     while num_good < num_evts:
         z0 = random.uniform(0, 1)
@@ -130,8 +130,8 @@ def uniform_param_generator(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg,
         )
         enu0 = proj_total_en - proj_mass * p_mc2
 
-        if enu0 >= 0:
-            yield np.array([x0, y0, z0, enu0, azi0, pol0])
+        if enu0 >= 0.5:
+            yield np.array([x0, y0, z0, enu0, azi0, pol0]), beamvec
             num_good += 1
 
 

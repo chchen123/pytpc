@@ -11,7 +11,7 @@ from pytpc.padplane import generate_pad_plane
 import logging
 from copy import copy
 
-from .database import ParameterSet, TriggerResult, CleaningResult, MinimizerResult, ClockOffsets
+from .database import ParameterSet, TriggerResult, CleaningResult, MinimizerResult, ClockOffsets, BeamVectorValues
 from .database import EventCannotContinue, managed_session
 
 logger = logging.getLogger(__name__)
@@ -173,7 +173,10 @@ class EfficiencySimulator(object):
 
     def prepare_event_for_cleaner(self, dict_evt, hitmask):
         sliced_evt = {k: v for k, v in dict_evt.items() if bool(hitmask[k])}
-        return self.evtsim.convert_event(sliced_evt)
+        if len(sliced_evt) > 0:
+            return self.evtsim.convert_event(sliced_evt)
+        else:
+            raise BadEventError('No triggered pads remain')
 
     def run_trigger(self, evt_id, dict_evt):
         didtrig, hitmask = self.trigger.process_event(dict_evt)
@@ -191,12 +194,15 @@ class EfficiencySimulator(object):
 
         return clean_res, clean_xyz, ctr
 
-    def run_fit(self, evt_id, clean_xyz, ctr):
-        mcres = self.fitter.process_event(clean_xyz, ctr[0], ctr[1], preprocess_kwargs={'rotate_pads': False})
+    def run_fit(self, evt_id, calib_xyz, calib_ctr):
+        if len(calib_xyz) < 50:
+            raise BadEventError('Too few points for fitter')
+
+        mcres = self.fitter.process_event(calib_xyz, calib_ctr[0], calib_ctr[1])
         mcres['evt_id'] = int(evt_id)
         return MinimizerResult(**mcres)
 
-    def process_event(self, evt_id, param_vector):
+    def process_event(self, evt_id, param_vector, beam_vector):
         with managed_session() as session:
             param_set = ParameterSet(
                 evt_id=evt_id,
@@ -208,6 +214,13 @@ class EfficiencySimulator(object):
                 pol0=param_vector[5],
             )
             session.add(param_set)
+
+            beam_vec_vals = BeamVectorValues(
+                x=beam_vector[0],
+                y=beam_vector[1],
+                z=beam_vector[2],
+            )
+            session.add(beam_vec_vals)
 
             if self.clocks_are_corrupted:
                 clock_res = self.setup_clock_offsets(evt_id)
@@ -239,7 +252,12 @@ class EfficiencySimulator(object):
                 session.add(clean_res)
 
             try:
-                fit_res = self.run_fit(evt_id, clean_xyz, ctr)
+                calib_xyz, calib_ctr = self.fitter.preprocess(clean_xyz, ctr, rotate_pads=False)
+            except Exception as err:
+                raise EventCannotContinue('Preprocessing failed for event {:d}'.format(evt_id)) from err
+
+            try:
+                fit_res = self.run_fit(evt_id, calib_xyz, calib_ctr)
             except BadEventError as err:
                 logger.warning('Fit failed for event %d: %s', evt_id, str(err))
             except Exception as err:

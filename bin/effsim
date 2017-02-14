@@ -105,23 +105,25 @@ def load_pedestals(path):
     return pedestals
 
 
-def make_param_generator(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg, gas, num_evts, dist_info=None):
+def make_param_generator(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg, max_beam_angle, beam_origin_z,
+                         gas, num_evts, dist_info=None):
     if dist_info is not None:
-        logger.info('Reading distribution from DSIGMAIV output')
-        ens, angs, xsecs, en_bounds, ang_bounds = get_distribution(dist_info, proj_chg, beam_chg)
-        return distribution_param_generator(
-            ens=ens,
-            angs=angs,
-            xsecs=xsecs,
-            beam_enu0=beam_enu0,
-            beam_mass=beam_mass,
-            beam_chg=beam_chg,
-            proj_mass=proj_mass,
-            gas=gas,
-            num_evts=num_evts,
-            en_bounds=en_bounds,
-            ang_bounds=ang_bounds,
-        )
+        raise NotImplementedError('This needs to be updated to work with beam dispersion')
+        # logger.info('Reading distribution from DSIGMAIV output')
+        # ens, angs, xsecs, en_bounds, ang_bounds = get_distribution(dist_info, proj_chg, beam_chg)
+        # return distribution_param_generator(
+        #     ens=ens,
+        #     angs=angs,
+        #     xsecs=xsecs,
+        #     beam_enu0=beam_enu0,
+        #     beam_mass=beam_mass,
+        #     beam_chg=beam_chg,
+        #     proj_mass=proj_mass,
+        #     gas=gas,
+        #     num_evts=num_evts,
+        #     en_bounds=en_bounds,
+        #     ang_bounds=ang_bounds,
+        # )
 
     else:
         return uniform_param_generator(
@@ -129,7 +131,8 @@ def make_param_generator(beam_enu0, beam_mass, beam_chg, proj_mass, proj_chg, ga
             beam_mass=beam_mass,
             beam_chg=beam_chg,
             proj_mass=proj_mass,
-            proj_chg=proj_chg,
+            max_beam_angle=max_beam_angle,
+            beam_origin_z=beam_origin_z,
             gas=gas,
             num_evts=num_evts,
         )
@@ -172,6 +175,8 @@ def main():
         beam_chg=evtgen_config['beam_charge'],
         proj_mass=evtgen_config['mass_num'],
         proj_chg=evtgen_config['charge_num'],
+        max_beam_angle=evtgen_config['max_beam_angle'] * degrees,
+        beam_origin_z=evtgen_config['beam_origin_z'],
         gas=gas,
         num_evts=num_pts,
         dist_info=args.distrib_info,
@@ -185,14 +190,14 @@ def main():
         logger.info('Already finished %d events. Resuming from where we left off.', num_finished)
         num_pts -= num_finished
 
-    for evt_id, param_vector in enumerate(param_gen):
+    for evt_id, (param_vector, beam_vector) in enumerate(param_gen):
         evt_id += num_finished
 
         if evt_id % 100 == 0:
             logger.info('Progress: at event %d / %d', evt_id, num_pts)
 
         try:
-            effsim.process_event(evt_id, param_vector)
+            effsim.process_event(evt_id, param_vector, beam_vector)
         except Exception:
             logger.exception('Event %d failed', evt_id)
 

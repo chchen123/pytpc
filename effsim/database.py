@@ -62,6 +62,14 @@ class ParameterSet(SQLBase):
     pol0 = Column(Float)
 
 
+class BeamVectorValues(SQLBase):
+    __tablename__ = 'beamvec'
+    evt_id = Column(Integer, primary_key=True)
+    x = Column(Float)
+    y = Column(Float)
+    z = Column(Float)
+
+
 class TriggerResult(SQLBase):
     __tablename__ = 'trigger'
     evt_id = Column(Integer, primary_key=True)
