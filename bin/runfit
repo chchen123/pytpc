@@ -15,8 +15,8 @@ import sys
 import os
 import argparse
 import h5py
-from pytpc.fitting import MCFitter, BadEventError, BeamTrackLinearModel
-from pytpc.utilities import find_run_number, find_exclusion_region, read_lookup_table
+from pytpc.fitting import MCFitter, BadEventError
+from pytpc.utilities import find_run_number
 from pytpc.cleaning import apply_clean_cut
 import yaml
 import logging
@@ -87,6 +87,7 @@ class MinimizerResult(SQLBase):
     pol0 = Column(Float)
     posChi2 = Column(Float)
     enChi2 = Column(Float)
+    vertChi2 = Column(Float)
     lin_scat_ang = Column(Float)
     lin_beam_int = Column(Float)
     lin_chi2 = Column(Float)
@@ -95,17 +96,6 @@ class MinimizerResult(SQLBase):
     curv_en = Column(Float)
     curv_ctr_x = Column(Float)
     curv_ctr_y = Column(Float)
-
-
-class BeamFitResult(SQLBase):
-    __tablename__ = 'beamfit_results'
-    evt_id = Column(Integer, primary_key=True)
-    xslope = Column(Float)
-    xintercept = Column(Float)
-    yslope = Column(Float)
-    yintercept = Column(Float)
-    chi2 = Column(Float)
-    num_pts = Column(Integer)
 
 
 def find_last_completed_event():
@@ -194,12 +184,11 @@ class FitManager(object):
         Reads the event, cleans it, fits it, and writes the output to the database.
 
     """
-    def __init__(self, config, evtlist_path, input_path, output_path, lowgpads):
+    def __init__(self, config, evtlist_path, input_path, output_path):
         self.fitter = MCFitter(config)
         self.run_num = find_run_number(input_path)
         self.input_file = h5py.File(input_path, 'r')
         self.db_engine = create_and_setup_database_engine(output_path)
-        self.lowgpads = lowgpads
 
         good_evts = pd.read_hdf(evtlist_path, 'evt_list')
         run_mask = good_evts.run_num == self.run_num
@@ -275,12 +264,6 @@ class FitManager(object):
         else:
             return cleaned
 
-    def fit_beam(self, full_xyz):
-        model = BeamTrackLinearModel(allowed_pads=self.lowgpads)
-        fitdata = model.filter_data(full_xyz)
-        model.fit(fitdata)
-        return model
-
     def process_event(self, evt_id):
         """Run the whole fitting process on the given event.
 
@@ -298,33 +281,16 @@ class FitManager(object):
         with monitored_execution('Cleaning', evt_id):
             clean_xyz = self.clean_data(raw_xyz)
 
-        with monitored_execution('Fitting beam', evt_id):
-            # In preprocessing step, we need to slice off the last two columns since they represent
-            # cleaning results, which are not relevant and will make the preprocessor choke.
-            full_xyz = self.fitter.preprocess(raw_xyz[:, :-2], drop_beampads=False, rotate_pads=False)
-            beam_model = self.fit_beam(full_xyz)
-
         with monitored_execution('Preprocessing', evt_id):
             xyz, (cu, cv) = self.fitter.preprocess(clean_xyz, center=(cx, cy), rotate_pads=False)
 
         with monitored_execution('Fitting', evt_id):
-            fitres = self.fitter.process_event(xyz, cu, cv, beamloc=beam_model)
+            fitres = self.fitter.process_event(xyz, cu, cv)
 
         # Write the results to the database
         with managed_session() as session:
             dbfitres = MinimizerResult(evt_id=evt_id, **fitres)
             session.add(dbfitres)
-
-            beamfitres = BeamFitResult(
-                evt_id=evt_id,
-                xslope=beam_model.slopes[0],
-                yslope=beam_model.slopes[1],
-                xintercept=beam_model.intercepts[0],
-                yintercept=beam_model.intercepts[1],
-                chi2=beam_model.chi2,
-                num_pts=beam_model.num_pts,
-            )
-            session.add(beamfitres)
 
 
 def parse_args():
@@ -332,7 +298,6 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Fit data using Monte Carlo optimization')
     parser.add_argument('--config', '-c', help='Path to config file, in YAML format', required=True)
     parser.add_argument('--config-patch', '-p', help='Configuration patches', action='append')
-    parser.add_argument('--xcfg-path', '-x', help='Path to GET electronics config file', required=True)
     parser.add_argument('--evtlist', '-e', help='Path to HDF5 file with results from the circle fit', required=True)
     parser.add_argument('--verbose', '-v', action='count', default=0,
                         help='Print more information')
@@ -377,15 +342,11 @@ def main():
             config.update(patch)
             logger.info('Patched config with %s', os.path.basename(path))
 
-    lookup = read_lookup_table(config['padmap_path'])
-    _, lowg = find_exclusion_region(args.xcfg_path, lookup)
-
     fit_manager = FitManager(
         config=config,
         evtlist_path=args.evtlist,
         input_path=args.input_file,
         output_path=args.db_path,
-        lowgpads=lowg,
     )
 
     for evt_id in fit_manager.evtid_iterator():

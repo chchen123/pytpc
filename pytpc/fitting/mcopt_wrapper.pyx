@@ -500,8 +500,7 @@ cdef class Minimizer:
         del self.thisptr
 
     def minimize(self, np.ndarray[np.double_t, ndim=1] ctr0, np.ndarray[np.double_t, ndim=1] sigma0,
-                 np.ndarray[np.double_t, ndim=2] expPos, np.ndarray[np.double_t, ndim=1] expHits,
-                 double beam_xslope, double beam_xint, double beam_yslope, double beam_yint, bint details=False):
+                 np.ndarray[np.double_t, ndim=2] expPos, np.ndarray[np.double_t, ndim=1] expHits, bint details=False):
         """Perform chi^2 minimization for the track.
 
         Parameters
@@ -546,7 +545,6 @@ cdef class Minimizer:
         cdef arma.vec *expHitsArr
         cdef arma.mat *expPosArr
         cdef mcopt.MCminimizeResult minres
-        cdef mcopt.BeamLocationEstimator* beamloc
 
         if len(ctr0) != len(sigma0):
             raise ValueError("Length of ctr0 and sigma0 arrays must be equal")
@@ -556,9 +554,7 @@ cdef class Minimizer:
             sigma0Arr = arma.np2vec(sigma0)
             expPosArr = arma.np2mat(expPos)
             expHitsArr = arma.np2vec(expHits)
-            beamloc = new mcopt.BeamLocationEstimator(beam_xslope, beam_xint, beam_yslope, beam_yint)
-            minres = self.thisptr.minimize(deref(ctr0Arr), deref(sigma0Arr), deref(expPosArr), deref(expHitsArr),
-                                           deref(beamloc))
+            minres = self.thisptr.minimize(deref(ctr0Arr), deref(sigma0Arr), deref(expPosArr), deref(expHitsArr))
         finally:
             del ctr0Arr, sigma0Arr, expPosArr, expHitsArr
 
@@ -570,6 +566,7 @@ cdef class Minimizer:
 
         cdef double lastPosChi
         cdef double lastEnChi
+        cdef double lastVertChi
 
         if details:
             allParams = arma.mat2np(minres.allParams)
@@ -580,7 +577,8 @@ cdef class Minimizer:
         else:
             lastPosChi = minres.minChis(minres.minChis.n_rows - 1, 0)
             lastEnChi = minres.minChis(minres.minChis.n_rows - 1, 1)
-            return ctr, lastPosChi, lastEnChi
+            lastVertChi = minres.minChis(minres.minChis.n_rows - 1, 2)
+            return ctr, lastPosChi, lastEnChi, lastVertChi
 
     def find_position_deviations(self, np.ndarray[np.double_t, ndim=2] simArr, np.ndarray[np.double_t, ndim=2] expArr):
         """Find the deviations in position between two tracks.
@@ -735,6 +733,14 @@ cdef class Minimizer:
         self.thisptr.enChi2Enabled = newval
 
     @property
+    def vertChi2Enabled(self):
+        return self.thisptr.vertChi2Enabled
+
+    @vertChi2Enabled.setter
+    def vertChi2Enabled(self, newval):
+        self.thisptr.vertChi2Enabled = newval
+
+    @property
     def posChi2Norm(self):
         return self.thisptr.posChi2Norm
 
@@ -749,3 +755,11 @@ cdef class Minimizer:
     @enChi2NormFraction.setter
     def enChi2NormFraction(self, newval):
         self.thisptr.enChi2NormFraction = newval
+
+    @property
+    def vertChi2Norm(self):
+        return self.thisptr.vertChi2Norm
+
+    @vertChi2Norm.setter
+    def vertChi2Norm(self, newval):
+        self.thisptr.vertChi2Norm = newval

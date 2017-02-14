@@ -33,20 +33,11 @@ class MCFitter(PreprocessMixin, LinearPrefitMixin, TrackerMixin, EventGeneratorM
 
         self.minimizer = Minimizer(self.tracker, self.evtgen, num_iters, num_pts, red_factor)
 
-    def process_event(self, xyz, cu, cv, exp_hits=None, return_details=False, beamloc=None):
+    def process_event(self, xyz, cu, cv, exp_hits=None, return_details=False):
         if exp_hits is None:
             exp_hits = np.zeros(10240)
             for a, p in xyz[['a', 'pad']].values:
                 exp_hits[int(p)] = a
-
-        if beamloc is not None:
-            xslope, yslope = beamloc.slopes         # unitless since it's mm / mm
-            xint, yint = beamloc.intercepts / 1000  # in meters for mcopt
-        else:
-            xslope = 0
-            yslope = 0
-            xint = 0
-            yint = 0
 
         xyz_sorted = xyz.sort_values(by='w', ascending=True)
         prefit_data = xyz_sorted.iloc[-len(xyz_sorted) // 4:].copy()
@@ -62,10 +53,6 @@ class MCFitter(PreprocessMixin, LinearPrefitMixin, TrackerMixin, EventGeneratorM
             self.sigma,
             exp_pos,
             exp_hits,
-            xslope,
-            xint,
-            yslope,
-            yint,
             details=return_details
         )
 
@@ -73,13 +60,16 @@ class MCFitter(PreprocessMixin, LinearPrefitMixin, TrackerMixin, EventGeneratorM
             ctr, min_chis, all_params, good_param_idx = minres
             posChi = min_chis[-1, 0]
             enChi = min_chis[-1, 1]
+            vertChi = min_chis[-1, 2]
         else:
-            ctr, posChi, enChi = minres
+            ctr, posChi, enChi, vertChi = minres
 
         result = dict(zip(['x0', 'y0', 'z0', 'enu0', 'azi0', 'pol0'],
                           [float(v) for v in ctr]))
         result['posChi2'] = float(posChi)
         result['enChi2'] = float(enChi)
+        result['vertChi2'] = float(vertChi)
+
         result.update(prefit_res)  # put the linear pre-fit results into result
 
         if return_details:

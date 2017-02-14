@@ -74,15 +74,7 @@ cdef extern from "mcopt/mcopt.h" namespace "mcopt":
         Chi2Set() except+
         double posChi2
         double enChi2
-
-
-    cdef cppclass BeamLocationEstimator:
-        BeamLocationEstimator(const double xslope, const double xint, const double yslope, const double yint) except+
-        double findX(const double z)
-        arma.vec findX(const arma.vec z)
-
-        double findY(const double z)
-        arma.vec findY(const arma.vec z)
+        double vertChi2
 
 
     cdef cppclass MCminimizer:
@@ -94,7 +86,7 @@ cdef extern from "mcopt/mcopt.h" namespace "mcopt":
         arma.mat findPositionDeviations(const arma.mat& simPos, const arma.mat& expPos) except+
         arma.vec findHitPatternDeviation(const arma.mat& simPos, const arma.vec& simEn, const arma.vec& expHits) except+
         MCminimizeResult minimize(const arma.vec& ctr0, const arma.vec& sigma0, const arma.mat& expPos,
-                                  const arma.vec& expMesh, const BeamLocationEstimator& beamloc) except+
+                                  const arma.vec& expMesh) except+
         Chi2Set runTrack(const arma.vec& params, const arma.mat& expPos, const arma.vec& expHits) except+
         arma.mat runTracks(const arma.mat& params, const arma.mat& expPos, const arma.vec& expHits) except+
 
