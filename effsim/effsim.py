@@ -216,6 +216,7 @@ class EfficiencySimulator(object):
             session.add(param_set)
 
             beam_vec_vals = BeamVectorValues(
+                evt_id=evt_id,
                 x=beam_vector[0],
                 y=beam_vector[1],
                 z=beam_vector[2],
