@@ -11,6 +11,7 @@ from ..utilities import find_vertex_energy
 
 
 cdef cppvec[double] np2cppvec(np.ndarray[np.double_t, ndim=1] v):
+    """Convert a numpy array to a C++ ``std::vector``."""
     cdef cppvec[double] res
     cdef double[:] vView = v
     for i in range(v.shape[0]):
@@ -43,9 +44,7 @@ cdef class Gas:
 
 
 cdef class Tracker:
-    """Tracker(mass_num, charge_num, gas, efield, bfield)
-
-    A class for simulating the track of a charged particle in the AT-TPC.
+    """A class for simulating the track of a charged particle in the AT-TPC.
 
     Parameters
     ----------
@@ -63,10 +62,6 @@ cdef class Tracker:
         The maximum allowable particle energy in MeV. This is used to make the energy lookup
         table for the tracker.
 
-    Raises
-    ------
-    ValueError
-        If the dimensions of an input array were invalid.
     """
     def __cinit__(self, int massNum, int chargeNum, double beam_enu0, int beam_mass, int beam_charge, pygas,
                   np.ndarray[np.double_t, ndim=1] efield, np.ndarray[np.double_t, ndim=1] bfield,
@@ -139,9 +134,7 @@ cdef class Tracker:
             del bfieldVec
 
     def track_particle(self, double x0, double y0, double z0, double enu0, double azi0, double pol0):
-        """Tracker.track_particle(x0, y0, z0, enu0, azi0, pol0)
-
-        Simulate the trajectory of a particle.
+        """Simulate the trajectory of a particle.
 
         Parameters
         ----------
@@ -218,6 +211,21 @@ cdef class PadPlane:
 
     @staticmethod
     def generate_pad_coordinates(double rotation_angle):
+        """Get the list of pad vertices as calculated by the C++ code.
+
+        This could be useful for testing.
+
+        Parameters
+        ----------
+        rotation_angle : float
+            The angle, in radians, by which the pad plane should be rotated.
+
+        Returns
+        -------
+        np.ndarray
+            The set of pad vertices. Each entry is a list of the three (x, y) coordinate pairs that define one pad.
+
+        """
         cdef cppvec[cppvec[cppvec[double]]] v = mcopt.PadPlane.generatePadCoordinates(rotation_angle)
         cdef size_t dim0 = v.size()
         cdef size_t dim1 = v[0].size()
@@ -237,7 +245,7 @@ cdef class EventGenerator:
 
     Parameters
     ----------
-    pad_plane : PadPlane instance
+    pad_plane : PadPlane
         The pad lookup table to use when projecting to the Micromegas. The units should be meters.
     vd : array-like
         The drift velocity vector, in cm/us.
@@ -298,6 +306,7 @@ cdef class EventGenerator:
 
     @property
     def electronics_gain(self):
+        """The preamplifier gain in the electronics."""
         return self.thisptr.electronicsGain
 
     @electronics_gain.setter
@@ -489,6 +498,13 @@ cdef class Minimizer:
         The tracker to use to simulate the tracks.
     evtgen : mcopt.EventGenerator
         The event generator to use to do the projection onto the pad plane.
+    numIters : unsigned int
+        The number of Monte Carlo iterations to perform.
+    numPts : unsigned int
+        The number of points to simulate per iteration.
+    redFactor : float
+        The amount to shrink the parameter space by on each iteration. Should be less than 1.
+
     """
     def __cinit__(self, Tracker tr, EventGenerator evtgen, unsigned numIters, unsigned numPts, double redFactor):
         self.pyTracker = tr
@@ -507,17 +523,13 @@ cdef class Minimizer:
         ----------
         ctr0 : ndarray
             The initial guess for the track's parameters. These are (x0, y0, z0, enu0, azi0, pol0, bmag0).
-        sig0 : ndarray
+        sigma0 : ndarray
             The initial width of the parameter space in each dimension. The distribution will be centered on `ctr0` with a
             width of `sig0 / 2` in each direction.
-        trueValues : ndarray
+        expPos : ndarray
             The experimental data points, as (x, y, z) triples.
-        numIters : int
-            The number of iterations to perform before stopping. Each iteration draws `numPts` samples and picks the best one.
-        numPts : int
-            The number of samples to draw in each iteration. The tracking function will be evaluated `numPts * numIters` times.
-        redFactor : float
-            The factor to multiply the width of the parameter space by on each iteration. Should be <= 1.
+        expHits : ndarray
+            The experimental hit pattern, or an array of pad amplitudes indexed by pad number.
         details : bool
             Controls the amount of detail returned. If true, return the things listed below. If False, return just
             the center and the last chi^2 value.
@@ -652,6 +664,23 @@ cdef class Minimizer:
 
     def run_track(self, np.ndarray[np.double_t, ndim=1] params, np.ndarray[np.double_t, ndim=2] expPos,
                   np.ndarray[np.double_t, ndim=1] expHits):
+        """Calculate the value of the objective function for the given set of parameters.
+
+        Parameters
+        ----------
+        params : ndarray
+            The set of track parameters to check.
+        expPos : ndarray
+            The experimental data points, as (x, y, z) triples.
+        expHits : ndarray
+            The experimental hit pattern, or an array of pad amplitudes indexed by pad number.
+
+        Returns
+        -------
+        posChi2, enChi2 : double
+            The position and energy chi-squared values.
+
+        """
         cdef arma.vec *paramsVec
         cdef arma.mat *expPosMat
         cdef arma.vec *expHitsVec
@@ -672,6 +701,25 @@ cdef class Minimizer:
 
     def run_tracks(self, np.ndarray[np.double_t, ndim=2] params, np.ndarray[np.double_t, ndim=2] expPos,
                    np.ndarray[np.double_t, ndim=1] expHits):
+        """Calculate the values of the objective function for each row of the given matrix of parameter sets.
+
+        Parameters
+        ----------
+        params : ndarray
+            The set of track parameter sets to check. Each row should be a different set of parameters, so
+            the shape should be ``(N, 6)``.
+        expPos : ndarray
+            The experimental data points, as (x, y, z) triples.
+        expHits : ndarray
+            The experimental hit pattern, or an array of pad amplitudes indexed by pad number.
+
+        Returns
+        -------
+        chiArr : ndarray
+            A matrix of objective function values. The rows correspond to the rows of ``params``, and the
+            columns are the position, energy, and vertex components of the objective function.
+
+        """
         cdef arma.mat *paramsMat
         cdef arma.mat *expPosMat
         cdef arma.vec *expHitsVec
