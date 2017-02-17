@@ -1,4 +1,8 @@
-#!/usr/bin/env python
+"""montecarlo.py
+
+This module contains the main Python class for fitting data with the Monte Carlo algorithm.
+
+"""
 
 import numpy as np
 from ..constants import degrees
@@ -8,10 +12,6 @@ from .mcopt_wrapper import Minimizer
 
 import logging
 logger = logging.getLogger(__name__)
-handler = logging.StreamHandler()
-formatter = logging.Formatter('[%(levelname)s:%(name)s] %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
 
 
 class MCFitter(PreprocessMixin, LinearPrefitMixin, TrackerMixin, EventGeneratorMixin):
