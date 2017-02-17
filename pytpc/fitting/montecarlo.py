@@ -15,9 +15,25 @@ logger = logging.getLogger(__name__)
 
 
 class MCFitter(PreprocessMixin, LinearPrefitMixin, TrackerMixin, EventGeneratorMixin):
+    """Performs Monte Carlo fits on events using the C++ fitting code.
+
+    Parameters
+    ----------
+    config : dict
+        The analysis config dictionary.
+
+    Methods
+    -------
+    preprocess(raw_xyz, center=None)
+        Calibrate and transform the data to the beam coordinate system.
+    process_event(xyz, cu, cv)
+        Fit an event.
+
+    """
     def __init__(self, config):
         super().__init__(config)
 
+        #: A set of pads that can be removed during preprocessing.
         self.beampads = np.fromfile(config['beampads_path'], sep=',', dtype='int')
 
         sig = config['sigma']
@@ -34,6 +50,38 @@ class MCFitter(PreprocessMixin, LinearPrefitMixin, TrackerMixin, EventGeneratorM
         self.minimizer = Minimizer(self.tracker, self.evtgen, num_iters, num_pts, red_factor)
 
     def process_event(self, xyz, cu, cv, exp_hits=None, return_details=False):
+        """Fit the given dataset using the Monte Carlo algorithm.
+
+        The details of the fit are governed by the Monte Carlo parameters ``num_iters``, ``num_pts``, and
+        ``red_factor``, which can be adjusted by setting the corresponding properties on this class.
+
+        Parameters
+        ----------
+        xyz : pd.DataFrame
+            The data in the beam coordinate system. Must have columns 'u', 'v', and 'w' for the position, in mm,
+            'a' for the amplitude, and 'pad' for the pad number.
+        cu, cv : float
+            The center of curvature of the track, in mm.
+        exp_hits : np.ndarray, optional
+            The hit pattern of the event. If None, a hit pattern will be calculated from ``xyz``.
+        return_details : bool, optional
+            If true, more data will be returned in addition to the result. See below for details.
+
+        Returns
+        -------
+        result : dict
+            The fit result. Has keys for the 6 track parameters, the 3 objective function components,
+            and some information about the prefit results.
+        min_chis : np.ndarray
+            The minimum total chi2 value for each iteration. Only returned if ``return_details == True``.
+        all_params : np.ndarray
+            The parameters from all generated tracks. There will be `num_iters * num_pts` rows.
+            Only returned if ``return_details == True``.
+        good_param_idx : np.ndarray
+            The row numbers in ``all_params`` corresponding to the best points from each iteration, i.e. the ones whose
+            chi2 values are in ``min_chis``. Only returned if ``return_details == True``.
+
+        """
         if exp_hits is None:
             exp_hits = np.zeros(10240)
             for a, p in xyz[['a', 'pad']].values:
