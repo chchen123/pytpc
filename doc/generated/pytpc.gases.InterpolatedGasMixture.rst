@@ -6,26 +6,24 @@ pytpc.gases.InterpolatedGasMixture
 .. autoclass:: InterpolatedGasMixture
 
    
-   .. automethod:: __init__
+
+    .. rubric:: Methods
+    .. autosummary::
+        :toctree:
+        
+                ~InterpolatedGasMixture.energy_loss
+                ~InterpolatedGasMixture.inverse_range
+                ~InterpolatedGasMixture.range
+
+
 
    
-   .. rubric:: Methods
 
-   .. autosummary::
-   
-      ~InterpolatedGasMixture.__init__
-      ~InterpolatedGasMixture.energy_loss
-      ~InterpolatedGasMixture.inverse_range
-      ~InterpolatedGasMixture.range
-   
-   
+    .. rubric:: Attributes
+    .. autosummary::
+        :toctree:
+        
+                ~InterpolatedGasMixture.energy_loss
+                ~InterpolatedGasMixture.inverse_range
+                ~InterpolatedGasMixture.range
 
-   
-   
-   .. rubric:: Attributes
-
-   .. autosummary::
-   
-      ~InterpolatedGasMixture.density
-   
-   

@@ -1,9 +1,9 @@
-pytpc.gases.Gas
-===============
+pytpc.fitting.mixins.TrackerMixin
+=================================
 
-.. currentmodule:: pytpc.gases
+.. currentmodule:: pytpc.fitting.mixins
 
-.. autoclass:: Gas
+.. autoclass:: TrackerMixin
 
    
 
@@ -11,7 +11,6 @@ pytpc.gases.Gas
     .. autosummary::
         :toctree:
         
-                ~Gas.energy_loss
 
 
 
@@ -21,5 +20,4 @@ pytpc.gases.Gas
     .. autosummary::
         :toctree:
         
-                ~Gas.energy_loss
 

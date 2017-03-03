@@ -12,19 +12,7 @@ This package provides Python modules for reading, analyzing, and fitting data fr
 Contents:
 
 .. toctree::
-   :maxdepth: 2
+    :maxdepth: 2
 
-   evtdata
-   tpcplot
-   simulation
-   ukf
-   gases
-   misc
-   coords
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`search`
-
+    cleaning/cleaning
+    fitting/fitting

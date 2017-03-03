@@ -22,13 +22,6 @@ class MCFitter(PreprocessMixin, LinearPrefitMixin, TrackerMixin, EventGeneratorM
     config : dict
         The analysis config dictionary.
 
-    Methods
-    -------
-    preprocess(raw_xyz, center=None)
-        Calibrate and transform the data to the beam coordinate system.
-    process_event(xyz, cu, cv)
-        Fit an event.
-
     """
     def __init__(self, config):
         super().__init__(config)

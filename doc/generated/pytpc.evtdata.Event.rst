@@ -6,19 +6,15 @@ pytpc.evtdata.Event
 .. autoclass:: Event
 
    
-   .. automethod:: __init__
+
+    .. rubric:: Methods
+    .. autosummary::
+        :toctree:
+        
+                ~Event.hits
+                ~Event.xyzs
+
+
 
    
-   .. rubric:: Methods
 
-   .. autosummary::
-   
-      ~Event.__init__
-      ~Event.hits
-      ~Event.xyzs
-   
-   
-
-   
-   
-   

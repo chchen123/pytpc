@@ -24,7 +24,7 @@ class HoughCleaner(Base):
 
     The different steps of the cleaning process are broken down into separate functions, so parts
     of the process can be applied independently (e.g. for testing purposes). The main function to use
-    to clean a dataset is `clean`. That one will perform the full cleaning process.
+    to clean a dataset is :meth:`clean`. That one will perform the full cleaning process.
 
     The class is initialized using a dictionary of configuration parameters. This might be loaded from
     a config file, for instance. The keys that must be in the dictionary are the same as the class's
@@ -311,6 +311,10 @@ class HoughCleaner(Base):
 
 class EventCleaner(HoughCleaner, PreprocessMixin):
     """A subclass of `HoughCleaner` with functionality for preprocessing and handling the TPC data.
+
+    This class can preprocess and calibrate an event, find the set of xyz triples, and clean the resulting data.
+    The main interface is the :func:`process_event` function, which takes a :class:`~pytpc.evtdata.Event` object
+    to clean.
 
     Parameters
     ----------
