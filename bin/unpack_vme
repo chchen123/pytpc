@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+
+"""
+unpack_vme
+
+A script for unpacking VME data.
+
+This uses the vmedata module from pytpc to rewrite the VME data from its raw form
+into HDF5 files. The resulting HDF5 files have a group called "vme" in their root,
+with four datasets in that group. The datasets contain the ion chamber signals ('ic'),
+the mesh signal ('mesh'), the trigger pulse ('trig'), and the coincidence register ('coinc').
+"""
+
+import h5py
+from pytpc.vmedata import VMEFile, ADCEvent, ScalerEvent
+import argparse
+import yaml
+from clint.textui import progress
+
+import logging
+import logging.config
+logger = logging.getLogger(__name__)
+
+
+class ResizableDataset:
+    def __init__(self, root, name, num_cols, dtype):
+        self.max_row = 0
+        self.ds = root.create_dataset(
+            name=name,
+            shape=(10, num_cols),
+            maxshape=(None, num_cols),
+            dtype=dtype,
+            compression='gzip',
+            shuffle=True,
+        )
+
+    def insert(self, row_id, data):
+        self.max_row = max(row_id, self.max_row)
+        current_size = self.ds.shape[0]
+
+        if row_id > current_size - 1:
+            self.ds.resize(current_size + max(abs(row_id - current_size), 10), axis=0)
+
+        self.ds[row_id] = data
+
+    def trim(self):
+        if self.ds.shape[0] > self.max_row + 1:
+            self.ds.resize(self.max_row + 1, axis=0)
+
+
+def iter_and_log_errors(gen):
+    try:
+        yield from gen
+    except StopIteration:
+        raise
+    except Exception:
+        logger.exception('Error while reading frame')
+
+
+def unpack(vme_channel_config, inpath, outpath):
+    """Unpack the data from the vme file at `inpath` into the HDF5 file at `outpath`.
+
+    Parameters
+    ----------
+    vme_channel_config : dict-like
+        The VME channels, from the config file. Should have keys 'adc' with a list of ADC channel names and
+        'scalers' with a list of scaler names.
+    inpath : string
+        Path to the raw input VME file. This will be parsed using the pytpc.vmedata module.
+    outpath: string
+        Path to an HDF5 file to write the output datasets to. This will be opened in 'append' mode,
+        so if the file exists, a new group will be added to it for the VME data. If the
+        VME datasets already exist in the file, this function will fail, so they should
+        not be overwritten.
+    """
+    vme_file = VMEFile(inpath)
+
+    with h5py.File(outpath, 'a') as h5file:
+        vme_group = h5file.require_group('/vme')
+
+        adc_datasets = [
+            ResizableDataset(
+                root=vme_group,
+                name=name,
+                num_cols=512,
+                dtype='uint16',
+            )
+            for name in vme_channel_config['adc']
+        ]
+
+        coinc_dataset = ResizableDataset(
+            root=vme_group,
+            name='coinc',
+            num_cols=16,
+            dtype='uint8',
+        )
+
+        scaler_dataset = ResizableDataset(
+            root=vme_group,
+            name='scalers',
+            num_cols=18,
+            dtype='uint32',
+        )
+
+        logger.info('Reading and unpacking events from file')
+        with progress.Bar(label='File position: ', expected_size=len(vme_file)) as prog_bar:
+            for evt in iter_and_log_errors(vme_file):
+                try:
+                    if isinstance(evt, ScalerEvent):
+                        scaler_dataset.insert(evt.index, evt.scalers)
+                    elif isinstance(evt, ADCEvent):
+                        coinc_dataset.insert(evt.evt_id, evt.coincidence_register)
+                        for ds, data in zip(adc_datasets, evt.data):
+                            ds.insert(evt.evt_id, data)
+                    else:
+                        logger.error('Unknown type returned by VME file: {:s}', type(evt))
+
+                except Exception:
+                    logger.exception('Failed to write event to HDF5 file.')
+
+                prog_bar.show(vme_file.fp.tell())
+
+        # Clean up extra rows
+        for ds in (*adc_datasets, coinc_dataset, scaler_dataset):
+            ds.trim()
+
+
+def setup_logging(config):
+    """Configure the logging library from the given dictionary.
+
+    The dictionary must have a key "logging_config" that contains a valid configuration for the logging library.
+
+    """
+    try:
+        log_conf = config['logging_config']
+        logging.config.dictConfig(log_conf)
+    except KeyError:
+        logger.warning('No logging config found. Info messages may be suppressed.')
+
+
+def main():
+    parser = argparse.ArgumentParser('A program for unpacking VME data from the AT-TPC')
+    parser.add_argument('config', help='Path to config file')
+    parser.add_argument('input', help='Path to input VME file')
+    parser.add_argument('output', help='Path to output HDF file')
+    args = parser.parse_args()
+
+    with open(args.config, 'r') as f:
+        config = yaml.load(f)
+
+    setup_logging(config)
+
+    unpack(config['vme_channels'], args.input, args.output)
+
+
+if __name__ == '__main__':
+    import signal
+    import sys
+
+    def handle_signal(signum, stack_frame):
+        print('Received signal %d. Quitting.', signum)
+        sys.stdout.flush()
+        sys.exit(1)
+
+    signal.signal(signal.SIGTERM, handle_signal)
+    signal.signal(signal.SIGQUIT, handle_signal)
+
+    main()

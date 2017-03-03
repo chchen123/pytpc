@@ -88,6 +88,7 @@ setup(
         'bin/pyclean',
         'bin/effsim',
         'bin/convergence',
+        'bin/unpack_vme',
     ],
     install_requires=[
         'scipy',
