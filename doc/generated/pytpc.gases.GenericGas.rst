@@ -5,18 +5,24 @@ pytpc.gases.GenericGas
 
 .. autoclass:: GenericGas
 
+   
+   .. automethod:: __init__
+
+   
    .. rubric:: Methods
 
    .. autosummary::
-      :toctree:
    
       ~GenericGas.__init__
       ~GenericGas.energy_loss
    
+   
+
+   
+   
    .. rubric:: Attributes
 
    .. autosummary::
-      :toctree:
    
       ~GenericGas.density
       ~GenericGas.electron_density

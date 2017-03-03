@@ -5,31 +5,27 @@ pytpc.evtdata.EventFile
 
 .. autoclass:: EventFile
 
-   .. rubric:: Working with files
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
 
    .. autosummary::
-      :toctree:
-
-      ~EventFile.open
+   
+      ~EventFile.__init__
       ~EventFile.close
-      ~EventFile.make_lookup_table
+      ~EventFile.evtrange
+      ~EventFile.get_by_event_id
       ~EventFile.load_lookup_table
-
-   .. rubric:: Reading data
-
-   Most of the commands in this section can be safely ignored. They mainly exist to support the preferred subscripting
-   and iteration methods of reading the files.
-
-   .. autosummary::
-      :toctree:
-
-      ~EventFile.read_event_by_number
-      ~EventFile.read_current
-      ~EventFile.read_next
-      ~EventFile.read_previous
+      ~EventFile.make_lookup_table
+      ~EventFile.open
       ~EventFile.pack_sample
+      ~EventFile.pack_samples
+      ~EventFile.read_event_by_number
       ~EventFile.unpack_sample
       ~EventFile.unpack_samples
+      ~EventFile.write
    
    
 
