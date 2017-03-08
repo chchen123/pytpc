@@ -2,18 +2,20 @@ from __future__ import division, print_function
 import struct
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class BadVMEDataError(Exception):
     pass
 
 
 class ADCEvent(object):
-    def __init__(self, evt_id, timestamp, coincidence_register, last_tb, data):
+    def __init__(self, evt_id, timestamp, coincidence_register, data):
         self.evt_id = evt_id
         self.timestamp = timestamp
         self.coincidence_register = np.array([(coincidence_register & 1 << i) > 0 for i in range(16)])
-        self.last_tb = last_tb
-        self.data = np.roll(data, -last_tb, axis=1)  # Puts the first time bucket at index 0
+        self.data = data
 
 
 class ScalerEvent(object):
@@ -22,7 +24,7 @@ class ScalerEvent(object):
         self.scalers = scalers
 
     def __str__(self):
-        return "Scaler event {}: {}".format(self.index, str(self.scalers))
+        return f"Scaler event {self.index:d}: {self.scalers:s}"
 
 
 class VMEFile(object):
@@ -59,7 +61,7 @@ class VMEFile(object):
             scalers = np.fromfile(self.fp, dtype='<I', count=18)
             sentinel = struct.unpack('<I', self.fp.read(4))[0]
             if sentinel != 0xffffffff:
-                raise BadVMEDataError('Invalid sentinel value {:x} at end of scaler frame'.format(sentinel))
+                raise BadVMEDataError(f'Invalid sentinel value {sentinel:x} at end of scaler frame')
             return ScalerEvent(
                 index=self.scaler_events_seen - 1,
                 scalers=scalers,
@@ -76,28 +78,32 @@ class VMEFile(object):
             reg2 = np.fromfile(self.fp, dtype='<I', count=4)
             raw2 = np.fromfile(self.fp, dtype='<I', count=512)
 
+            self.adc_events_seen += 1
+            true_evtnum = evtnum - self.scaler_events_seen  # evt num is incremented even for a scaler buffer
+
+            last_tb1 = reg1[3] & 0x1ffff
+            last_tb2 = reg2[3] & 0x1ffff
+            if last_tb1 != last_tb2:
+                logger.warning('Last TBs do not match for event %d (frame 0x%x): %d != %d',
+                               true_evtnum, evtnum, last_tb1, last_tb2)
+
+            raw1 = np.roll(raw1, -last_tb1, axis=-1)
+            raw2 = np.roll(raw2, -last_tb2, axis=-1)
+
             adc_data = np.zeros((4, 512), dtype='int32')
             adc_data[0] = (raw1 & 0x1fff0000) >> 16
             adc_data[1] = (raw1 & 0x1fff)
             adc_data[2] = (raw2 & 0x1fff0000) >> 16
             adc_data[3] = (raw2 & 0x1fff)
 
-            self.adc_events_seen += 1
-            true_evtnum = evtnum - self.scaler_events_seen  # evt num is incremented even for a scaler buffer
-
-            last_tb1 = reg1[3] & 0x1ffff
-            last_tb2 = reg2[3] & 0x1ffff
-            assert last_tb1 == last_tb2, 'last TBs did not match'
-
             return ADCEvent(
                 evt_id=true_evtnum,
                 timestamp=timestamp,
                 coincidence_register=coinreg,
-                last_tb=last_tb1,
                 data=adc_data,
             )
         else:
-            raise IOError('Invalid header:', hex(evthdr))
+            raise IOError(f'Invalid header: {evthdr:x}')
 
     def __iter__(self):
         self.fp.seek(0)
