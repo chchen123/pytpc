@@ -89,6 +89,7 @@ setup(
         'bin/effsim',
         'bin/convergence',
         'bin/unpack_vme',
+        'bin/select_vme',
     ],
     install_requires=[
         'scipy',
