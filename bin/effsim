@@ -20,7 +20,6 @@ logger = logging.getLogger(__name__)
 def parse_arguments():
     parser = argparse.ArgumentParser(description='A program to check the efficiency of the linear and MC fits')
     parser.add_argument('--num_pts', '-n', help='Number of points to simulate. If uniform dist, num per dimension', type=int)
-    parser.add_argument('--xcfg-path', '-x', help='Path to GET config file, for exlusion region')
     parser.add_argument('--evtgen-config-patch', '-e', help='A special patch for the evtgen config')
     parser.add_argument('--config-patch', '-p', help='One or more YAML files to patch the config with', action='append')
     parser.add_argument('--distrib-info', '-d', help='YAML file giving info about distribution to use')
@@ -147,15 +146,20 @@ def main():
 
     num_pts = args.num_pts or config['dist_num_pts']
 
-    if args.xcfg_path is not None:
-        logger.info('Reading exclusion regions from %s', os.path.basename(args.xcfg_path))
+    xcfg_root = config.get('xcfg_root', None)
+    xcfg_subpath = config.get('xcfg_path', None)
+    if xcfg_root and xcfg_subpath:
+        xcfg_path = os.path.join(xcfg_root, xcfg_subpath)
+        logger.info('Reading exclusion regions from %s', os.path.basename(xcfg_path))
         lookup = read_lookup_table(config['padmap_path'])
-        excluded_pads, lowgain_pads = find_exclusion_region(args.xcfg_path, lookup)
+        excluded_pads, lowgain_pads = find_exclusion_region(xcfg_path, lookup)
     else:
         excluded_pads = []
         lowgain_pads = []
 
     pedestals = load_pedestals(config['pedestals_path'])
+
+    excluded_cobos = config.get('excluded_cobos', None)
 
     effsim = EfficiencySimulator(
         config=config,
@@ -164,6 +168,7 @@ def main():
         evtgen_config=evtgen_config,
         pedestals=pedestals,
         corrupt_cobo_clocks=args.corrupt_cobo_clocks,
+        excluded_cobos=excluded_cobos,
     )
 
     sql_engine = create_engine('sqlite:///{}'.format(args.output))

@@ -30,12 +30,15 @@ class TriggerSimulator(object):
     excluded_pads : iterable, optional
         The set of pads to exclude from the trigger. This is internally converted to a ``set``, so any iterable
         should work. The default value is the empty list ``[]``.
+    excluded_cobos : iterable, optional
+        A list of CoBos that should be excluded from the trigger, if any. If this is not provided,
+        all CoBos will be included in the trigger.
     pedestals : array-like, optional
         An array of the pedestal values indexed by pad number. If this isn't provided, the default is
         zero for each pad.
 
     """
-    def __init__(self, config, excluded_pads=[], pedestals=None):
+    def __init__(self, config, excluded_pads=None, excluded_cobos=None, pedestals=None):
         #: A lookup table mapping ``(cobo, asad, aget, channel)`` to pad number
         self.padmap = read_lookup_table(config['padmap_path'])
 
@@ -43,8 +46,18 @@ class TriggerSimulator(object):
         self.reverse_padmap = {v: k for k, v in self.padmap.items()}
 
         #: The set of pads to exclude from the trigger
-        self.badpads = set(excluded_pads)
+        self.badpads = set(excluded_pads if excluded_pads is not None else [])
         logger.info('%d pads will be excluded from trigger', len(self.badpads))
+
+        # Exclude pads from excluded CoBos
+        if excluded_cobos is not None:
+            excluded_cobos = set(excluded_cobos)
+            excluded_cobo_pads = set(pad
+                                     for (cobo, asad, aget, channel), pad in self.padmap.items()
+                                     if cobo in excluded_cobos)
+            self.badpads |= excluded_cobo_pads  # Add these pads to the set with a union operation
+            logger.info('CoBos %s will be excluded from trigger. Total excluded pads = %d.',
+                        str(excluded_cobos), len(self.badpads))
 
         if pedestals is None:
             pedestals = np.zeros(10240, dtype='float64')

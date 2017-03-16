@@ -28,11 +28,11 @@ def three_point_center(p1, p2, p3):
 
 
 class EventSimulator(TrackerMixin, EventGeneratorMixin):
-    def __init__(self, config, badpads=[]):
+    def __init__(self, config, badpads=None):
         super().__init__(config)
         self.untiltmat = pytpc.utilities.tilt_matrix(self.tilt)
-        self.badpads = set(badpads)
-        logger.info('%d pads will be dropped from the generated events', len(badpads))
+        self.badpads = set(badpads if badpads is not None else [])
+        logger.info('%d pads will be dropped from the generated events', len(self.badpads))
         self.padmap = read_lookup_table(config['padmap_path'])  # maps (cobo, asad, aget, ch) -> pad
         self.reverse_padmap = {v: k for k, v in self.padmap.items()}  # maps pad -> (cobo, asad, aget, ch)
         self.noise_stddev = config['noise_stddev']
@@ -147,13 +147,18 @@ class NoiseMaker(object):
 
 
 class EfficiencySimulator(object):
-    def __init__(self, config, excluded_pads=[], lowgain_pads=[], evtgen_config=None, pedestals=None,
-                 corrupt_cobo_clocks=False):
+    def __init__(self, config, excluded_pads=None, lowgain_pads=None, evtgen_config=None, pedestals=None,
+                 corrupt_cobo_clocks=False, excluded_cobos=None):
         if evtgen_config is None:
             evtgen_config = config
         self.evtsim = EventSimulator(evtgen_config, badpads=lowgain_pads)
         self.noisemaker = NoiseMaker(evtgen_config, pedestals=pedestals, corrupt_cobo_clocks=corrupt_cobo_clocks)
-        self.trigger = TriggerSimulator(config, excluded_pads=excluded_pads, pedestals=pedestals)
+        self.trigger = TriggerSimulator(
+            config=config,
+            excluded_pads=excluded_pads,
+            excluded_cobos=excluded_cobos,
+            pedestals=pedestals,
+        )
         self.cleaner = EventCleaner(config)
         self.fitter = MCFitter(config)
 
