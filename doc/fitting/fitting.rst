@@ -17,9 +17,25 @@ of xyz data, fit it, and return the results as a dictionary.
 
     MCFitter
 
+Mixins
+------
+
 The :class:`MCFitter` encompasses a lot of functionality, including particle tracking, event generation, fitting,
 and preprocessing. Each of these parts can be used independently in your own classes by using the associated
-mixins located in :mod:`pytpc.fitting.mixins`.
+`mixins <https://en.wikipedia.org/wiki/Mixin>`_ located in :mod:`pytpc.fitting.mixins`. The mixins each contain a
+fragment of the functionality of the :class:`MCFitter` class, and each of them depends on the analysis config
+file for its parameters. For example, to include particle tracking and event generation capabilities in a custom class,
+inherit from :class:`TrackerMixin` and :class:`EventGeneratorMixin`:
+
+..  code-block:: python
+
+    class ExampleClass(TrackerMixin, EventGeneratorMixin):
+        def __init__(self, config):
+            super().__init__(config)  # Initializes the Tracker and EventGenerator
+            # Custom initialization for ExampleClass goes here
+
+The resulting class will have a :class:`Tracker` member named ``tracker`` and an :class:`EventGenerator` member
+named ``evtgen``, along with some other members containing the simulation parameters from the config file.
 
 ..  rubric:: Mixins
 ..  autosummary::

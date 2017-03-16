@@ -16,16 +16,17 @@ class TrackerMixin(Base):
 
     """
     def __init__(self, config):
-        self.gas = InterpolatedGas(config['gas_name'], config['gas_pressure'])
+        self.gas = InterpolatedGas(config['gas_name'], config['gas_pressure'])  #: The detector gas
         self._efield = np.array(config['efield'])
         self._bfield = np.array(config['bfield'])
-        self.mass_num = config['mass_num']
-        self.charge_num = config['charge_num']
-        self.beam_enu0 = config['beam_enu0']
-        self.beam_mass = config['beam_mass']
-        self.beam_charge = config['beam_charge']
-        self.max_en = config['tracker_max_en']
+        self.mass_num = config['mass_num']  #: The mass number of the tracked particle
+        self.charge_num = config['charge_num']  #: The charge number of the tracked particle
+        self.beam_enu0 = config['beam_enu0']  #: The initial energy of the beam, in MeV/u
+        self.beam_mass = config['beam_mass']  #: The mass number of the beam particle
+        self.beam_charge = config['beam_charge']  #: The charge number of the beam particle
+        self.max_en = config['tracker_max_en']  #: The maximum energy at which the tracker will work
 
+        #: A :class:`Tracker` instance
         self.tracker = Tracker(self.mass_num,
                                self.charge_num,
                                self.beam_enu0,
