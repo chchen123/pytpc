@@ -14,5 +14,6 @@ Contents:
 .. toctree::
     :maxdepth: 2
 
+    config
     cleaning/cleaning
     fitting/fitting
