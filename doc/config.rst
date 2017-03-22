@@ -163,7 +163,7 @@ Sample file
     multiplicity_threshold: 20000
 
     # The CoBo multiplicity window. This is given by the key "multWindowSize" in the xcfg
-    # file, and the units are the number of periods of the 100 MHz clock.
+    # file, and the units are the number of periods of the 25 MHz clock.
     multiplicity_window: 300
 
     # The gain set for the GET electronics, in coulombs.

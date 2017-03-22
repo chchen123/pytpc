@@ -89,7 +89,7 @@ cdef class MultiplicityTrigger:
         self.trigger_height = 48
 
         self.multiplicity_threshold = config['multiplicity_threshold']
-        self.multiplicity_window = <int> round(config['multiplicity_window'] / self.master_clock * self.write_clock)
+        self.multiplicity_window = <int> round(config['multiplicity_window'] / self.read_clock * self.write_clock)
 
         self.padmap = padmap
 
