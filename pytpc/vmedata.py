@@ -81,6 +81,10 @@ class VMEFile(object):
             self.adc_events_seen += 1
             true_evtnum = evtnum - self.scaler_events_seen  # evt num is incremented even for a scaler buffer
 
+            # Check that the frame index is consistent
+            if (evtnum != self.adc_events_seen + self.scaler_events_seen - 1):
+                raise BadVMEDataError(f'Frame index is inconsistent at frame index {evtnum:x}')
+
             last_tb1 = reg1[3] & 0x1ffff
             last_tb2 = reg2[3] & 0x1ffff
             if last_tb1 != last_tb2:

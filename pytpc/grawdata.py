@@ -128,6 +128,14 @@ class GRAWFile(pytpc.datafile.DataFile):
         self.fp.seek(startpos)
         return self.fp.read(frame_size)
 
+    def _read_header(self):
+        """Read and return only the next header."""
+        startpos = self.fp.tell()
+        rawhdr = self.fp.read(83)
+        hdr = self._parse_header(rawhdr)
+        self.fp.seek(startpos + hdr['frame_size'])
+        return hdr
+
     @staticmethod
     def _unpack_data_partial_readout(raw):
         agets = (raw & 0xC0000000) >> 30
@@ -145,9 +153,8 @@ class GRAWFile(pytpc.datafile.DataFile):
         return agets, samples
 
     @staticmethod
-    def _parse(rawframe, return_header=False):
-
-        hdr_raw = struct.unpack('>5BHB2HL6BL2BHB32B4HL4H', rawframe[:83])
+    def _parse_header(rawheader):
+        hdr_raw = struct.unpack('>5BHB2HL6BL2BHB32B4HL4H', rawheader)
         header = {'metatype': hdr_raw[0],
                   'frame_size': GRAWFile._bsmerge(hdr_raw[1:4]) * 256,
                   'data_source': hdr_raw[4],
@@ -162,6 +169,12 @@ class GRAWFile(pytpc.datafile.DataFile):
                   'asad': hdr_raw[18],
                   'offset': hdr_raw[19],
                   'status': hdr_raw[20]}
+
+        return header
+
+    @staticmethod
+    def _parse(rawframe, return_header=False):
+        header = GRAWFile._parse_header(rawframe[:83])
 
         logger.debug('Frame header: metatype %d, type %d, revision %d, with %d items',
                      header['metatype'], header['frame_type'], header['revision'], header['num_items'])
