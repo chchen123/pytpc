@@ -54,6 +54,7 @@ def setup_logging(config):
 
 def main():
     parser = argparse.ArgumentParser(description='A script to clean data and write results to an HDF5 file')
+    parser.add_argument('--canon-evtids', help='Path to HDF5 file containing canonical evt ids')
     parser.add_argument('config', help='Path to a config file')
     parser.add_argument('input', help='The input evt file')
     parser.add_argument('output', help='The output HDF5 file')
@@ -64,7 +65,7 @@ def main():
 
     setup_logging(config)
 
-    inFile = pytpc.HDFDataFile(args.input, 'r')
+    inFile = pytpc.HDFDataFile(args.input, 'r', canonical_evtid_path=args.canon_evtids)
 
     cleaner = EventCleaner(config)
 
