@@ -48,11 +48,23 @@ class HDFDataFile(object):
         valid open mode for an h5py file object.
     get_group_name : string, optional
         The name of the group in the HDF5 file containing GET events. Usually just keep the default value of '/get'.
+    canonical_evtid_path : str, optional
+        Path to an HDF5 file containing a table mapping a canonical event ID to the event ID for each CoBo. This
+        can be used to correct for CoBos that dropped triggers.
+    canonical_evtid_key : str, optional
+        The key to read in the canonical event ID file. The default value is 'canonical_evtids'.
     """
 
-    def __init__(self, fp, open_mode='r', get_group_name='/get'):
+    def __init__(self, fp, open_mode='r', get_group_name='/get', canonical_evtid_path=None,
+                 canonical_evtid_key='canonical_evtids'):
         self.fp = h5py.File(fp, mode=open_mode)
         self.get_group_name = get_group_name
+
+        if canonical_evtid_path is not None:
+            with h5py.File(canonical_evtid_path, 'r') as hf:
+                self.canonical_evtid_table = hf[canonical_evtid_key][:]
+        else:
+            self.canonical_evtid_table = None
 
         self.fp.require_group(self.get_group_name)
 
@@ -145,10 +157,32 @@ class HDFDataFile(object):
             not valid).
         """
         gp = self.fp[self.get_group_name]
-        ds = gp[str(i)]
-        evt_id = ds.attrs.get('evt_id', 0)
-        timestamp = ds.attrs.get('timestamp', 0)
-        return self._unpack_get_event(evt_id, timestamp, ds)
+
+        if self.canonical_evtid_table is not None:
+            # Use the canonical event ID table to correct for a dropped trigger
+            # in some CoBo. Read fragments of each required CoBo event, and then
+            # reconstruct the full event.
+            cobo_evt_ids = self.canonical_evtid_table[i]
+            cobo_evts = {n: gp[str(n)][:] for n in np.unique(cobo_evt_ids)}
+
+            evt_chunks = []
+            for cobo_id, cobo_evt_id in enumerate(cobo_evt_ids):
+                cobo_evt = cobo_evts[cobo_evt_id]
+                chunk = cobo_evt[np.where(cobo_evt[:, 0] == cobo_id)]
+                evt_chunks.append(chunk)
+
+            rawevt = np.concatenate(evt_chunks, axis=0)
+            evt_id = i
+            timestamp = 0  # FIXME: make real?
+
+        else:
+            # There is no canonical event ID table, so just read the event.
+            ds = gp[str(i)]
+            evt_id = ds.attrs.get('evt_id', 0)
+            timestamp = ds.attrs.get('timestamp', 0)
+            rawevt = ds[:]
+
+        return self._unpack_get_event(evt_id, timestamp, rawevt)
 
     def write_get_event(self, evt):
         """Write the given Event object to the file.
