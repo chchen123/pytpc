@@ -22,6 +22,7 @@ import h5py
 from scipy.signal import argrelextrema
 import argparse
 import yaml
+from pytpc.vmedata import VMEAlignmentTable
 
 import logging
 import logging.config
@@ -129,8 +130,8 @@ def select_events(ic, goodidx):
     ----------
     ic : np.array
         The raw ion chamber signal from the unpacked VME file.
-    goodidx : np.array of integers
-        The event IDs of events that should be considered. This could be the set of
+    goodidx : np.array
+        The (integer) event IDs of events that should be considered. This could be the set of
         events that pass the other criteria in this script.
 
     Returns
@@ -138,29 +139,38 @@ def select_events(ic, goodidx):
     pd.DataFrame
         The height, peak position, and CFD peak position of all events with one ion chamber peak.
     """
-    pkdata = {}
+    pkdata = []
     dropped_evts_maxes = 0
     dropped_evts_cfd = 0
-    for i, (evtid, sig) in enumerate(zip(goodidx, ic[goodidx])):
+
+    for i, evtid in enumerate(goodidx):
         if i % 1000 == 0:
             logger.info('At event %d / %d', i, len(goodidx))
-        sig = sig.astype('float64')
-        sig = -sig + np.median(sig)
+
+        sig = ic[evtid].astype('float64')  # Required to prevent integer wraparound
+        sig = -sig + np.median(sig)  # Remove baseline and invert signal
+
         pks = find_peaks(sig, 600)
-        cfd_zeros = cfd_trigger(sig, -10, 0.4, 500)
         if len(pks) != 1:
             dropped_evts_maxes += 1
             continue
-        else:
-            if len(cfd_zeros) != 1:
-                logger.warning('Evt %d: CFD found %d peaks instead of 1. Dropping event.', evtid, len(cfd_zeros))
-                dropped_evts_cfd += 1
-                continue
-            pkdata[evtid] = {'height': sig[int(pks[0])], 'pk_pos': pks[0], 'cfd_pos': cfd_zeros[0]}
+
+        cfd_zeros = cfd_trigger(sig, -10, 0.4, 500)
+        if len(cfd_zeros) != 1:
+            logger.warning('Evt %d: CFD found %d peaks instead of 1. Dropping event.', evtid, len(cfd_zeros))
+            dropped_evts_cfd += 1
+            continue
+
+        pkdata.append({
+            'vme_evt_id': evtid,
+            'height': sig[int(pks[0])],
+            'pk_pos': pks[0],
+            'cfd_pos': cfd_zeros[0]
+        })
 
     logger.info('Dropped %d events that had more than one peak', dropped_evts_maxes)
     logger.warning('Dropped %d events due to bad CFD filter', dropped_evts_cfd)
-    return pd.DataFrame.from_dict(pkdata, orient='index')
+    return pd.DataFrame(pkdata)
 
 
 def setup_logging(config):
@@ -178,10 +188,39 @@ def setup_logging(config):
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='A script to select good events based on VME data.')
+    parser.add_argument('--offsets', '-o', help='Path to HDF5 file containing DAQ alignment offsets.')
     parser.add_argument('config', help='Path to the analysis config file')
     parser.add_argument('vme_data', help='Path to an HDF5 file containing the VME data')
     parser.add_argument('outpath', help='Path to an HDF5 file to write')
     return parser.parse_args()
+
+
+def fix_offsets(offsets_path, goodvme):
+    """Apply DAQ alignment offsets to data.
+    
+    This produces an extra column of GET event IDs in the dataset.
+    
+    Parameters
+    ----------
+    offsets_path : str
+        Path to the DAQ alignment offsets file.
+    goodvme : pd.DataFrame
+        The peak data, as calculated by this script.
+
+    Returns
+    -------
+    goodvme : pd.DataFrame
+        The modified peak data.
+
+    """
+    try:
+        align_table = VMEAlignmentTable.from_hdf(offsets_path)
+    except OSError:
+        logger.exception('Invalid path given for offsets table. Event IDs were not corrected.')
+    else:
+        goodvme['get_evt_id'] = [align_table.vme_to_get(e) for e in goodvme['vme_evt_id']]
+
+    return goodvme
 
 
 def main():
@@ -206,8 +245,13 @@ def main():
 
         logger.info('Finding single peaks for remaining events')
         goodvme = select_events(h5file['/vme/ic'][:], cut_idx)
-        logger.info('Finished. Found %d single peaks.', len(goodvme))
-        goodvme.to_hdf(args.outpath, 'single_ic_pk_heights', format='t')
+        logger.info('Finished processing. Found %d single peaks.', len(goodvme))
+
+    if args.offsets is not None:
+        logger.info('Applying DAQ alignment offsets.')
+        goodvme = fix_offsets(args.offsets, goodvme)
+
+    goodvme.to_hdf(args.outpath, 'single_ic_pk_heights', format='t')
 
 
 if __name__ == '__main__':

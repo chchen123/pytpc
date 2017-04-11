@@ -1,6 +1,7 @@
 from __future__ import division, print_function
 import struct
 import numpy as np
+import h5py
 
 import logging
 logger = logging.getLogger(__name__)
@@ -124,3 +125,115 @@ class VMEFile(object):
                 raise StopIteration from e
             except IOError:
                 continue
+
+
+class VMEAlignmentTable:
+    """A table that maps VME event IDs to GET electronics event IDs.
+    
+    This keeps track of the results of this alignment. It maintains a list of offsets
+    between the two DAQs for each event and a list of which events have been invalidated
+    because they are misaligned and not recoverable.
+    
+    Parameters
+    ----------
+    num_events : int
+        The number of events in the table. This should correspond to the number of events
+        in the VME DAQ.
+    
+    """
+
+    # Identifiers for the output HDF5 file
+    hdf_group_name = 'alignment'
+    hdf_offset_ds_name = 'offsets'
+    hdf_valid_ds_name = 'valid'
+
+    def __init__(self, num_events):
+        # Offsets are defined such that VME + offset = GET.
+        # Thus, they are indexed by VME event ID
+        self.offsets = np.zeros(num_events, dtype='int')
+        self.valid = np.full(num_events, True, dtype=bool)
+
+    def vme_to_get(self, evt_id):
+        """Convert a VME event ID to the corresponding GET event ID.
+        
+        This applies the correct offset to the VME event ID to get the GET event ID.
+        
+        Parameters
+        ----------
+        evt_id : int
+            The VME event ID.
+
+        Returns
+        -------
+        int
+            The GET event ID.
+
+        """
+        return evt_id + self.offsets[evt_id]
+
+    def update_offset(self, start_vme_evt_id, offset):
+        """Increment the offset for all events after the given VME event ID by the given offset. 
+        
+        Parameters
+        ----------
+        start_vme_evt_id : int
+            The first event ID whose offset will be updated.
+        offset : int
+            The stored offsets for all events after the first one given will be increased by
+            this amount. Use a negative value to decrease the offsets.
+
+        """
+        self.offsets[start_vme_evt_id:] += offset
+
+    def invalidate_range(self, begin, end):
+        """Mark events between ``begin`` and ``end`` as invalid.
+        
+        The upper bound ``end`` is not included.
+        
+        Parameters
+        ----------
+        begin, end : int
+            The first and last events to mark. The last event is not included.
+
+        """
+        self.valid[begin:end] = False
+        logger.warning(f'VME events {begin} through {end} were invalidated')
+
+    def to_hdf(self, path):
+        """Write the results to an HDF5 file.
+        
+        Parameters
+        ----------
+        path : str
+            Path to output file.
+
+        """
+        with h5py.File(path) as hf:
+            group = hf.create_group(self.hdf_group_name)
+            group.create_dataset(self.hdf_offset_ds_name, data=self.offsets)
+            group.create_dataset(self.hdf_valid_ds_name, data=self.valid)
+
+    @classmethod
+    def from_hdf(cls, path):
+        """Load the table from the given HDF5 file.
+        
+        Parameters
+        ----------
+        path : str
+            Path to the HDF5 file.
+
+        Returns
+        -------
+        VMEAlignmentTable
+            An instance of this class containing the data from the file.
+
+        """
+        with h5py.File(path, 'r') as hf:
+            group = hf[cls.hdf_group_name]
+            offsets = group[cls.hdf_offset_ds_name][:]
+            valid = group[cls.hdf_valid_ds_name][:]
+
+        instance = cls(len(offsets))
+        instance.offsets = offsets
+        instance.valid = valid
+        return instance
