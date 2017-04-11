@@ -87,9 +87,9 @@ def cfd_trigger(sig, delay, frac, noise_thresh):
 
 
 def coincidence_cut(coinc):
-    """Find events that are coincident between >= 1 CoBo and the ion chamber.
+    """Find events that trigger at least one CoBo.
     """
-    return np.logical_and(np.any(coinc[:, :10], axis=1), coinc[:, 10])
+    return np.any(coinc[:, :10], axis=1)
 
 
 def saturation_cut(ic):
