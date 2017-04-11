@@ -104,6 +104,24 @@ def trigger_cut(trig):
     return np.any(trig < 250, axis=1)
 
 
+def perform_cut(dataset, cut_function):
+    """Apply the given cut to a dataset.
+    
+    Parameters
+    ----------
+    dataset : h5py.Dataset
+        The dataset from the HDF5 file.
+    cut_function : callable
+        A function that returns a Boolean mask of events that pass the cut.
+    
+    """
+    data = dataset[:]
+    logger.info('Performing cut with function %s', cut_function.__name__)
+    cut = cut_function(data)
+    logger.info('%d events were cut', np.where(~cut)[0].shape[0])
+    return cut
+
+
 def select_events(ic, goodidx):
     """Select events that have one peak in the ion chamber.
 
@@ -158,12 +176,16 @@ def setup_logging(config):
         logger.warning('No logging config found. Info messages may be suppressed.')
 
 
-def main():
+def parse_arguments():
     parser = argparse.ArgumentParser(description='A script to select good events based on VME data.')
     parser.add_argument('config', help='Path to the analysis config file')
     parser.add_argument('vme_data', help='Path to an HDF5 file containing the VME data')
     parser.add_argument('outpath', help='Path to an HDF5 file to write')
-    args = parser.parse_args()
+    return parser.parse_args()
+
+
+def main():
+    args = parse_arguments()
 
     with open(args.config, 'r') as f:
         config = yaml.load(f)
@@ -171,32 +193,21 @@ def main():
     setup_logging(config)
 
     with h5py.File(args.vme_data, 'r') as h5file:
-        coinc = h5file['/vme/coinc'][:]
-        logger.info('Total number of events is %d', coinc.shape[0])
-        logger.info('Performing coincidence cut')
-        coinccut = coincidence_cut(coinc)
-        del coinc
-        logger.info('%d events were cut', np.where(~coinccut)[0].shape[0])
+        logger.info('Total number of events is %d', len(h5file['/vme/coinc']))
 
-        logger.info('Performing cut on events with no trigger signal')
-        trig = h5file['/vme/trig'][:]
-        trigcut = trigger_cut(trig)
-        del trig
-        logger.info('%d events were cut', np.where(~trigcut)[0].shape[0])
+        coinccut = perform_cut(h5file['/vme/coinc'], coincidence_cut)
+        trigcut = perform_cut(h5file['/vme/trig'], trigger_cut)
+        satcut = perform_cut(h5file['/vme/ic'], saturation_cut)
 
-        logger.info('Performing cut on IC events that saturate the ADC')
-        ic = h5file['/vme/ic'][:]
-        satcut = saturation_cut(ic)
-        logger.info('%d events were cut', np.where(~satcut)[0].shape[0])
+        total_cut = np.all(np.column_stack((coinccut, trigcut, satcut)), axis=1)
+        cut_idx = np.where(total_cut)[0]
+        logger.info('After cuts, %d good events remain (%d were cut)',
+                    cut_idx.shape[0], np.where(~total_cut)[0].shape[0])
 
-        cut = np.all(np.column_stack((coinccut, trigcut, satcut)), axis=1)
-        idx = np.where(cut)[0]
-        logger.info('After cuts, %d good events remain (%d were cut)', idx.shape[0], np.where(~cut)[0].shape[0])
-
-    logger.info('Finding single peaks for remaining events')
-    goodvme = select_events(ic, idx)
-    logger.info('Finished. Found %d single peaks.', len(goodvme))
-    goodvme.to_hdf(args.outpath, 'single_ic_pk_heights', format='t')
+        logger.info('Finding single peaks for remaining events')
+        goodvme = select_events(h5file['/vme/ic'][:], cut_idx)
+        logger.info('Finished. Found %d single peaks.', len(goodvme))
+        goodvme.to_hdf(args.outpath, 'single_ic_pk_heights', format='t')
 
 
 if __name__ == '__main__':
