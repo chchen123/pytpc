@@ -1,9 +1,33 @@
-from setuptools import setup, Extension
+from setuptools import setup, Extension, Command
+from setuptools.command.build_py import build_py
 import numpy as np
 from Cython.Build import cythonize
 import sys
 import os
 import re
+
+
+class BuildGasDBCommand(Command):
+    """A command to build the gas database."""
+    description = "create the gas database"
+    user_options = []
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+        from build_gasdb import build
+        build()
+
+
+class BuildPyCommand(build_py):
+    # Extend the build_py command to force it to build the gas DB
+    def run(self):
+        self.run_command('build_gasdb')
+        super().run()
 
 
 def get_omp_flag():
@@ -97,10 +121,15 @@ setup(
         'h5py',
         'tables',
         'sqlalchemy',
+        'pyyaml',
     ],
     package_data={'pytpc': ['data/gases/*', 'data/raw/*', 'fitting/*.pxd']},
     extras_require={
         'docs': ['sphinx_bootstrap_theme>=0.4.5', 'sphinx>=1.2'],
         'plots': ['matplotlib', 'seaborn'],
+    },
+    cmdclass={
+        'build_gasdb': BuildGasDBCommand,
+        'build_py': BuildPyCommand,
     },
 )
