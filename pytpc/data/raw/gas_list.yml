@@ -1,0 +1,62 @@
+# List of gases to include in the database
+
+# Example entry:
+#
+# example_gas:          # A name to identify the gas
+#   mass: 12.3          # The mass of a gas molecule in amu
+#   particles:          # The list of projectiles defined for this gas
+#     - mass: 4         # Projectile mass
+#       charge: 2       # Projectile charge
+#       file: path.txt  # Path to file containing the data
+#       source: srim    # Source of the data. Must correspond to a known parser.
+#     - mass: 12        # Make similar entries for all other particles
+# ...
+#
+
+isobutane:
+  mass: 58.12
+  particles:
+    - mass: 4
+      charge: 2
+      file: srim-he4-butane.txt
+      source: srim
+    - mass: 40
+      charge: 18
+      file: srim-ar40-butane.txt
+      source: srim
+    - mass: 46
+      charge: 18
+      file: srim-ar46-butane.txt
+      source: srim
+    - mass: 12
+      charge: 6
+      file: srim-c12-butane.txt
+      source: srim
+    - mass: 58
+      charge: 28
+      file: srim-ni58-butane.txt
+      source: srim
+    - mass: 60
+      charge: 28
+      file: srim-ni60-butane.txt
+      source: srim
+    - mass: 1
+      charge: 1
+      file: srim-p-butane.txt
+      source: srim
+
+helium:
+  mass: 4.002
+  particles:
+    - mass: 4
+      charge: 2
+      file: helium_astar.txt
+      source: astar
+
+carbon_dioxide:
+  mass: 44.01
+  particles:
+    - mass: 4
+      charge: 2
+      file: co2_astar.txt
+      source: astar
