@@ -3,7 +3,7 @@
 # Example entry:
 #
 # example_gas:          # A name to identify the gas
-#   mass: 12.3          # The mass of a gas molecule in amu
+#   mass: 12.3          # Molar mass of the gas in g/mol
 #   particles:          # The list of projectiles defined for this gas
 #     - mass: 4         # Projectile mass
 #       charge: 2       # Projectile charge
