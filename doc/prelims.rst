@@ -86,8 +86,8 @@ This will place the built binary in the bin folder and run through an extensive 
 
 .. _HDF5 Library: https://support.hdfgroup.org/HDF5/
 
-d)Install and Compile mcopt Library
-***********************************
+d) Install and Compile mcopt Library
+************************************
 
 Now install the mcopt library itself; it can be found `here <https://help.ubuntu.com/lts/serverguide/git.html>`__. Install the repsitory locally using the .git link found on github.
 
@@ -116,3 +116,7 @@ Create a config file for the analysis code. There is a template on the ______ pa
 7) Set Up Energy Loss Data
 --------------------------
 
+
+
+
+*Tested for Ubuntu 14.04 and 16.04.*
