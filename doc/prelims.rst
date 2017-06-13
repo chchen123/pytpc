@@ -20,7 +20,7 @@ This is the Monte Carlo code library. There are a few dependencies that must be 
 a) Install CMake
 ****************
 
-CMake_ is am open source software to control the worlkflow and build process of software. To install CMake, enter the following command into the command line (using a package manager of your choice):
+`CMake <https://cmake.org/>`__ is am open source software to control the worlkflow and build process of software. To install CMake, enter the following command into the command line (using a package manager of your choice):
 
 .. code-block:: shell
 
@@ -32,15 +32,13 @@ After installation you can check the version of CMake that was installed with th
 
    cmake --version
 
-.. _CMake: https://cmake.org/
-
 .. warning:: 
    Depending on the OS being run, a repository update may be neccesary to install the newest version of these dependencies.
 
 b) Install Armadillo
 ********************
 
-Armadillo_ is a linear algebra library for C++. To install Armadillo, it is best to follow the instructions outlined `here <http://arma.sourceforge.net/download.html>`__. First, install the reccomended packages based on your OS. Then, in the command line, use wget or an equivalent to download the .tar archive and extract it:
+`Armadillo <http://arma.sourceforge.net/>`__ is a linear algebra library for C++. To install Armadillo, it is best to follow the instructions outlined `here <http://arma.sourceforge.net/download.html>`__. First, install the reccomended packages based on your OS. Then, in the command line, use wget or an equivalent to download the .tar archive and extract it:
 
 .. code-block:: shell
    
@@ -63,13 +61,10 @@ To test that armadillo and its prerequisites have been installed correctly, chan
    make
    ./main
 
-.. _Armadillo: http://arma.sourceforge.net/
-
-
 c) Install the HDF5 Library
 ***************************
 
-The `HDF5 Library`_ (compiled with C++ support) is used for storing and managing raw experimental data. It is easiest install and build the library with CMake, the steps for which can be `here <https://support.hdfgroup.org/HDF5/release/cmakebuild518.html>`__. To download and uncompress the file, find the correct file link and enter the following into the command line.
+The `HDF5 Library <https://support.hdfgroup.org/HDF5/>`__ (compiled with C++ support) is used for storing and managing raw experimental data. It is easiest install and build the library with CMake, the steps for which can be `here <https://support.hdfgroup.org/HDF5/release/cmakebuild518.html>`__. To download and uncompress the file, find the correct file link and enter the following into the command line.
 
 .. code-block:: shell
 
@@ -84,12 +79,10 @@ Then change to the directory created by the extraction and excecute the batch fi
 
 This will place the built binary in the bin folder and run through an extensive series of tests for correct installation.
 
-.. _HDF5 Library: https://support.hdfgroup.org/HDF5/
-
 d) Install and Compile mcopt Library
 ************************************
 
-Now install the mcopt library itself; it can be found `here <https://help.ubuntu.com/lts/serverguide/git.html>`__. Install the repsitory locally using the .git link found on github.
+Now install the mcopt library itself; it can be found `here <https://github.com/jbradt/mcopt>`__. Install the repsitory locally using the .git link found on github.
 
 .. code-block:: shell
 
@@ -109,14 +102,13 @@ run tests
 
 6) Create a Config File
 -----------------------
-Create a config file for the analysis code. There is a template on the ______ page of this sphinx documentation or use the one created for argon-46 which can be found here_. 
-
-.. _here: https://github.com/jbradt/ar40-aug15/blob/master/fitters/config_e15503b.yml
+Create a config file for the analysis code. There is a template on the *config* page of this sphinx documentation or use the one created for argon-46 which can be found `here <https://github.com/jbradt/ar40-aug15/blob/master/fitters/config_e15503b.yml>`__.
 
 7) Set Up Energy Loss Data
 --------------------------
 
 
 
-
-*Tested for Ubuntu 14.04 and 16.04.*
+.. note::
+   
+   Tested for Ubuntu 14.04 and 16.04.*
