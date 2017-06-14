@@ -117,6 +117,7 @@ Finally, install the mcopt library itself; it can be found `here <https://github
 The compilation and installation instructions can be found in the README.md file in this directory. The neccesary commands are as follows.
 
 .. code-block:: shell
+
    mkdir build && cd build
    cmake -DCMAKE_BUILD_TYPE=Release ..
    make
@@ -125,6 +126,7 @@ The compilation and installation instructions can be found in the README.md file
 Test for correct installation by excecuting the *test_mcopt* file:
 
 .. code-block:: shell
+
    ./test_mcopt
 
 4) Create a new Virtual Env
@@ -136,6 +138,7 @@ Test for correct installation by excecuting the *test_mcopt* file:
 Now install the pytpc package and its dependencies; it can be found `here <https://github.com/ATTPC/pytpc.git>`__. Install the repository locally usign the .git link found on github.
 
 .. code-block:: shell
+
    git clone https://github.com/ATTPC/pytpc.git
    cd pytpc
 
