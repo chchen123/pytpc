@@ -67,7 +67,7 @@ The data itself could come from a paper, from SRIM, or from a website like http:
 
 In the JSON format, a file might look like this:
 
-..  code-block:: javascript
+..  code-block:: json
 
     {
         "molar_mass": 4.002,

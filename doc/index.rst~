@@ -14,7 +14,6 @@ Contents:
 .. toctree::
     :maxdepth: 2
 
-    prelims
     config
     cleaning/cleaning
     fitting/fitting

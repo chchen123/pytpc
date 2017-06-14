@@ -15,7 +15,7 @@ is presented below.
 Parsing the config file
 -----------------------
 
-The configuration file can be read using the PyYAML library. This can be installed with :command:`pip`:
+The configuration file can be read using the PyYAML library. This can be installed with :command:`pip`::
 
 ..  code-block:: shell
 
