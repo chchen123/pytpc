@@ -12,7 +12,7 @@ Check your current python version(s) by entering the following commands into the
 
 If Python 3.6+ is not present, follow these instructions depending on your operating system:
 
-Running **macOS** install/update Python 3.0+ (here using the `Homebrew <https://brew.sh/>`__ package manager):
+Running **macOS** install/update Python 3.0+ (here using the `Homebrew <https://brew.sh/>`__ package manager): **ADD DEV PART**
 
 .. code-block:: shell
 
@@ -32,6 +32,22 @@ If running **Ubuntu**, Python must be compiled. Download and compile the most re
    cd Python-3.6.1
    sudo ./configure
    sudo make altinstall
+
+**Replace tarball part with below (to get python-dev -- unless 3.6+ neccesary...)**
+
+If running **Ubuntu**, install the newest Python 3.0+ version and its -dev version using apt-get. If you are running Ubuntu 16.04 or above install python3.6 and python3.6-dev.
+
+.. code-block:: shell
+
+   sudo apt-get install python3
+   sudo apt-get install python3-dev
+
+.. note::
+   It can be helpful to use an alias to aid in differentiation between Python releases. Place this into your ~/.bashrc or ~/.bash_aliases file using the following code (alias to python3 or python3.6 depending on your current OS and be sure to restart the command line):
+
+   .. code-block:: shell
+      
+      alias python=python3
 
 
 2) Install virtualenvwrapper
@@ -135,6 +151,7 @@ Test for correct installation by excecuting the *test_mcopt* file:
 
 5) Install the pytpc Package
 ----------------------------
+
 Now install the pytpc package and its dependencies; it can be found `here <https://github.com/ATTPC/pytpc.git>`__. Install the repository locally usign the .git link found on github.
 
 .. code-block:: shell
@@ -142,11 +159,13 @@ Now install the pytpc package and its dependencies; it can be found `here <https
    git clone https://github.com/ATTPC/pytpc.git
    cd pytpc
 
-Installation instructions can be found in the README.md file. However, the easiest way to install the code is by satisfying the dependencies with Anaconda. Download and install Anaconda by following the steps outlined `here <http://continuum.io/downloads>`__ (make sure you get the Python 3 version). Then install the dependencies using the command line with:
+Installation instructions can be found in the README.md file. However, it is best to avoid Anaconda when using pytpc due to assorted problems with dependency versions and etc. Use pip to manage and the required Python software packages.
 
 .. code-block:: shell
 
-   conda install numpy scipy scikit-learn matplotlib seaborn
+   sudo apt-get install python3-pip
+   sudo python3 -m pip install --upgrade pip
+   sudo pip3 install numpy scipy Cython scikit-learn matplotlib seaborn sphinx pyYaml sqlalchemy tables
 
 Then, to install pytpc from the source code, run:
 
@@ -154,10 +173,13 @@ Then, to install pytpc from the source code, run:
 
    python setup.py install
 
+TESTSSS
+
 6) Create a Config File
 -----------------------
 
 Create a config file for the analysis code. There is a template on the *config* page of this sphinx documentation or use the one created for argon-46 which can be found `here <https://github.com/jbradt/ar40-aug15/blob/master/fitters/config_e15503b.yml>`__. The next section contains more informaton regarding the config file.
+
 
 7) Set Up Energy Loss Data
 --------------------------
