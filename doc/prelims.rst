@@ -22,6 +22,7 @@ Running **macOS** install/update Python 3.0+ (here using the `Homebrew <https://
 If running **Ubuntu**, Python must be compiled. Download and compile the most recent Python release with the following commands (find the link to the correct .tar file `here <https://www.python.org/downloads/>`__):
 
 .. note::
+
    If CMake is not already on your machine skip to step 3a to install it.
 
 .. code-block:: shell
@@ -43,6 +44,7 @@ If running **Ubuntu**, install the newest Python 3.0+ version and its -dev versi
    sudo apt-get install python3-dev
 
 .. note::
+
    It can be helpful to use an alias to aid in differentiation between Python releases. Place this into your ~/.bashrc or ~/.bash_aliases file using the following code (alias to python3 or python3.6 depending on your current OS and be sure to restart the command line):
 
    .. code-block:: shell
@@ -74,6 +76,7 @@ After installation, check the version of CMake that was installed with the follo
    cmake --version
 
 .. warning:: 
+
    Depending on the OS being run, a repository update may be neccesary to install the newest version of CMake.
 
 b) Install Armadillo
@@ -173,7 +176,7 @@ Then, to install pytpc from the source code, run:
 
    python setup.py install
 
-TESTSSS
+**Tests**
 
 6) Create a Config File
 -----------------------
