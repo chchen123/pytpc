@@ -1,5 +1,5 @@
-Preliminary Steps on Linux Distributions
-========================================
+Preliminary Steps for Linux Distributions
+=========================================
 
 1) Install Python 3.6+
 ----------------------
@@ -13,7 +13,7 @@ Check your current python version(s) by entering the following commands into the
 
 If Python 3.6+ is not present, follow these instructions depending on your operating system:
 
-If running a **Linux** distribution, Python must be compiled. Download and compile the most recent Python release with the following commands (find the link to the correct .tar file `here <https://www.python.org/downloads/>`__):
+Running a Linux distribution, Python must be compiled. Download and compile the most recent Python release with the following commands (find the link to the correct .tar file `here <https://www.python.org/downloads/>`__):
 
 .. note::
 
@@ -27,7 +27,6 @@ If running a **Linux** distribution, Python must be compiled. Download and compi
    cd Python-3.6.1
    sudo ./configure
    sudo make altinstall
-
 
 Some newer **Linux** distributions can install Python 3.6+ using apt-get.
 
@@ -107,14 +106,15 @@ The `HDF5 Library <https://support.hdfgroup.org/HDF5/>`__ (compiled with C++ sup
 
 .. code-block:: shell
 
-   wget https://support.hdfgroup.org/ftp/HDF5/current18/src/CMake-hdf5-1.8.18.tar.gz 
-   tar xzf CMake-hdf5-1.8.18.tar.gz 
+   wget https://support.hdfgroup.org/ftp/HDF5/current18/src/CMake-hdf5-1.8.19.tar.gz
+   tar xzf CMake-hdf5-1.8.19.tar.gz 
 
 Then change to the directory created by the extraction and execute the batch file named *build-unix.sh*.
 
 .. code-block:: shell
 
-   ./batch-shell.sh
+   cd CMake-hdf5-1.8.19
+   ./build-unix.sh
 
 This will place the built binary in the bin folder and run through a series of tests for correct installation.
 
@@ -137,7 +137,7 @@ The compilation and installation instructions can be found in the README.md file
    make
    sudo make install
 
-Test for correct installation by executing the *test_mcopt* file:
+Test for correct installation by running the *test_mcopt* executable:
 
 .. code-block:: shell
 

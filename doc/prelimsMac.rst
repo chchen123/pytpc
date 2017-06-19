@@ -1,5 +1,5 @@
-Preliminary Steps
-=================
+Preliminary Steps for macOS
+===========================
 
 1) Install Python 3.6+
 ----------------------
@@ -11,50 +11,38 @@ Check your current python version(s) by entering the following commands into the
    python3 --version
    python3.6 --version
 
-If Python 3.6+ is not present, follow these instructions depending on your operating system:
-
 Running **macOS** install/update Python 3.0+ (here using the `Homebrew <https://brew.sh/>`__ package manager):
 
 .. code-block:: shell
 
    brew install python3
-   brew upgrade python3
+   brew upgrade python3 
 
-If running a **Linux** distribution, Python must be compiled. Download and compile the most recent Python release with the following commands (find the link to the correct .tar file `here <https://www.python.org/downloads/>`__):
-
-.. note::
-
-   If CMake is not already on your machine skip to step 3a to install it.
+A .bashrc file is a shell script that Bash runs whenever it is started or executed by the user. The installation instructions for Linux distributions involve adding lines to the built-in .bashrc folder, and this step is neccesary for macOS for aliases and path adjustments. However, you must first create the a .bashrc file as it is not included by default on Mac systems. To create and open a plaintext .bashrc file enter the following into your command line:
 
 .. code-block:: shell
    
-   cd /usr/src
-   wget https://www.python.org/ftp/python/3.6.1/Python-3.6.1.tar.xz
-   sudo tar xzf Python-3.6.1.tar.xz
-   cd Python-3.6.1
-   sudo ./configure
-   sudo make altinstall
+   touch ~/.bashrc
+   open ~/.bashrc
 
-
-Some newer **Linux** distributions can install Python 3.6+ using apt-get.
+This file will not appear in your home directory unless a '-a' flag is included with an 'ls' command in the terminal. Although not strictly neccesary, paste the two lines below into your new .bashrc file; these lines map the python and pip commands to their Python 3.6+ counterparts (i.e. 
+*python helloworld.py* will be executed using Python 3.6+).
 
 .. code-block:: shell
-
-   sudo apt-get install python3.6
-
-.. note::
-
-   It can be helpful to use an alias to aid in differentiation between Python releases. Place this into your ~/.bashrc or ~/.bash_aliases file by entering the following into the command line:
-
-   .. code-block:: shell
       
-      alias python=python3.6
-      alias pip=pip3.6
-      source ~/.bashrc
+   alias python=python3
+   alias pip=pip3
+
+To force set these changes into effect, enter the following command in the command line. You may also wish to have the command below run automatically on the startup of your shell. To do this paste the command into the the *Startup - Run command* field in Terminal>Preferences>Profiles>Shell.
+
+.. code-block:: shell
+      
+   source ~/.bashrc
 
 
 2) Install virtualenvwrapper
 ----------------------------
+Install and setup virtualenvwrapper and associated tools. This allows you to create isolated "virtual environments with independent installations of Python packages. This isn't strictly necessary, but helps prevent conflicts between incompatible package versions.
 
 
 3) Compile and Install the mcopt Library
@@ -114,14 +102,15 @@ The `HDF5 Library <https://support.hdfgroup.org/HDF5/>`__ (compiled with C++ sup
 
 .. code-block:: shell
 
-   wget https://support.hdfgroup.org/ftp/HDF5/current18/src/CMake-hdf5-1.8.18.tar.gz 
-   tar xzf CMake-hdf5-1.8.18.tar.gz 
+   wget https://support.hdfgroup.org/ftp/HDF5/current18/src/CMake-hdf5-1.8.19.tar.gz
+   tar xzf CMake-hdf5-1.8.19.tar.gz 
 
 Then change to the directory created by the extraction and execute the batch file named *build-unix.sh*.
 
 .. code-block:: shell
 
-   ./batch-shell.sh
+   cd CMake-hdf5-1.8.19
+   ./build-unix.sh
 
 This will place the built binary in the bin folder and run through a series of tests for correct installation.
 
@@ -200,4 +189,7 @@ Create a config file for the analysis code. There is a template in the next sect
 --------------------------
 Set up the energy loss info for the relevant nuclei.
 
-*Tested for Ubuntu 14.04 and 16.04.*
+SAMPLE .bashrc FILE
+
+
+*Tested for macOS *
