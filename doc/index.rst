@@ -14,7 +14,8 @@ Contents:
 .. toctree::
     :maxdepth: 2
 
-    prelims
+    prelimsLinux
+    prelimsMac
     config
     cleaning/cleaning
     fitting/fitting
