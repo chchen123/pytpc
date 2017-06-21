@@ -17,5 +17,11 @@ Contents:
     prelimsLinux
     prelimsMac
     config
+    unpackGRAW
     cleaning/cleaning
     fitting/fitting
+    coords
+    datafiles
+    gases
+    ukf
+    misc
