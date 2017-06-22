@@ -21,7 +21,6 @@ Running a Linux distribution, Python must be compiled. Download and compile the 
 
 .. code-block:: shell
    
-   cd /usr/src
    wget https://www.python.org/ftp/python/3.6.1/Python-3.6.1.tar.xz
    sudo tar xzf Python-3.6.1.tar.xz
    cd Python-3.6.1
@@ -50,6 +49,8 @@ Some newer **Linux** distributions can install Python 3.6+ using apt-get.
 
 a) Install gcc
 **************
+
+Neccesary?
 
 Gcc (`GNU Compiler Collection <https://gcc.gnu.org/>`__) is a compiler system that supports multiple languages. Although it an older version is most already installed on your mac, it is important to install the newest version using
 
