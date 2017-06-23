@@ -13,56 +13,38 @@ Check your current python version(s) by entering the following commands into the
 
 If Python 3.6+ is not present, follow these instructions depending on your operating system:
 
-Running a Linux distribution, Python must be compiled. Download and compile the most recent Python release with the following commands (find the link to the correct .tar file `here <https://www.python.org/downloads/>`__):
+Running a **Linux** distribution, Python must be compiled. Download and compile the most recent Python release with the following commands (find the link to the correct .tar file `here <https://www.python.org/downloads/>`__):
 
 .. note::
 
-   If CMake is not already on your machine skip to step 3a to install it.
+   If CMake is not already on your machine see step 3a to install it.
 
 .. code-block:: shell
    
    wget https://www.python.org/ftp/python/3.6.1/Python-3.6.1.tar.xz
    sudo tar xzf Python-3.6.1.tar.xz
    cd Python-3.6.1
-   sudo ./configure
-   sudo make altinstall
+   ./configure       # sudo might be required
+   make altinstall   # sudo might be required
 
-Some newer **Linux** distributions can install Python 3.6+ using apt-get.
+Some **newer Linux** distributions may be able to install Python 3.6+ using apt-get.
 
 .. code-block:: shell
 
-   sudo apt-get install python3.6
+   apt-get install python3.6   # sudo might be required
 
 .. note::
 
-   It can be helpful to use an alias to aid in differentiation between Python releases. Place this into your ~/.bashrc or ~/.bash_aliases file by entering the following into the command line:
+   It can be helpful to use an alias to aid in differentiation between Python releases. paste the following lines into your ~/.bashrc or ~/.bash_aliases file (be sure to enter `source ~/.bashrc` or restart your shell):
 
    .. code-block:: shell
       
       alias python=python3.6
       alias pip=pip3.6
-      source ~/.bashrc
 
 
-2) Install gcc and virtualenvwrapper
-------------------------------------
-
-a) Install gcc
-**************
-
-Neccesary?
-
-Gcc (`GNU Compiler Collection <https://gcc.gnu.org/>`__) is a compiler system that supports multiple languages. Although it an older version is most already installed on your mac, it is important to install the newest version using
-
-To make the most recent version of gcc the default compiler on your system (neccesary to run this analysis) paste the following lines into the .bashrc:
-
-.. code-block:: shell
-
-
-OpenMP is packaged with the new versions of the gcc compiler. This tool allows for shared memory multiprocessing in C and C++; in the context of this software OpenMP allows for parallel track generation during the minimization and is highly reccomended for running the analysis.
-
-b) Install virtualenvwrapper
-****************************
+2) Install virtualenvwrapper
+----------------------------
 
 Install and setup virtualenvwrapper and associated tools. This allows you to create isolated "virtual environments" with independent installations of Python packages. This isn't strictly necessary, but helps prevent conflicts between incompatible package versions. To install virtualenvwrapper, run the command below:
 
@@ -70,7 +52,7 @@ Install and setup virtualenvwrapper and associated tools. This allows you to cre
    
    pip3.6 install virtualenvwrapper
 
-An introduction and walkthrough to using the virtualenvwrapper tool can be found `here <https://virtualenvwrapper.readthedocs.io/en/latest/>`__. To use virtual environments, place the following lines in the .bashrc file. The first line sets the Python interpreter for your virtual environments to python3.6. The last line is a path to your shell startup file and you should change it depending on where virtualenvwrapper was installed by pip.
+An introduction and walkthrough to using the virtualenvwrapper tool is found `here <https://virtualenvwrapper.readthedocs.io/en/latest/>`__. To use virtual environments, place the following lines in the .bashrc file. The first line sets the Python interpreter for your virtual environments to python3.6. The last line is a path to your shell startup file, change it depending on where virtualenvwrapper was installed by pip.
 
 .. code-block:: shell
 
@@ -95,7 +77,7 @@ a) Install CMake
 
 .. code-block:: shell
 
-   sudo apt-get install cmake
+   apt-get install cmake   # sudo might be required
 
 After installation, check the version of CMake that was installed with the following call:
 
@@ -105,12 +87,12 @@ After installation, check the version of CMake that was installed with the follo
 
 .. warning:: 
 
-   Depending on the OS being run, a repository update may be neccesary to install the newest version of CMake.
+   Depending on the OS being run, a repository update may be neccesary to install the newer version of CMake.
 
 b) Install Armadillo
 ********************
 
-`Armadillo <http://arma.sourceforge.net/>`__ is a wrapper that presents a clean interface to several linear algebra libraries. To install Armadillo, it is best to follow the instructions outlined `here <http://arma.sourceforge.net/download.html>`__. First, install the reccomended packages based the OS being run. Then, in the command line, use wget or an equivalent to download the .tar archive and extract it (use the link above to find the most recent release):
+`Armadillo <http://arma.sourceforge.net/>`__ is a wrapper that presents a clean interface to several linear algebra libraries. To install Armadillo, it is best to follow the instructions outlined `here <http://arma.sourceforge.net/download.html>`__. First, install the reccomended packages based the OS being run. Then, in the command line, use wget to download the .tar archive and extract it (use the link above to find the most recent release):
 
 .. code-block:: shell
    
@@ -123,7 +105,7 @@ The README.txt file found in the folder created by unpacking the Armadillo archi
 
    cmake .
    make
-   make install
+   make install   # sudo might be required
 
 To test that armadillo and its prerequisites have been installed correctly, run the included tester executable with the following commands:
 
@@ -149,14 +131,14 @@ Then change to the directory created by the extraction and execute the batch fil
 .. code-block:: shell
 
    cd CMake-hdf5-1.8.19
-   ./build-unix.sh
+   ./build-unix.sh   # sudo might be required
 
 This will place the built binary in the bin folder and run through a series of tests for correct installation.
 
 d) Install and Compile mcopt Library
 ************************************
 
-Finally, install the mcopt library itself; it can be found `here <https://github.com/jbradt/mcopt>`__. Install the repository locally using the .git link found on GitHub.
+Finally, install the mcopt library itself; it can be found `here <https://github.com/jbradt/mcopt>`__. Clone the repository locally using the .git link found on GitHub.
 
 .. code-block:: shell
 
@@ -170,9 +152,9 @@ The compilation and installation instructions can be found in the README.md file
    mkdir build && cd build
    cmake -DCMAKE_BUILD_TYPE=Release ..
    make
-   sudo make install
+   make install   # sudo might be required
 
-Test for correct installation by running the *test_mcopt* executable:
+Test for correct code compilation by running the *test_mcopt* executable:
 
 .. code-block:: shell
 
@@ -180,6 +162,15 @@ Test for correct installation by running the *test_mcopt* executable:
 
 4) Create a new Virtual Env
 ---------------------------
+
+Now, create a virtual environment by entering the following into the command line:
+
+.. code-block:: shell
+
+   mkvirtualenv [name]
+
+Refer to the link in step 2 for information on using and managing virtual environments.
+
 
 
 5) Install the pytpc Package
@@ -192,11 +183,11 @@ Now, install the pytpc package and its dependencies; it can be found `here <http
    git clone https://github.com/ATTPC/pytpc.git
    cd pytpc
 
-Installation instructions can be found in the README.md file. However, it is best to avoid Anaconda when using pytpc due to assorted problems with dependency versions and etc. Use pip to manage and the required Python software packages.
+Installation instructions can be found in the README.md file. However, avoid Anaconda when for pytpc's purposes due to assorted problems with dependency versions and etc. Use pip to manage the required Python software packages.
 
 .. code-block:: shell
 
-   sudo pip3.6 install Cython numpy scipy sklearn scikit-learn matplotlib seaborn jinja2 pandas clint pyYaml sqlalchemy tables h5py sphinx
+   pip3.6 install Cython numpy scipy sklearn scikit-learn matplotlib seaborn jinja2 pandas clint pyYaml sqlalchemy tables h5py sphinx   # sudo might be required
 
 Then, to install pytpc from the source code, run:
 
@@ -221,7 +212,7 @@ To test for correct installation. Run the provided tests with the following comm
 6) Create a Config File
 -----------------------
 
-Create a config file for the analysis code. There is a template in the next section of this documentation or use the one created for argon-40 which can be found `here <https://github.com/jbradt/ar40-aug15/blob/master/fitters/config_e15503b.yml>`__.
+Create a config file for the analysis code. There is a template in the next section of this documentation, or use the one created for argon-40 which can be found `here <https://github.com/jbradt/ar40-aug15/blob/master/fitters/config_e15503b.yml>`__.
 
 
 7) Set Up Energy Loss Data

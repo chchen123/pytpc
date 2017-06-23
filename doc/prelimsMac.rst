@@ -11,21 +11,21 @@ Check your current python version(s) by entering the following commands into the
    python3 --version
    python3.6 --version
 
-Running **macOS** install/update Python 3.0+ (here using the `Homebrew <https://brew.sh/>`__ package manager):
+Running **macOS** install/update Python 3.0+ (here using the reccomended `Homebrew <https://brew.sh/>`__ package manager):
 
 .. code-block:: shell
 
    brew install python3
    brew upgrade python3 
 
-A .bashrc file is a shell script that Bash runs whenever it is started or executed by the user. The installation instructions for Linux distributions involve adding lines to the built-in .bashrc folder, and this step is neccesary for macOS for aliases and path adjustments. However, you must first create the a .bashrc file as it is not included by default on Mac systems. To create and open a plaintext .bashrc file enter the following into your command line:
+A .bashrc file is a shell script that Bash runs whenever it is started or executed by the user. The installation instructions for other Linux distributions involve adding lines to the built-in .bashrc, and creating one is neccesary on macOS for aliases and path adjustments. However, you must first create the .bashrc file as it is not included by default on Mac systems. To create and open a plain text .bashrc file, enter the following into your command line:
 
 .. code-block:: shell
    
    touch ~/.bashrc
    open ~/.bashrc
 
-This file will not appear in your home directory unless a '-a' flag is included with an 'ls' command in the terminal. Although not strictly neccesary, paste the two lines below into your new .bashrc file; these lines map the python and pip commands to their Python 3.6+ counterparts (i.e. 
+This file will not appear in your home directory unless you enter 'ls -a' in the terminal to show hidden files. Although not strictly neccesary, paste the two lines below into your new .bashrc file; these lines map the python and pip commands to their Python 3.6+ counterparts (i.e. 
 *python helloworld.py* will be executed using Python 3.6+).
 
 .. code-block:: shell
@@ -43,10 +43,10 @@ To set these changes into effect, enter the following command in the command lin
 2) Install gcc and virtualenvwrapper
 ------------------------------------
 
-a) Install gcc
-**************
+a) Install gcc(maybe now new clang)
+***********************************
 
-Gcc (`GNU Compiler Collection <https://gcc.gnu.org/>`__) is a compiler system that supports multiple languages. Although it an older version is most already installed on your mac, it is important to install the newest version using brew:
+Gcc (`GNU Compiler Collection <https://gcc.gnu.org/>`__) is a compiler system that supports multiple languages. Although an older version is most already installed on your Mac, install the newest version using brew:
 
 .. code-block:: shell
 
@@ -68,7 +68,7 @@ Install and setup virtualenvwrapper and associated tools. This allows you to cre
 
 .. code-block:: shell
    
-   pip3 install virtualenvwrapper
+   pip3 install virtualenvwrapper   # sudo might be required
 
 An introduction and walkthrough to using the virtualenvwrapper tool can be found `here <https://virtualenvwrapper.readthedocs.io/en/latest/>`__. To use virtual environments, place the following lines in the .bashrc file created in the previous step. The first line sets the Python interpreter for your virtual environments to python3.6. The last line is a path to your shell startup file and you should change it depending on where virtualenvwrapper was installed by pip.
 
@@ -100,7 +100,7 @@ a) Install CMake
 b) Install Armadillo
 ********************
 
-`Armadillo <http://arma.sourceforge.net/>`__ is a wrapper that presents a clean interface to several linear algebra libraries. Install Armadillo using brew (this requires the addition of a Homebrew/science repository from GitHub): **CHECK THIS**
+`Armadillo <http://arma.sourceforge.net/>`__ is a wrapper that presents a clean interface to several linear algebra libraries. Install Armadillo using brew (this requires the addition of a Homebrew/science repository):
 
 .. code-block:: shell
    
@@ -110,7 +110,7 @@ b) Install Armadillo
 c) Install the HDF5 Library
 ***************************
 
-The `HDF5 Library <https://support.hdfgroup.org/HDF5/>`__ (compiled with C++ support) is used for storing and managing raw experimental data. Brew most likely installed the hdf5 library as a dependency for armadillo, but just to be sure run the following command:
+The `HDF5 Library <https://support.hdfgroup.org/HDF5/>`__ (compiled with C++ support) is used for storing and managing raw experimental data. Brew most likely installed the HDF5 Library as a dependency for armadillo, but run the following command to be sure:
 
 .. code-block:: shell
 
@@ -133,9 +133,9 @@ The compilation and installation instructions can be found in the README.md file
    mkdir build && cd build
    cmake -DCMAKE_BUILD_TYPE=Release ..
    make
-   sudo make install
+   make install   # sudo might be required
 
-Test for correct installation by executing the *test_mcopt* file:
+Test for correct code compilation by executing the *test_mcopt* file:
 
 .. code-block:: shell
 
@@ -163,11 +163,11 @@ Now, install the pytpc package and its dependencies; it can be found `here <http
    git clone https://github.com/ATTPC/pytpc.git
    cd pytpc
 
-Installation instructions can be found in the README.md file. However, it is best to avoid Anaconda when using pytpc due to assorted problems with dependency versions and etc. Use pip to manage and the required Python software packages.
+Installation instructions can be found in the README.md file. However, avoid Anaconda when for pytpc's purposes due to assorted problems with dependency versions and etc. Use pip to manage the required Python software packages.
 
 .. code-block:: shell
 
-   sudo pip3 install Cython numpy scipy sklearn scikit-learn matplotlib seaborn jinja2 pandas clint pyYaml sqlalchemy tables h5py sphinx
+   pip3 install Cython numpy scipy sklearn scikit-learn matplotlib seaborn jinja2 pandas clint pyYaml sqlalchemy tables h5py sphinx   # sudo might be required
 
 Then, to install pytpc from the source code, run:
 
@@ -189,10 +189,11 @@ To test for correct installation. Run the provided tests with the following comm
    python3 test_ukf.py
    python3 test_utilities.py
 
+
 6) Create a Config File
 -----------------------
 
-Create a config file for the analysis code. There is a template in the next section of this documentation or use the one created for argon-40 which can be found `here <https://github.com/jbradt/ar40-aug15/blob/master/fitters/config_e15503b.yml>`__.
+Create a config file for the analysis code. There is a template in the next section of this documentation, or use the one created for argon-40 which can be found `here <https://github.com/jbradt/ar40-aug15/blob/master/fitters/config_e15503b.yml>`__.
 
 
 7) Set Up Energy Loss Data
