@@ -5,6 +5,7 @@ Preliminary Steps for macOS
 ----------------------
 Check your current python version(s) by entering the following commands into the command line: 
 
+
 .. code-block:: shell
 
    python --version
@@ -18,48 +19,36 @@ Running **macOS** install/update Python 3.0+ (here using the reccomended `Homebr
    brew install python3
    brew upgrade python3 
 
-A .bashrc file is a shell script that Bash runs whenever it is started or executed by the user. The installation instructions for other Linux distributions involve adding lines to the built-in .bashrc, and creating one is neccesary on macOS for aliases and path adjustments. However, you must first create the .bashrc file as it is not included by default on Mac systems. To create and open a plain text .bashrc file, enter the following into your command line:
+A .profile file is a shell script that Bash runs whenever it is started or executed by the user. The installation instructions for Linux distributions involve adding lines to a built-in .bashrc, and the .profile is the macOS equivalent. However, you must first create the .profile file as it is not included on Mac systems by default. Create and open a plain text file titled `.profile.txt` in your home directory. This file will not appear in your home directory unless you enter 'ls -a' in the terminal to show hidden files.
 
-.. code-block:: shell
-   
-   touch ~/.bashrc
-   open ~/.bashrc
-
-This file will not appear in your home directory unless you enter 'ls -a' in the terminal to show hidden files. Although not strictly neccesary, paste the two lines below into your new .bashrc file; these lines map the python and pip commands to their Python 3.6+ counterparts (i.e. 
-*python helloworld.py* will be executed using Python 3.6+).
+To set these changes into effect either restart your shell or enter the following command in the command line.
 
 .. code-block:: shell
       
-   alias python=python3
-   alias pip=pip3
-
-To set these changes into effect, enter the following command in the command line. You may also wish to have the command below run automatically on the startup of your shell. To do this paste the command into the the *Startup - Run command* field in Terminal>Preferences>Profiles>Shell.
-
-.. code-block:: shell
-      
-   source ~/.bashrc
+   source ~/.profile
 
 
-2) Install gcc and virtualenvwrapper
-------------------------------------
+2) Install Clang and virtualenvwrapper
+--------------------------------------
 
-a) Install gcc(maybe now new clang)
-***********************************
+a) Install/Update Clang
+***********************
 
-Gcc (`GNU Compiler Collection <https://gcc.gnu.org/>`__) is a compiler system that supports multiple languages. Although an older version is most already installed on your Mac, install the newest version using brew:
+`Clang <https://clang.llvm.org/>`__ is a compiler front end that supports multiple languages. Although an older version is already installed on your system, install the newest version using brew:
 
 .. code-block:: shell
 
-   brew install gcc
+   brew install llvm
 
-To make the most recent version of gcc the default compiler on your system (neccesary to run this analysis) paste the following lines into the .bashrc file created above:
+To make this most recent version of clang the default compiler on your system (and enable OpenMP support) paste the following lines into the .profile file created above:
 
 .. code-block:: shell
 
    export CC=/usr/local/Cellar/gcc/7.1.0/bin/gcc-7
    export CXX=/usr/local/Cellar/gcc/7.1.0/bin/g++-7
+   export LDFLAGS=-L$(brew --prefix llvm)/lib
 
-OpenMP is packaged with the new versions of the gcc compiler. This tool allows for shared memory multiprocessing in C and C++; in the context of this software OpenMP allows for parallel track generation during the minimization and is highly reccomended for running the analysis.
+OpenMP is packaged with the new versions of the clang compiler. This tool allows for shared memory multiprocessing in C and C++; in the context of this software OpenMP allows for parallel track generation during the minimization and is highly reccomended for running the analysis.
 
 b) Install virtualenvwrapper
 ****************************
@@ -70,7 +59,7 @@ Install and setup virtualenvwrapper and associated tools. This allows you to cre
    
    pip3 install virtualenvwrapper   # sudo might be required
 
-An introduction and walkthrough to using the virtualenvwrapper tool can be found `here <https://virtualenvwrapper.readthedocs.io/en/latest/>`__. To use virtual environments, place the following lines in the .bashrc file created in the previous step. The first line sets the Python interpreter for your virtual environments to python3.6. The last line is a path to your shell startup file and you should change it depending on where virtualenvwrapper was installed by pip.
+An introduction and walkthrough to using the virtualenvwrapper tool can be found `here <https://virtualenvwrapper.readthedocs.io/en/latest/>`__. To use virtual environments, place the following lines in the .profileF file created in the previous step. The first line sets the Python interpreter for your virtual environments to python3.6. The last line is a path to your shell startup file and you should change it depending on where virtualenvwrapper was installed by pip.
 
 .. code-block:: shell
 
@@ -78,10 +67,6 @@ An introduction and walkthrough to using the virtualenvwrapper tool can be found
    export WORKON_HOME=$HOME/.virtualenvs
    export MSYS_HOME=/c/msys/1.0
    source /usr/local/bin/virtualenvwrapper.sh
-
-.. note:: 
-   
-   Remember to source your .bashrc file or restart the command line.
 
 
 3) Compile and Install the mcopt Library
@@ -135,6 +120,10 @@ The compilation and installation instructions can be found in the README.md file
    make
    make install   # sudo might be required
 
+.. note::
+
+   Other flags may be neccesary depending on where the mcopt libary is to be installed. Refer to the `CMake documentation <https://cmake.org/cmake/help/v3.9/index.html#>`__ for information on this.
+
 Test for correct code compilation by executing the *test_mcopt* file:
 
 .. code-block:: shell
@@ -144,6 +133,7 @@ Test for correct code compilation by executing the *test_mcopt* file:
 
 4) Create a new Virtual Env
 ---------------------------
+
 Now, create a virtual environment by entering the following into the command line:
 
 .. code-block:: shell
@@ -163,7 +153,7 @@ Now, install the pytpc package and its dependencies; it can be found `here <http
    git clone https://github.com/ATTPC/pytpc.git
    cd pytpc
 
-Installation instructions can be found in the README.md file. However, avoid Anaconda when for pytpc's purposes due to assorted problems with dependency versions and etc. Use pip to manage the required Python software packages.
+Installation instructions can be found in the README.md file. Use pip to manage the required Python software packages.
 
 .. code-block:: shell
 
@@ -180,20 +170,13 @@ To test for correct installation. Run the provided tests with the following comm
 .. code-block:: shell
    
    cd pytpc/tests
-   python3 test_evtdata.py
-   python3 test_gases.py
-   python3 test_grawdata.py
-   python3 test_hdfdata.py
-   python3 test_relativity.py
-   python3 test_simulation.py
-   python3 test_ukf.py
-   python3 test_utilities.py
+   python3.6 -m unittest discover
 
 
 6) Create a Config File
 -----------------------
 
-Create a config file for the analysis code. There is a template in the next section of this documentation, or use the one created for argon-40 which can be found `here <https://github.com/jbradt/ar40-aug15/blob/master/fitters/config_e15503b.yml>`__.
+Create a config file for the analysis code. There is a template in the next section of this documentation.
 
 
 7) Set Up Energy Loss Data

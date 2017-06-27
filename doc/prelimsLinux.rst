@@ -27,20 +27,11 @@ Running a **Linux** distribution, Python must be compiled. Download and compile 
    ./configure       # sudo might be required
    make altinstall   # sudo might be required
 
-Some **newer Linux** distributions may be able to install Python 3.6+ using apt-get.
+Some **newer Linux** distributions may be able to install Python 3.6+ using your package manager.
 
 .. code-block:: shell
 
    apt-get install python3.6   # sudo might be required
-
-.. note::
-
-   It can be helpful to use an alias to aid in differentiation between Python releases. paste the following lines into your ~/.bashrc or ~/.bash_aliases file (be sure to enter `source ~/.bashrc` or restart your shell):
-
-   .. code-block:: shell
-      
-      alias python=python3.6
-      alias pip=pip3.6
 
 
 2) Install virtualenvwrapper
@@ -84,10 +75,6 @@ After installation, check the version of CMake that was installed with the follo
 .. code-block:: shell
 
    cmake --version
-
-.. warning:: 
-
-   Depending on the OS being run, a repository update may be neccesary to install the newer version of CMake.
 
 b) Install Armadillo
 ********************
@@ -154,11 +141,16 @@ The compilation and installation instructions can be found in the README.md file
    make
    make install   # sudo might be required
 
+.. note::
+
+   Other flags may be neccesary depending on where the mcopt libary is to be installed. Refer to the `CMake documentation <https://cmake.org/cmake/help/v3.9/index.html#>`__ for information on this.
+
 Test for correct code compilation by running the *test_mcopt* executable:
 
 .. code-block:: shell
 
    ./test_mcopt
+
 
 4) Create a new Virtual Env
 ---------------------------
@@ -172,7 +164,6 @@ Now, create a virtual environment by entering the following into the command lin
 Refer to the link in step 2 for information on using and managing virtual environments.
 
 
-
 5) Install the pytpc Package
 ----------------------------
 
@@ -183,7 +174,7 @@ Now, install the pytpc package and its dependencies; it can be found `here <http
    git clone https://github.com/ATTPC/pytpc.git
    cd pytpc
 
-Installation instructions can be found in the README.md file. However, avoid Anaconda when for pytpc's purposes due to assorted problems with dependency versions and etc. Use pip to manage the required Python software packages.
+Installation instructions can be found in the README.md file. Use pip to manage the required Python software packages.
 
 .. code-block:: shell
 
@@ -200,23 +191,18 @@ To test for correct installation. Run the provided tests with the following comm
 .. code-block:: shell
    
    cd pytpc/tests
-   python3.6 test_evtdata.py
-   python3.6 test_gases.py
-   python3.6 test_grawdata.py
-   python3.6 test_hdfdata.py
-   python3.6 test_relativity.py
-   python3.6 test_simulation.py
-   python3.6 test_ukf.py
-   python3.6 test_utilities.py
+   python3.6 -m unittest discover
+
 
 6) Create a Config File
 -----------------------
 
-Create a config file for the analysis code. There is a template in the next section of this documentation, or use the one created for argon-40 which can be found `here <https://github.com/jbradt/ar40-aug15/blob/master/fitters/config_e15503b.yml>`__.
+Create a config file for the analysis code. There is an annotated template in the next section of this documentation.
 
 
 7) Set Up Energy Loss Data
 --------------------------
 Set up the energy loss info for the relevant nuclei.
+
 
 *Tested for Ubuntu 14.04 and 16.04.*
