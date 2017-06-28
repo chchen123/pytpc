@@ -4,11 +4,11 @@
 Installing and Compiling
 ------------------------
 
-**This step in the analysis should be performed locally.** Install the graw-merger tool and its dependencies. The graw-merger repository contains the source code for the `graw2hdf` tool, which can be used to merge the GRAW files produced by the GET electronics into an `HDF5 <https://www.hdfgroup.org/HDF5/>`__ file. Armadillo should already be installed, but some `Boost C++ libraries <http://www.boost.org/>`__ are required for this step. Use wget to download to download the .tar archive and extract it (find the correct download `here <http://www.boost.org/users/download/>`__):
+**This step in the analysis should be performed locally.** Install the graw-merger tool and its dependencies. The graw-merger repository contains the source code for the `graw2hdf` tool, which can be used to merge the GRAW files produced by the GET electronics from a run into an `HDF5 <https://www.hdfgroup.org/HDF5/>`__ file. Armadillo should already be installed, but some `Boost C++ libraries <http://www.boost.org/>`__ are required for this step. Use wget to download to download the .tar archive and extract it (find the correct download `here <http://www.boost.org/users/download/>`__):
 
 .. note::
    
-   Building Boost can be a pain. You may wish to use a package manager such as apt-get (libboost-all-dev) or Homebrew (boost-compute) to install the  package and skip the following steps. Just be sure to intall version 1.55 or later.
+   Building Boost can be a pain. You may wish to use a package manager such as apt-get (*libboost-all-dev*) or Homebrew (*boost-compute*) to install the  package and skip the following steps. Just be sure to install version 1.55 or later.
 
 .. code-block:: shell
 
@@ -33,7 +33,7 @@ Now, clone the graw-merger repository from GitHub. It can be found `here <https:
 
 More information on installation and compilation can be found in the README.md file packaged with the software, but the instructions are outlined here:
 
-.. code-block: shell
+.. code-block:: shell
 
    mkdir build && cd build
    cmake -DCMAKE_BUILD_TYPE=Release ..
@@ -49,7 +49,7 @@ Usage
 
    graw2hdf [-v] --lookup LOOKUP INPUT [OUTPUT]
 
-The `LOOKUP` argument takes the path to a pad map .csv lookup table. The `INPUT` argument should be the path to a directory containing GRAW files for a run. The `OUTPUT` argument is the path where the output HDF5 file should be created. If no output path is given, a file will be created next to the `INPUT` directory with the same name as that directory and an `.h5` extension.
+The `LOOKUP` argument takes the path to a pad map .csv lookup table **with no headers**. The `INPUT` argument should be the path to a directory containing the GRAW files for a run. The `OUTPUT` argument is the path where the output HDF5 file should be created. If no output path is given, a file will be created next to the `INPUT` directory with the same name as that directory and an `.h5` extension.
 
 The following command will display this information in the terminal (also a good installation test):
 

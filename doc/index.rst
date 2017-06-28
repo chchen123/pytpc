@@ -14,8 +14,7 @@ Contents:
 .. toctree::
     :maxdepth: 2
 
-    prelimsLinux
-    prelimsMac
+    prelims
     config
     unpackGRAW
     cleaning/cleaning
