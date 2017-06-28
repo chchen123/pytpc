@@ -1,4 +1,4 @@
-The config file
+The Config File
 ===============
 
 Many parts of the :mod:`pytpc` code are configured using settings from an external config

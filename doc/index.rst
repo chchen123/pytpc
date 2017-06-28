@@ -3,7 +3,7 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-AT-TPC data analysis with pytpc
+AT-TPC Data Analysis with pytpc
 ===============================
 
 This package provides Python modules for reading, analyzing, and fitting data from the AT-TPC at the
@@ -14,6 +14,14 @@ Contents:
 .. toctree::
     :maxdepth: 2
 
+    prelimsLinux
+    prelimsMac
     config
+    unpackGRAW
     cleaning/cleaning
     fitting/fitting
+    coords
+    datafiles
+    gases
+    ukf
+    misc
