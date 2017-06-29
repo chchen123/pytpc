@@ -118,14 +118,16 @@ setup(
     install_requires=[
         'scipy',
         'numpy',
+        'pandas',
         'h5py',
         'tables',
         'sqlalchemy',
         'pyyaml',
+        'Cython',
     ],
     package_data={'pytpc': ['data/gases/*', 'data/raw/*', 'fitting/*.pxd']},
     extras_require={
-        'docs': ['sphinx_bootstrap_theme>=0.4.5', 'sphinx>=1.2'],
+        'docs': ['sphinx_rtd_theme>=0.2.4', 'sphinx>=1.5'],
         'plots': ['matplotlib', 'seaborn'],
     },
     cmdclass={
