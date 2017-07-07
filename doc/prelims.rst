@@ -25,10 +25,12 @@ Running a **Linux distribution**, Python must be compiled. Download and compile 
 .. code-block:: shell
    
    wget https://www.python.org/ftp/python/3.6.1/Python-3.6.1.tar.xz
-   sudo tar xzf Python-3.6.1.tar.xz
+   tar xvf Python-3.6.1.tar.xz   # sudo might be required
    cd Python-3.6.1
-   ./configure       # sudo might be required
-   make altinstall   # sudo might be required
+   ./configure --with-ensurepip=install   # sudo might be required
+   make
+   make test
+   make install   # sudo might be required
 
 Some **newer Linux distributions** may be able to install Python 3.6+ using a package manager:
 
@@ -87,7 +89,6 @@ An introduction and walkthrough to using the virtualenvwrapper tool can be found
 
    VIRTUALENVWRAPPER_PYTHON=/usr/local/bin/python3.6
    export WORKON_HOME=$HOME/.virtualenvs
-   export MSYS_HOME=/c/msys/1.0
    source /usr/local/bin/virtualenvwrapper.sh
 
 .. note:: 
@@ -124,7 +125,7 @@ If running a **Linux distribution**, it is best to compile Armadillo from source
 .. code-block:: shell
    
    wget http://sourceforge.net/projects/arma/files/armadillo-7.950.1.tar.xz
-   tar xzf armadillo-7.950.1.tar.xz
+   tar xzf armadillo-7.950.1.tar.xz   # sudo might be required
    cd armadillo-7.950.1
    cmake .
    make
@@ -156,7 +157,7 @@ If running a **Linux distribution**, it is easiest to install and build the libr
 .. code-block:: shell
 
    wget https://support.hdfgroup.org/ftp/HDF5/current18/src/CMake-hdf5-1.8.19.tar.gz
-   tar xzf CMake-hdf5-1.8.19.tar.gz 
+   tar xzf CMake-hdf5-1.8.19.tar.gz   # sudo might be required
    cd CMake-hdf5-1.8.19
    ./build-unix.sh   # sudo might be required
 
@@ -224,7 +225,7 @@ Installation instructions can be found in the README.md file. Use pip to manage 
 
 .. code-block:: shell
 
-   pip install Cython numpy scipy sklearn scikit-learn matplotlib seaborn jinja2 pandas clint pyYaml sqlalchemy tables h5py sphinx   # sudo might be required
+   pip install -r requirements.txt   # sudo might be required
 
 Then, to install pytpc from the source code, run:
 

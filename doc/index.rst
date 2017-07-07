@@ -15,6 +15,7 @@ Contents:
     :maxdepth: 2
 
     prelims
+    prelimsNoSudo
     config
     unpackGRAW
     cleaning/cleaning
