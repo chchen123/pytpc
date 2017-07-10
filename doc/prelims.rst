@@ -45,7 +45,7 @@ Running **macOS** install/update Python 3.0+ (here using the reccomended `Homebr
    brew install python3
    brew upgrade python3 
 
-A .profile file is a shell script that Bash runs whenever it is started or executed by the user. Setting up pytpc on Linux distributions involves adding lines to a built-in .bashrc, and the .profile is the macOS equivalent. However, you must first create the .profile file as it is not included on Mac systems by default. **Create and open a plain text file titled `.profile.txt` in your home directory**. This file will not appear in your home directory unless you enter 'ls -a' in the terminal to show hidden files.
+A .profile file is a shell script that Bash runs whenever it is started or executed by the user. Setting up pytpc on Linux distributions involves adding lines to a built-in .bashrc, and the .profile is the macOS equivalent. However, you must first create the .profile file as it is not included on Mac systems by default. **Create and open a plain text file titled `.profile` in your home directory**. This file will not appear in your home directory unless you enter 'ls -a' in the terminal to show hidden files.
 
 .. note::
 
@@ -68,9 +68,10 @@ To make this most recent version of clang the default compiler on your system (a
 
 .. code-block:: shell
 
-   export CC=/usr/local/Cellar/llvm/4.0.0_1/bin/clang-4.0
-   export CXX=/usr/local/Cellar/llvm/4.0.0_1/bin/clang++
-   export LDFLAGS=-L$(brew --prefix llvm)/lib
+   LLVM_PATH=$(brew --prefix llvm)
+   export CC=${LLVM_PATH}/bin/clang-4.0
+   export CXX=${LLVM_PATH}/bin/clang++
+   export LDFLAGS=-L${LLVM_PATH}/lib
 
 OpenMP is packaged with the new versions of the clang compiler. This tool allows for shared memory multiprocessing in C and C++; in the context of this software OpenMP allows for parallel track generation during the minimization and is highly reccomended for running the analyses.
 
@@ -83,11 +84,11 @@ Install and setup virtualenvwrapper and associated tools. This allows you to cre
    
    pip install virtualenvwrapper   # sudo might be required
 
-An introduction and walkthrough to using the virtualenvwrapper tool can be found `here <https://virtualenvwrapper.readthedocs.io/en/latest/>`__. To use virtual environments, place the following lines in your .bashrc or .profile file. The first line sets the Python interpreter for your virtual environments to python3.6. The last line is a path to your shell startup file and you should change it depending on where virtualenvwrapper was installed by pip.
+An introduction and walkthrough to using the virtualenvwrapper tool can be found `here <https://virtualenvwrapper.readthedocs.io/en/latest/>`__. To use virtual environments, place the following lines in your .bashrc or .profile file. The first line sets the Python interpreter for your virtual environments to python3.6. The last line is a path to your shell startup file, and you should change it depending on where virtualenvwrapper was installed by pip.
 
 .. code-block:: shell
 
-   VIRTUALENVWRAPPER_PYTHON=/usr/local/bin/python3.6
+   VIRTUALENVWRAPPER_PYTHON=$(which python3.6)
    export WORKON_HOME=$HOME/.virtualenvs
    source /usr/local/bin/virtualenvwrapper.sh
 
