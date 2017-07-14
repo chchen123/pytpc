@@ -11,6 +11,7 @@ in a terminal, or take a look at the function `parse_args`.
 """
 
 import pandas as pd
+import numpy as np
 import sys
 import os
 import argparse
@@ -117,6 +118,28 @@ def find_last_completed_event():
             return last_evtid
 
 
+def get_evtid_list_from_hdf(clean_file):
+    """Get the list of event IDs contained in the HDF5 file.
+
+    This looks in the group "/clean" and returns a list of all children. This assumes that the
+    children are named using an event ID.
+
+    Parameters
+    ----------
+    clean_file : string
+        The path to the HDF5 file containing the cleaned data.
+
+    Returns
+    -------
+    evt_ids : list
+        A sorted list of the event IDs, as integers.
+
+    """
+    clean_group = clean_file['clean']
+    evt_ids = map(int, clean_group.keys())
+    return sorted(evt_ids)
+
+
 def create_and_setup_database_engine(path):
     """Create the output database and initialize it.
 
@@ -173,8 +196,10 @@ class FitManager(object):
     ----------
     config : dict-like
         The config dictionary.
-    evtlist_path, input_path, output_path : string
-        Paths to the list of good events, input data file, and output database, respectively.
+    input_path, output_path : string
+        Paths to the input data file and output database, respectively.
+    evtlist_path : string, optional
+        Path to a list of good events to fit, as HDF5.
 
     Methods
     -------
@@ -184,23 +209,27 @@ class FitManager(object):
         Reads the event, cleans it, fits it, and writes the output to the database.
 
     """
-    def __init__(self, config, evtlist_path, input_path, output_path):
+    def __init__(self, config, input_path, output_path, evtlist_path=None):
         self.fitter = MCFitter(config)
         self.run_num = find_run_number(input_path)
         self.input_file = h5py.File(input_path, 'r')
         self.db_engine = create_and_setup_database_engine(output_path)
 
-        good_evts = pd.read_hdf(evtlist_path, 'evt_list')
-        run_mask = good_evts.run_num == self.run_num
-        nevts = len(good_evts[run_mask])
-        logger.info('Loaded VME results. VME had %d valid events in this run.', nevts)
+        if evtlist_path is not None:
+            good_evts = pd.read_hdf(evtlist_path, 'evt_list')
+            run_mask = good_evts.run_num == self.run_num
+            input_evtids = good_evts[run_mask].evt_id.values  # Array of event IDs in input event list
+            logger.info('Loaded VME results. VME had %d valid events in this run.', len(input_evtids))
+        else:
+            input_evtids = np.array(get_evtid_list_from_hdf(self.input_file))
+            logger.info('Input file has %d events.', len(input_evtids))
 
         last_evtid = find_last_completed_event()
         if last_evtid > 0:
             logger.info('Already finished up to event %d. Starting from where we left off.', last_evtid)
-        evtid_mask = good_evts.evt_id > last_evtid
+        evtid_mask = input_evtids > last_evtid
 
-        self.evt_ids_to_process = good_evts[run_mask & evtid_mask].evt_id.values
+        self.evt_ids_to_process = input_evtids[evtid_mask]
 
     def evtid_iterator(self):
         """Iterates over all event IDs to be processed.
@@ -298,7 +327,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Fit data using Monte Carlo optimization')
     parser.add_argument('--config', '-c', help='Path to config file, in YAML format', required=True)
     parser.add_argument('--config-patch', '-p', help='Configuration patches', action='append')
-    parser.add_argument('--evtlist', '-e', help='Path to HDF5 file containing a list of good events', required=True)
+    parser.add_argument('--evtlist', '-e', help='Path to HDF5 file containing a list of good events')
     parser.add_argument('--verbose', '-v', action='count', default=0,
                         help='Print more information')
     parser.add_argument('input_file', help='The input HDF5 file containing the peaks')
@@ -344,9 +373,9 @@ def main():
 
     fit_manager = FitManager(
         config=config,
-        evtlist_path=args.evtlist,
         input_path=args.input_file,
         output_path=args.db_path,
+        evtlist_path=args.evtlist,
     )
 
     for evt_id in fit_manager.evtid_iterator():
