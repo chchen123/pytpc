@@ -43,13 +43,12 @@ Tilting the detector presents a special problem since it makes the electric and 
 easiest way to deal with this is to keep the detector's coordinate system as above, and *tilt the magnetic field vector*
 instead. This is illustrated in the figure below.
 
-.. figure:: images/CoordinateSystems.svg
+.. figure:: images/coordinate_system_xyz.pdf
     :width: 400 px
     :align: center
     :figwidth: 600 px
 
-    The coordinate system when the detector is tilted. Here, :math:`\tau` is the tilt angle. From the perspective
-    of the detector's coordinate system, the magnetic field vector is tilted upward by :math:`\tau`.
+    The coordinate system when the detector is tilted. Here, :math:`\tau` is the tilt angle. From the perspective of the detector's coordinate system, the magnetic field vector is tilted upward by :math:`\tau`.
 
 Using this system, the vectors are along these axes:
 
