@@ -298,7 +298,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Fit data using Monte Carlo optimization')
     parser.add_argument('--config', '-c', help='Path to config file, in YAML format', required=True)
     parser.add_argument('--config-patch', '-p', help='Configuration patches', action='append')
-    parser.add_argument('--evtlist', '-e', help='Path to HDF5 file with results from the circle fit', required=True)
+    parser.add_argument('--evtlist', '-e', help='Path to HDF5 file containing a list of good events', required=True)
     parser.add_argument('--verbose', '-v', action='count', default=0,
                         help='Print more information')
     parser.add_argument('input_file', help='The input HDF5 file containing the peaks')
