@@ -18,6 +18,7 @@ Contents:
     prelimsNoSudo
     config
     unpackGRAW
+    cleanGETData
     cleaning/cleaning
     fitting/fitting
     coords
