@@ -26,6 +26,24 @@ logger = logging.getLogger(__name__)
 
 
 def event_iterator(input_evtid_set, output_evtid_set):
+    """Iterates through event IDs that need to be processed.
+
+    This takes two sets: a set of IDs that are in the input file, and a set of IDs that are in the output file.
+    It then yields event IDs that are in the first, but not the second.
+
+    Parameters
+    ----------
+    input_evtid_set : set
+        A set of integer event IDs that are present in the input file.
+    output_evtid_set : set
+        A set of integer event IDs that are present in the output file.
+
+    Yields
+    ------
+    int
+        The next event ID to process.
+
+    """
     unprocessed_events = input_evtid_set - output_evtid_set
     num_input_evts = len(input_evtid_set)
     num_events_remaining = len(unprocessed_events)
@@ -45,6 +63,7 @@ def event_iterator(input_evtid_set, output_evtid_set):
 
 
 def setup_logging(config):
+    """Configures the logging library based on the parameters in the config file."""
     try:
         log_conf = config['logging_config']
         logging.config.dictConfig(log_conf)
@@ -70,7 +89,8 @@ def main():
     cleaner = EventCleaner(config)
 
     with h5py.File(args.output, 'a') as outFile:
-        gp = outFile.require_group('clean')
+        gp = outFile.require_group('clean')  # This HDF5 group will contain the cleaned data
+
         logger.info('Finding set of event IDs in input')
         input_evtid_set = {k for k in inFile.evtids()}
         num_input_evts = len(input_evtid_set)
@@ -79,18 +99,21 @@ def main():
         output_evtid_set = {int(k) for k in gp}
 
         for evt_index in event_iterator(input_evtid_set, output_evtid_set):
+            # Read the data from the input file
             try:
                 evt = inFile[evt_index]
             except Exception:
                 logger.exception('Failed to read event with index %d from input', evt_index)
                 continue
 
+            # Clean the data
             try:
                 clean_xyz, center = cleaner.process_event(evt)
             except Exception:
                 logger.exception('Cleaning failed for event with index %d', evt_index)
                 continue
 
+            # Write the cleaned data to the output file
             try:
                 dset = gp.create_dataset('{:d}'.format(evt.evt_id), data=clean_xyz, compression='gzip', shuffle=True)
                 dset.attrs['center'] = center
@@ -103,10 +126,12 @@ if __name__ == '__main__':
     import signal
 
     def handle_signal(signum, stack_frame):
+        """Gracefully exit when receiving the given signal."""
         logger.critical('Received signal %d. Quitting.', signum)
         sys.stdout.flush()
         sys.exit(1)
 
+    # Handle SIGTERM and SIGQUIT so the HDF5 file will be closed safely if the HPCC kills this program
     signal.signal(signal.SIGTERM, handle_signal)
     signal.signal(signal.SIGQUIT, handle_signal)
 
