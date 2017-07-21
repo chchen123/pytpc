@@ -14,11 +14,7 @@ Contents:
 .. toctree::
     :maxdepth: 2
 
-    prelims
-    prelimsNoSudo
     config
-    unpackGRAW
-    cleanGETData
     cleaning/cleaning
     fitting/fitting
     coords
