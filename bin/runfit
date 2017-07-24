@@ -391,10 +391,12 @@ if __name__ == '__main__':
     import signal
 
     def handle_signal(signum, stack_frame):
+        """Gracefully exit when receiving the given signal."""
         logger.critical('Received signal %d. Quitting.', signum)
         sys.stdout.flush()
         sys.exit(1)
 
+    # Handle SIGTERM and SIGQUIT so the HDF5 file will be closed safely if the HPCC kills this program
     signal.signal(signal.SIGTERM, handle_signal)
     signal.signal(signal.SIGQUIT, handle_signal)
 

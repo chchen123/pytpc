@@ -109,7 +109,7 @@ setup(
     ext_modules=cythonize(all_extensions),
     scripts=[
         'bin/runfit',
-        'bin/pyclean',
+        'bin/clean_events',
         'bin/effsim',
         'bin/convergence',
         'bin/unpack_vme',

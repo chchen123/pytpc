@@ -1,5 +1,5 @@
 #!/usr/bin python3
-"""pyclean
+"""clean_events
 Authors M.P. Kuchera, J. Bradt
 
 This python script parses through a data file and removes noise
