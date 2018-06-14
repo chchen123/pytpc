@@ -95,15 +95,19 @@ def make_random_beam(max_beam_angle, beam_origin_z, vertex_z, window_z=1.0):
     return beam_vector, vertex, window, transform
 
 
-def uniform_param_generator(beam_enu0, beam_mass, beam_chg, proj_mass, max_beam_angle, beam_origin_z, gas, num_evts):
+def uniform_param_generator(beam_enu0, beam_mass, beam_chg, proj_mass, max_beam_angle, 
+                            beam_origin_z, gas, num_evts, z0=None, proj_azi=None, proj_pol=None):
     num_good = 0
     while num_good < num_evts:
-        z0 = random.uniform(0, 1)
+        if z0 == None:
+            z0 = random.uniform(0, 1)
         beamvec, vertex, window, transform = make_random_beam(max_beam_angle, beam_origin_z, z0)
         x0, y0 = vertex[:2]
-
-        proj_azi = random.uniform(0, 2 * pi)
-        proj_pol = random.uniform(pi / 2, pi)
+        
+        if proj_azi == None:
+            proj_azi = random.uniform(0, 2 * pi)
+        if proj_pol ==None:
+            proj_pol = random.uniform(pi / 2, pi)
         proj_vec = np.array([
             np.sin(proj_pol) * np.cos(proj_azi),
             np.sin(proj_pol) * np.sin(proj_azi),
